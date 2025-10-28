@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Travel Packages</title>
+</head>
+<body>
+    <h1>Available Travel Packages</h1>
+    {% if packages %}
+        <ul>
+            {% for package in packages %}
+                <li>
+                    <h2>{{ package.name }}</h2>
+                    <p>{{ package.description }}</p>
+                    <p>Price: ${{ package.price }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No travel packages available at the moment.</p>
+    {% endif %}
+</body>
+</html>
