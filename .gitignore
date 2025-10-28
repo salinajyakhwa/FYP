@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django specific
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+static/
+.env
+.env.*
+*.mo
+
+# Django migrations (optional, if you want to exclude them until stable)
+# */migrations/
+# !*/migrations/__init__.py
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+.novice/
+Scripts/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# VS Code settings
+.vscode/
+
+# Local configs
+*.local
+
