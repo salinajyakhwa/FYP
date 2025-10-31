@@ -1,0 +1,37 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title mb-0">{{ package.name }}</h1>
+        <p class="card-subtitle text-muted">Offered by: {{ package.vendor.name }}</p>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <h2>Description</h2>
+                <p>{{ package.description }}</p>
+                
+                <h2>Itinerary</h2>
+                <p style="white-space: pre-wrap;">{{ package.itinerary }}</p>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h4 class="card-title">Booking Information</h4>
+                        <p class="card-text fs-4"><strong>${{ package.price|floatformat:2 }}</strong></p>
+                        <p><strong>Dates:</strong><br>{{ package.start_date }} to {{ package.end_date }}</p>
+                        <form action="{% url 'book_package' package.id %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success w-100">Book Now</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer">
+        <a href="{% url 'package_list' %}" class="btn btn-secondary">← Back to all packages</a>
+    </div>
+</div>
+{% endblock %}
