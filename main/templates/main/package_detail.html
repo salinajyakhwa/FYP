@@ -14,6 +14,32 @@
                 
                 <h2>Itinerary</h2>
                 <p style="white-space: pre-wrap;">{{ package.itinerary }}</p>
+
+                <hr class="my-4">
+
+                <h2>Reviews</h2>
+                {% for review in reviews %}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ review.user.username }}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">Rating: {{ review.rating }}/5</h6>
+                            <p class="card-text">{{ review.comment }}</p>
+                            <small class="text-muted">Posted on {{ review.created_at|date:"F j, Y" }}</small>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p>No reviews for this package yet.</p>
+                {% endfor %}
+
+                {% if user_can_review %}
+                <hr class="my-4">
+                <h3>Leave a Review</h3>
+                <form action="{% url 'add_review' package.id %}" method="post">
+                    {% csrf_token %}
+                    {{ review_form.as_p }}
+                    <button type="submit" class="btn btn-primary">Submit Review</button>
+                </form>
+                {% endif %}
             </div>
             <div class="col-md-4">
                 <div class="card bg-light">

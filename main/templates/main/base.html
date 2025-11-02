@@ -17,6 +17,9 @@
                             <span class="nav-link">Hello, {{ user.username }}</span>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="{% url 'my_bookings' %}">My Bookings</a>
+                        </li>
+                        <li class="nav-item">
                             <form method="post" action="{% url 'logout' %}">
                                 {% csrf_token %}
                                 <button type="submit" class="nav-link btn btn-link">Logout</button>
