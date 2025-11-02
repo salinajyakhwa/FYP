@@ -62,7 +62,13 @@ class Command(BaseCommand):
                 vendor=random.choice(vendors),
                 name=package_names[i],
                 description=f'An unforgettable journey: {package_names[i]}.',
-                itinerary=f'Day 1: Arrive. Day 2: Explore. Day 3: Depart.',
+                itinerary=[
+                    {"day": 1, "title": "Arrival and Welcome", "description": "Arrive at your destination, check into your hotel, and enjoy a welcome dinner."},
+                    {"day": 2, "title": "City Exploration", "description": "A guided tour of the city's main attractions and landmarks."},
+                    {"day": 3, "title": "Cultural Experience", "description": "Visit local markets and museums, and experience the local culture."},
+                    {"day": 4, "title": "Free Day", "description": "Enjoy a free day to explore on your own or relax."},
+                    {"day": 5, "title": "Departure", "description": "Enjoy a final breakfast before heading to the airport for your departure."}
+                ],
                 price=random.uniform(999.99, 4999.99),
                 start_date=start_date,
                 end_date=start_date + timedelta(days=random.randint(5, 14))

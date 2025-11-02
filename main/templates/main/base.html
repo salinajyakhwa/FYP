@@ -16,6 +16,11 @@
                         <li class="nav-item">
                             <span class="nav-link">Hello, {{ user.username }}</span>
                         </li>
+                        {% if user_profile.role == 'vendor' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'vendor_dashboard' %}">Vendor Dashboard</a>
+                        </li>
+                        {% endif %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'my_bookings' %}">My Bookings</a>
                         </li>

@@ -31,7 +31,7 @@ class TravelPackage(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='packages')
     name = models.CharField(max_length=255)
     description = models.TextField()
-    itinerary = models.TextField()
+    itinerary = models.JSONField(default=list)  # Changed from TextField
     price = models.DecimalField(max_digits=10, decimal_places=2)
     start_date = models.DateField()
     end_date = models.DateField()

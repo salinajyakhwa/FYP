@@ -1,0 +1,29 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Vendor Dashboard</h1>
+    <a href="#" class="btn btn-primary">Add New Package</a>
+</div>
+
+<h2>Your Packages</h2>
+
+<div class="list-group">
+    {% for package in packages %}
+    <div class="list-group-item list-group-item-action flex-column align-items-start">
+        <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1">{{ package.name }}</h5>
+            <small>{{ package.start_date }} to {{ package.end_date }}</small>
+        </div>
+        <p class="mb-1">Price: ${{ package.price|floatformat:2 }}</p>
+        <a href="#" class="btn btn-secondary btn-sm">Manage Itinerary</a>
+        <a href="#" class="btn btn-info btn-sm">Edit Package</a>
+    </div>
+    {% empty %}
+    <div class="list-group-item">
+        <p class="mb-1">You have not created any packages yet.</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
