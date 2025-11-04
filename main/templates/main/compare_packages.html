@@ -1,0 +1,53 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Compare Packages</h1>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Feature</th>
+                {% for package in packages %}
+                    <th>{{ package.name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Vendor</strong></td>
+                {% for package in packages %}
+                    <td>{{ package.vendor.name }}</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td><strong>Price</strong></td>
+                {% for package in packages %}
+                    <td>${{ package.price|floatformat:2 }}</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td><strong>Start Date</strong></td>
+                {% for package in packages %}
+                    <td>{{ package.start_date }}</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td><strong>End Date</strong></td>
+                {% for package in packages %}
+                    <td>{{ package.end_date }}</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td><strong>Description</strong></td>
+                {% for package in packages %}
+                    <td>{{ package.description }}</td>
+                {% endfor %}
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<a href="{% url 'package_list' %}" class="btn btn-primary mt-3">Back to Packages</a>
+
+{% endblock %}

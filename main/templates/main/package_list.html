@@ -8,27 +8,83 @@
     </div>
 </div>
 
-<h2 class="mb-4">Available Travel Packages</h2>
+<div class="mb-4">
+    <form method="get" action="{% url 'package_list' %}">
+        <div class="input-group">
+            <input type="text" name="q" class="form-control" placeholder="Search for packages..." value="{{ query|default:'' }}">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </div>
+    </form>
+</div>
 
-<div class="row">
-    {% for package in packages %}
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title">{{ package.name }}</h5>
-                <h6 class="card-subtitle mb-2 text-muted">Offered by: {{ package.vendor.name }}</h6>
-                <p class="card-text">{{ package.description|truncatewords:20 }}</p>
-                <div class="mt-auto">
-                    <p class="card-text fs-5"><strong>${{ package.price|floatformat:2 }}</strong></p>
-                    <a href="{% url 'package_detail' package.id %}" class="btn btn-primary">View Details</a>
+{% if query %}
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 class="mb-4">Search Results for "{{ query }}"</h2>
+        <a href="{% url 'package_list' %}" class="btn btn-secondary">Clear Search</a>
+    </div>
+{% else %}
+    <h2 class="mb-4">Available Travel Packages</h2>
+{% endif %}
+
+<form id="compare-form" method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        <button type="submit" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>
+    </div>
+    <div class="row">
+        {% for package in packages %}
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ package.name }}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">Offered by: {{ package.vendor.name }}</h6>
+                    <p class="card-text">{{ package.description|truncatewords:20 }}</p>
+                    <div class="mt-auto">
+                        <p class="card-text fs-5"><strong>${{ package.price|floatformat:2 }}</strong></p>
+                        <a href="{% url 'package_detail' package.id %}" class="btn btn-primary">View Details</a>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input compare-checkbox" type="checkbox" name="package_ids" value="{{ package.id }}" id="compare-{{ package.id }}">
+                            <label class="form-check-label" for="compare-{{ package.id }}">
+                                Compare
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+        {% empty %}
+        <div class="col">
+            <p>No travel packages available at the moment.</p>
+        </div>
+        {% endfor %}
     </div>
-    {% empty %}
-    <div class="col">
-        <p>No travel packages available at the moment.</p>
-    </div>
-    {% endfor %}
-</div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const compareButton = document.getElementById('compare-button');
+    const checkboxes = document.querySelectorAll('.compare-checkbox');
+    const compareForm = document.getElementById('compare-form');
+
+    function updateCompareButtonState() {
+        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
+        compareButton.disabled = checkedCount < 2;
+    }
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateCompareButtonState);
+    });
+
+    compareForm.addEventListener('submit', function(event) {
+        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
+        if (checkedCount < 2) {
+            event.preventDefault();
+            alert('Please select at least two packages to compare.');
+        }
+    });
+
+    // Initial state check
+    updateCompareButtonState();
+</script>
 {% endblock %}

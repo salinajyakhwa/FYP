@@ -1,0 +1,52 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<h1>Manage Itinerary for {{ package.name }}</h1>
+
+<form method="post">
+    {% csrf_token %}
+    {{ formset.management_form }}
+
+    <div id="itinerary-forms">
+        {% for form in formset %}
+        <div class="itinerary-form mb-3 p-3 border rounded">
+            <div class="row">
+                <div class="col-md-1">{{ form.day.label_tag }} {{ form.day }}</div>
+                <div class="col-md-5">{{ form.title.label_tag }} {{ form.title }}</div>
+                <div class="col-md-5">{{ form.description.label_tag }} {{ form.description }}</div>
+                <div class="col-md-1">{{ form.DELETE.label_tag }} {{ form.DELETE }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <button type="button" id="add-form" class="btn btn-secondary">Add Another Day</button>
+    <button type="submit" class="btn btn-primary">Save Itinerary</button>
+    <a href="{% url 'vendor_dashboard' %}" class="btn btn-light">Cancel</a>
+</form>
+
+<div id="empty-form" style="display:none">
+    <div class="itinerary-form mb-3 p-3 border rounded">
+        <div class="row">
+            <div class="col-md-1">{{ formset.empty_form.day.label_tag }} {{ formset.empty_form.day }}</div>
+            <div class="col-md-5">{{ formset.empty_form.title.label_tag }} {{ formset.empty_form.title }}</div>
+            <div class="col-md-6">{{ formset.empty_form.description.label_tag }} {{ formset.empty_form.description }}</div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('add-form').addEventListener('click', function() {
+    var formsetContainer = document.getElementById('itinerary-forms');
+    var totalForms = document.getElementById('id_form-TOTAL_FORMS');
+    var formIdx = totalForms.value;
+    
+    var emptyFormHtml = document.getElementById('empty-form').innerHTML.replace(/__prefix__/g, formIdx);
+    var newForm = document.createElement('div');
+    newForm.innerHTML = emptyFormHtml;
+    formsetContainer.appendChild(newForm);
+    
+    totalForms.value = parseInt(formIdx) + 1;
+});
+</script>
+{% endblock %}

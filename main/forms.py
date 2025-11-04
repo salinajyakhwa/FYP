@@ -1,5 +1,6 @@
 from django import forms
-from .models import Review
+from django.forms import formset_factory
+from .models import Review, TravelPackage
 
 class ReviewForm(forms.ModelForm):
     class Meta:
@@ -8,4 +9,23 @@ class ReviewForm(forms.ModelForm):
         widgets = {
             'rating': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 5}),
             'comment': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+class ItineraryDayForm(forms.Form):
+    day = forms.IntegerField(widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    title = forms.CharField(max_length=200, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    description = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}))
+
+ItineraryFormSet = formset_factory(ItineraryDayForm, extra=1, can_delete=True)
+
+class TravelPackageForm(forms.ModelForm):
+    class Meta:
+        model = TravelPackage
+        fields = ['name', 'description', 'price', 'start_date', 'end_date']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'price': forms.NumberInput(attrs={'class': 'form-control'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }

@@ -2,13 +2,25 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+
 from .models import TravelPackage, Booking, Review
-from .forms import ReviewForm
+from .forms import ReviewForm, ItineraryFormSet, TravelPackageForm
 from .decorators import role_required
 
+from django.db.models import Q
+
+# --- Public Views ---
+
 def package_list(request):
-    packages = TravelPackage.objects.all()
-    return render(request, 'main/package_list.html', {'packages': packages})
+    query = request.GET.get('q')
+    if query:
+        packages = TravelPackage.objects.filter(
+            Q(name__icontains=query) | Q(description__icontains=query)
+        )
+    else:
+        packages = TravelPackage.objects.all()
+    return render(request, 'main/package_list.html', {'packages': packages, 'query': query})
 
 def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
@@ -26,6 +38,8 @@ def package_detail(request, package_id):
     }
     return render(request, 'main/package_detail.html', context)
 
+# --- Authentication Views ---
+
 def register(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
@@ -36,6 +50,8 @@ def register(request):
     else:
         form = UserCreationForm()
     return render(request, 'main/register.html', {'form': form})
+
+# --- User-specific Views ---
 
 @login_required
 def add_review(request, package_id):
@@ -67,13 +83,71 @@ def my_bookings(request):
     bookings = Booking.objects.filter(user=request.user).order_by('-booking_date')
     return render(request, 'main/my_bookings.html', {'bookings': bookings})
 
+# --- Vendor Views ---
+
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_dashboard(request):
-    # Assuming the related name from UserProfile to Vendor is 'vendor'
     vendor = request.user.userprofile.vendor
     packages = TravelPackage.objects.filter(vendor=vendor)
     context = {
         'packages': packages
     }
     return render(request, 'main/vendor_dashboard.html', context)
+
+def compare_packages(request):
+    if request.method == 'POST':
+        package_ids = request.POST.getlist('package_ids')
+        if len(package_ids) < 2:
+            # Handle error: not enough packages to compare
+            return redirect('package_list') # Or render with an error message
+        
+        packages = TravelPackage.objects.filter(id__in=package_ids)
+        return render(request, 'main/compare_packages.html', {'packages': packages})
+    
+    return redirect('package_list')
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def create_package(request):
+    if request.method == 'POST':
+        form = TravelPackageForm(request.POST)
+        if form.is_valid():
+            package = form.save(commit=False)
+            package.vendor = request.user.userprofile.vendor
+            package.save()
+            return redirect('vendor_dashboard')
+    else:
+        form = TravelPackageForm()
+    return render(request, 'main/create_package.html', {'form': form})
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def manage_itinerary(request, package_id):
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    if package.vendor != request.user.userprofile.vendor:
+        raise PermissionDenied
+
+    if request.method == 'POST':
+        formset = ItineraryFormSet(request.POST)
+        if formset.is_valid():
+            new_itinerary = []
+            for form in formset:
+                if form.cleaned_data and not form.cleaned_data.get('DELETE'):
+                    new_itinerary.append({
+                        'day': form.cleaned_data['day'],
+                        'title': form.cleaned_data['title'],
+                        'description': form.cleaned_data['description'],
+                    })
+            package.itinerary = new_itinerary
+            package.save()
+            return redirect('vendor_dashboard')
+    else:
+        initial_data = package.itinerary if isinstance(package.itinerary, list) else []
+        formset = ItineraryFormSet(initial=initial_data)
+
+    context = {
+        'package': package,
+        'formset': formset
+    }
+    return render(request, 'main/manage_itinerary.html', context)
