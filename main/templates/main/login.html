@@ -1,21 +1,54 @@
 {% extends "main/base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h2>Login</h2>
-            </div>
-            <div class="card-body">
+<style>
+    .login-container {
+        min-height: 80vh;
+    }
+    .img-container {
+        background-image: url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1470');
+        background-size: cover;
+        background-position: center;
+    }
+    .form-container {
+        background-color: #f8f9fa; /* Light gray background */
+    }
+</style>
+
+<div class="row g-0 login-container rounded-3 shadow-lg">
+    <!-- Left Image Column -->
+    <div class="col-md-6 d-none d-md-block img-container rounded-start-2">
+    </div>
+
+    <!-- Right Form Column -->
+    <div class="col-md-6 d-flex align-items-center justify-content-center form-container rounded-end-2">
+        <div class="card" style="border: none; background: transparent;">
+            <div class="card-body p-5">
+                <h2 class="card-title text-center mb-4 fw-light">Welcome Back</h2>
+                {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        Your username and password didn't match. Please try again.
+                    </div>
+                {% endif %}
                 <form method="post">
                     {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit" class="btn btn-primary w-100">Login</button>
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">Username</label>
+                        <input type="text" name="username" id="id_username" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label">Password</label>
+                        <input type="password" name="password" id="id_password" class="form-control">
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">Login</button>
+                    </div>
                 </form>
-            </div>
-            <div class="card-footer text-center">
-                <a href="{% url 'register' %}">Don't have an account? Register here.</a>
+                <hr class="my-4">
+                <div class="text-center">
+                    <p>Don't have an account? <a href="{% url 'register' %}">Register here</a>.</p>
+                    <p><a href="{% url 'password_reset' %}">Forgot password?</a></p>
+                </div>
             </div>
         </div>
     </div>

@@ -1,5 +1,19 @@
 from django import forms
 from django.forms import formset_factory
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserChangeForm, PasswordChangeForm
+
+class UserUpdateForm(UserChangeForm):
+    password = None # Remove the password field from this form
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name']
+        widgets = {
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
 from .models import Review, TravelPackage
 
 class ReviewForm(forms.ModelForm):

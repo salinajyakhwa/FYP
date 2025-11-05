@@ -15,4 +15,20 @@ urlpatterns = [
     path('vendor/package/create/', views.create_package, name='create_package'),
     path('vendor/package/<int:package_id>/manage-itinerary/', views.manage_itinerary, name='manage_itinerary'),
     path('compare/', views.compare_packages, name='compare_packages'),
+    path('profile/', views.profile, name='profile'),
+    path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
+
+    # Password Reset URLs
+    path('password_reset/', 
+         auth_views.PasswordResetView.as_view(template_name='main/password_reset.html'), 
+         name='password_reset'),
+    path('password_reset/done/', 
+         auth_views.PasswordResetDoneView.as_view(template_name='main/password_reset_done.html'), 
+         name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', 
+         auth_views.PasswordResetConfirmView.as_view(template_name='main/password_reset_confirm.html'), 
+         name='password_reset_confirm'),
+    path('reset/done/', 
+         auth_views.PasswordResetCompleteView.as_view(template_name='main/password_reset_complete.html'), 
+         name='password_reset_complete'),
 ]

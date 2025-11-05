@@ -26,7 +26,7 @@
     <h2 class="mb-4">Available Travel Packages</h2>
 {% endif %}
 
-<form id="compare-form" method="post">
+<form id="compare-form" action="{% url 'compare_packages' %}" method="post">
     {% csrf_token %}
     <div class="mb-3">
         <button type="submit" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>

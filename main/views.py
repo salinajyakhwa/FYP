@@ -5,7 +5,59 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 
 from .models import TravelPackage, Booking, Review
-from .forms import ReviewForm, ItineraryFormSet, TravelPackageForm
+from .forms import ReviewForm, ItineraryFormSet, TravelPackageForm, UserUpdateForm, PasswordChangeForm
+from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
+
+@login_required
+def profile(request):
+    if request.method == 'POST':
+        # Distinguish between the two forms
+        if 'update_profile' in request.POST:
+            user_form = UserUpdateForm(request.POST, instance=request.user)
+            if user_form.is_valid():
+                user_form.save()
+                messages.success(request, 'Your profile has been updated successfully!')
+                return redirect('profile')
+        
+        elif 'change_password' in request.POST:
+            pass_form = PasswordChangeForm(request.user, request.POST)
+            if pass_form.is_valid():
+                user = pass_form.save()
+                update_session_auth_hash(request, user)  # Important!
+                messages.success(request, 'Your password was successfully updated!')
+                return redirect('profile')
+            else:
+                messages.error(request, 'Please correct the error below.')
+
+    user_form = UserUpdateForm(instance=request.user)
+    pass_form = PasswordChangeForm(request.user)
+
+    context = {
+        'user_form': user_form,
+        'pass_form': pass_form
+    }
+    return render(request, 'main/profile.html', context)
+
+@login_required
+def cancel_booking(request, booking_id):
+    booking = get_object_or_404(Booking, pk=booking_id)
+
+    # Check if the user owns this booking
+    if booking.user != request.user:
+        raise PermissionDenied
+
+    if request.method == 'POST':
+        # Only allow cancellation if the booking is pending or confirmed
+        if booking.status in ['pending', 'confirmed']:
+            booking.status = 'cancelled'
+            booking.save()
+            messages.success(request, f'Your booking for "{booking.package.name}" has been cancelled.')
+        else:
+            messages.error(request, 'This booking cannot be cancelled.')
+    
+    return redirect('my_bookings')
+
 from .decorators import role_required
 
 from django.db.models import Q
