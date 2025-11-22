@@ -64,15 +64,28 @@ from django.db.models import Q
 
 # --- Public Views ---
 
+@login_required
+def dashboard(request):
+    recent_bookings = Booking.objects.filter(user=request.user).order_by('-booking_date')[:5]
+    context = {
+        'recent_bookings': recent_bookings
+    }
+    return render(request, 'main/dashboard.html', context)
+
 def package_list(request):
     query = request.GET.get('q')
     if query:
         packages = TravelPackage.objects.filter(
-            Q(name__icontains=query) | Q(description__icontains=query)
+            Q(name__icontains=query) | 
+            Q(description__icontains=query) |
+            Q(vendor__name__icontains=query)
         )
     else:
         packages = TravelPackage.objects.all()
     return render(request, 'main/package_list.html', {'packages': packages, 'query': query})
+
+def about(request):
+    return render(request, 'main/about.html')
 
 def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
