@@ -35,7 +35,7 @@ class TravelPackage(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     start_date = models.DateField()
     end_date = models.DateField()
-    # image = models.ImageField(upload_to='package_images/', blank=True, null=True)
+    image = models.ImageField(upload_to='package_images/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
