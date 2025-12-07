@@ -60,3 +60,20 @@ htmlcov/
 # Local configs
 *.local
 
+# Virtual Environments
+travel-env/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Database
+db.sqlite3
+
+# Environment variables
+.env
+
+# Static & Media
+static/
+media/

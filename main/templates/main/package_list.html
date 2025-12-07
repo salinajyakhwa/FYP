@@ -1,25 +1,29 @@
 {% extends "main/base.html" %}
 
 {% block content %}
-<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-    <div class="col-lg-8 px-0">
-        <h1 class="display-4 fst-italic">Your Next Adventure Awaits</h1>
-        <p class="lead my-3">Compare and book travel packages from verified vendors. Find the best deals and plan your perfect trip with confidence.</p>
+<!-- Hero Section -->
+<div class="p-5 mb-4 bg-light rounded-3 text-center">
+    <div class="container-fluid py-5">
+        <h1 class="display-5 fw-bold">Your Next Adventure Awaits</h1>
+        <p class="fs-4">Compare and book travel packages from verified vendors. Find the best deals and plan your perfect trip with confidence.</p>
     </div>
 </div>
 
-<div class="mb-4">
-    <form method="get" action="{% url 'package_list' %}">
-        <div class="input-group">
-            <input type="text" name="q" class="form-control" placeholder="Search for packages..." value="{{ query|default:'' }}">
-            <button class="btn btn-primary" type="submit">Search</button>
-        </div>
-    </form>
+<!-- Search and Compare Section -->
+<div class="row justify-content-center mb-4">
+    <div class="col-md-8">
+        <form method="get" action="{% url 'package_list' %}">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="Search for packages by name, destination, or vendor..." value="{{ query|default:'' }}">
+                <button class="btn btn-primary" type="submit">Search</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% if query %}
-    <div class="d-flex justify-content-between align-items-center">
-        <h2 class="mb-4">Search Results for "{{ query }}"</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Search Results for "{{ query }}"</h2>
         <a href="{% url 'package_list' %}" class="btn btn-secondary">Clear Search</a>
     </div>
 {% else %}
