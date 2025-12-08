@@ -18,7 +18,7 @@ static/
 .env.*
 *.mo
 
-# Django migrations (optional, if you want to exclude them until stable)
+# Django migrations 
 # */migrations/
 # !*/migrations/__init__.py
 
