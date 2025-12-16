@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Explore the World - TravelBooker{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Hero Section Styling */
+    .hero-section {
+        position: relative;
+        height: 85vh; /* Takes up 85% of screen height */
+        min-height: 600px;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .hero-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4); /* Darkens image for text readability */
+        z-index: 1;
+    }
+
+    .hero-content {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+    }
+
+    /* Typography Polish */
+    .script-font {
+        font-family: 'Playfair Display', serif; /* Or just serif */
+        font-style: italic;
+        font-size: 2rem;
+        margin-bottom: -10px;
+        color: #ddd;
+    }
+
+    .hero-title {
+        font-size: 5rem;
+        font-weight: 700;
+        letter-spacing: -2px;
+        text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    /* Floating Search Bar */
+    .search-container {
+        position: relative;
+        z-index: 10;
+        margin-top: -3.5rem; /* Pulls it up to overlap the hero */
+        margin-bottom: 4rem;
+    }
+
+    .search-box {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 4px; /* Sharp clean corners like Zourney */
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    .form-control-custom {
+        border: none;
+        border-bottom: 1px solid #eee;
+        border-radius: 0;
+        padding: 10px 0;
+        font-size: 0.9rem;
+    }
+    
+    .form-control-custom:focus {
+        box-shadow: none;
+        border-color: var(--accent-color);
+    }
+
+    /* Tour Cards (Zourney Style - Text over Image) */
+    .tour-card {
+        height: 450px;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+        transition: transform 0.3s ease;
+    }
+
+    .tour-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .tour-bg {
+        width: 100%;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+        transition: transform 0.5s ease;
+    }
+
+    .tour-card:hover .tour-bg {
+        transform: scale(1.05); /* Zoom effect on hover */
+    }
+
+    .tour-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.9) 10%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0) 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 1.5rem;
+        color: white;
+    }
+
+    .price-badge {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255,255,255,0.2);
+        backdrop-filter: blur(5px);
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: white;
+    }
+
+    /* Icon Grid */
+    .feature-icon-circle {
+        width: 80px;
+        height: 80px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 2rem;
+        color: var(--primary-color);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ================= 1. HERO SECTION ================= -->
+<section class="hero-section" style="background-image: url('{% static 'img/dash-background.jpg' %}');">
+    <div class="hero-overlay"></div>
+
+    <div class="container hero-content text-center">
+        <p class="script-font">amazing tour</p>
+        <h1 class="hero-title mb-3">Maldives</h1>
+        
+        <div class="d-flex justify-content-center align-items-center gap-2 mb-4">
+            <span class="text-warning"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i></span>
+            <span class="small opacity-75">4.8/5 (689 reviews)</span>
+        </div>
+
+        <a href="#tours" class="btn btn-outline-light px-5 py-2 rounded-pill">
+            Take Me There <i class="bi bi-arrow-right ms-2"></i>
+        </a>
+    </div>
+</section>
+
+<!-- ================= 2. SEARCH BAR (Floating) ================= -->
+<div class="container search-container">
+    <div class="search-box">
+        <form class="row g-3 align-items-end">
+            <!-- Destination -->
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label small text-muted text-uppercase fw-bold mb-0">Where</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-0 ps-0"><i class="bi bi-geo-alt text-primary"></i></span>
+                    <input type="text" class="form-control form-control-custom" placeholder="Destination">
+                </div>
+            </div>
+            
+            <!-- Activity -->
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label small text-muted text-uppercase fw-bold mb-0">Type</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-0 ps-0"><i class="bi bi-flag text-primary"></i></span>
+                    <select class="form-select form-control-custom border-0 bg-transparent">
+                        <option selected>Adventure</option>
+                        <option value="1">Relaxation</option>
+                        <option value="2">Hiking</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Date -->
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label small text-muted text-uppercase fw-bold mb-0">When</label>
+                <div class="input-group">
+                    <input type="date" class="form-control form-control-custom ps-0">
+                </div>
+            </div>
+            
+            <!-- Guests -->
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label small text-muted text-uppercase fw-bold mb-0">Guests</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-0 ps-0"><i class="bi bi-people text-primary"></i></span>
+                    <input type="number" class="form-control form-control-custom" placeholder="0">
+                </div>
+            </div>
+            
+            <!-- Button -->
+            <div class="col-lg-2 col-md-12">
+                <button class="btn btn-primary w-100 rounded-1 py-3">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= 3. POPULAR TOURS (Cards) ================= -->
+<section class="py-5" id="tours">
+    <div class="container text-center mb-5">
+        <p class="text-uppercase text-primary fw-bold small mb-2">Explore Our Tours</p>
+        <h2 class="fw-bold display-6">New and Most Popular Tours</h2>
+        <div class="border-bottom border-warning border-3 w-50px mx-auto mt-3" style="width: 60px;"></div>
+    </div>
+
+    <div class="container">
+        <form id="compare-form" action="{% url 'compare_packages' %}" method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <button type="submit" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>
+            </div>
+            <div class="row g-4">
+                {% for package in packages %}
+                <div class="col-md-3 col-sm-6">
+                    <div class="tour-card shadow-sm">
+                        <a href="{% url 'package_detail' package.id %}" class="text-decoration-none">
+                            <!-- Price Badge -->
+                            <div class="price-badge">From ${{ package.price }}</div>
+                            
+                            <!-- Background Image -->
+                            {% with first_image=package.images.first %}
+                                <div class="tour-bg" style="background-image: url('{% if first_image %}{{ first_image.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');"></div>
+                            {% endwith %}
+                            
+                            <!-- Overlay Content -->
+                            <div class="tour-overlay">
+                                <span class="small text-warning mb-1">
+                                    <i class="bi bi-geo-alt-fill"></i> {{ package.location }}
+                                </span>
+                                <h5 class="fw-bold mb-1">{{ package.name }}</h5>
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-2 small">
+                                    <span class="text-light opacity-75"><i class="bi bi-clock"></i> 5 days</span>
+                                    <span class="text-warning"><i class="bi bi-star-fill"></i> {{ package.rating }}</span>
+                                </div>
+                                
+                                <div class="mt-3 pt-3 border-top border-light border-opacity-25">
+                                    <span class="text-white text-decoration-none small text-uppercase fw-bold">
+                                        More Information <i class="bi bi-arrow-right ms-1"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input compare-checkbox" type="checkbox" name="package_ids" value="{{ package.id }}" id="compare-{{ package.id }}">
+                        <label class="form-check-label" for="compare-{{ package.id }}">
+                            Compare
+                        </label>
+                    </div>
+                </div>
+                {% empty %}
+                <!-- Mock Data if no packages exist in DB yet -->
+                <div class="col-12 text-center py-5">
+                    <p class="text-muted">No packages available at the moment.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- ================= 4. FEATURES GRID ================= -->
+<section class="py-5 bg-light mt-5">
+    <div class="container">
+        <div class="row text-center g-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-icon-circle">
+                    <i class="bi bi-backpack"></i>
+                </div>
+                <h5 class="fw-bold">Memorable Experiences</h5>
+                <p class="text-muted small px-3">Browse and book tours you’ll never forget with our expert guides.</p>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-icon-circle">
+                    <i class="bi bi-map"></i>
+                </div>
+                <h5 class="fw-bold">Ultimate Flexibility</h5>
+                <p class="text-muted small px-3">We offer free cancellation and flexible payment options.</p>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-icon-circle">
+                    <i class="bi bi-binoculars"></i>
+                </div>
+                <h5 class="fw-bold">Extended Customization</h5>
+                <p class="text-muted small px-3">Hand-tailor your tour exactly to your specific needs.</p>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-icon-circle">
+                    <i class="bi bi-heart-pulse"></i>
+                </div>
+                <h5 class="fw-bold">Customer Satisfaction</h5>
+                <p class="text-muted small px-3">We deliver beyond expectations to ensure you smile.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const compareButton = document.getElementById('compare-button');
+    const checkboxes = document.querySelectorAll('.compare-checkbox');
+    const compareForm = document.getElementById('compare-form');
+
+    function updateCompareButtonState() {
+        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
+        compareButton.disabled = checkedCount < 2;
+    }
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateCompareButtonState);
+    });
+
+    compareForm.addEventListener('submit', function(event) {
+        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
+        if (checkedCount < 2) {
+            event.preventDefault();
+            alert('Please select at least two packages to compare.');
+        }
+    });
+
+    // Initial state check
+    updateCompareButtonState();
+</script>
+{% endblock %}
