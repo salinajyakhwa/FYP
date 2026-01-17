@@ -98,6 +98,10 @@ def package_detail(request, package_id):
 def compare_packages(request):
     if request.method == 'POST':
         package_ids = request.POST.getlist('package_ids')
+        
+        # --- DEBUGGING LINE ---
+        print("Received package IDs for comparison:", package_ids)
+        
         if len(package_ids) < 2:
             messages.warning(request, "Select at least two packages to compare.")
             return redirect('package_list')

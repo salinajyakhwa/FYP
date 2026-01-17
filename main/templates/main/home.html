@@ -8,7 +8,7 @@
     /* Hero Section Styling */
     .hero-section {
         position: relative;
-        height: 85vh; /* Takes up 85% of screen height */
+        height: 30vh; /* Takes up 85% of screen height */
         min-height: 600px;
         background-size: cover;
         background-position: center;
@@ -37,7 +37,7 @@
         font-style: italic;
         font-size: 2rem;
         margin-bottom: -10px;
-        color: #ddd;
+        color: #ffffff;
     }
 
     .hero-title {
@@ -237,7 +237,7 @@
                             
                             <!-- Background Image -->
                             {% with first_image=package.images.first %}
-                                <div class="tour-bg" style="background-image: url('{% if first_image %}{{ first_image.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');"></div>
+                                <div class="tour-bg" style="background-image: url('{% if first_image %}{{ first_image.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');2"></div>
                             {% endwith %}
                             
                             <!-- Overlay Content -->

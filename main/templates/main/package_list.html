@@ -29,7 +29,7 @@
 <form id="compare-form" action="{% url 'compare_packages' %}" method="post">
     {% csrf_token %}
     <div class="mb-3">
-        <button type="submit" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>
+        <button type="button" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>
     </div>
     <div class="row">
         {% for package in packages %}
@@ -72,28 +72,41 @@
 
 {% block scripts %}
 <script>
-    const compareButton = document.getElementById('compare-button');
-    const checkboxes = document.querySelectorAll('.compare-checkbox');
-    const compareForm = document.getElementById('compare-form');
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM fully loaded. Attaching event listeners.');
 
-    function updateCompareButtonState() {
-        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-        compareButton.disabled = checkedCount < 2;
-    }
+        const compareButton = document.getElementById('compare-button');
+        const checkboxes = document.querySelectorAll('.compare-checkbox');
+        const compareForm = document.getElementById('compare-form');
 
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateCompareButtonState);
-    });
-
-    compareForm.addEventListener('submit', function(event) {
-        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-        if (checkedCount < 2) {
-            event.preventDefault();
-            alert('Please select at least two packages to compare.');
+        if (!compareButton || !compareForm || checkboxes.length === 0) {
+            console.error('Compare functionality elements not found!');
+            return;
         }
-    });
 
-    // Initial state check
-    updateCompareButtonState();
+        function updateCompareButtonState() {
+            const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
+            console.log('Checked count:', checkedCount);
+            compareButton.disabled = checkedCount < 2;
+        }
+
+        checkboxes.forEach(function(checkbox) {
+            checkbox.addEventListener('change', updateCompareButtonState);
+        });
+
+        compareButton.addEventListener('click', function(event) {
+            console.log('Compare button clicked');
+            const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
+            if (checkedCount >= 2) {
+                console.log('Submitting form...');
+                compareForm.submit();
+            } else {
+                alert('Please select at least two packages to compare.');
+            }
+        });
+
+        // Initial state check on page load
+        updateCompareButtonState();
+    });
 </script>
 {% endblock %}
