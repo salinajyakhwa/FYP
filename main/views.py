@@ -5,7 +5,6 @@ from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.core.paginator import Paginator # Added for pagination
-from django.http import JsonResponse
 
 # Models
 from .models import TravelPackage, Booking, Review
@@ -98,17 +97,14 @@ def package_detail(request, package_id):
 def compare_packages(request):
     if request.method == 'POST':
         package_ids = request.POST.getlist('package_ids')
-        
-        # --- DEBUGGING LINE ---
-        print("Received package IDs for comparison:", package_ids)
-        
+
         if len(package_ids) < 2:
             messages.warning(request, "Select at least two packages to compare.")
             return redirect('package_list')
-        
+
         packages = TravelPackage.objects.filter(id__in=package_ids)
         return render(request, 'main/compare_packages.html', {'packages': packages})
-    
+
     return redirect('package_list')
 
 # ==========================================
@@ -324,60 +320,3 @@ def manage_itinerary(request, package_id):
         'formset': formset
     }
     return render(request, 'main/manage_itinerary.html', context)
-def toggle_comparison(request, package_id):
-    """
-    AJAX view to add/remove a package from the comparison session.
-    """
-    # Initialize session list if not exists
-    if 'comparison_list' not in request.session:
-        request.session['comparison_list'] = []
-
-    compare_list = request.session['comparison_list']
-    package_id = int(package_id)
-
-    if package_id in compare_list:
-        compare_list.remove(package_id)
-        action = 'removed'
-    else:
-        if len(compare_list) >= 4: # Limit to 4 items
-            return JsonResponse({'status': 'error', 'message': 'Max 4 packages allowed'}, status=400)
-        compare_list.append(package_id)
-        action = 'added'
-
-    request.session['comparison_list'] = compare_list
-    request.session.modified = True # Important!
-
-    return JsonResponse({
-        'status': 'success', 
-        'action': action, 
-        'count': len(compare_list)
-    })
-
-def compare_packages(request):
-    """
-    The actual comparison page.
-    """
-    # Get IDs from session
-    package_ids = request.session.get('comparison_list', [])
-    
-    if not package_ids:
-        messages.warning(request, "No packages selected for comparison.")
-        return redirect('package_list')
-
-    # Fetch objects
-    packages = TravelPackage.objects.filter(id__in=package_ids)
-    
-    # We need to find the "Best Value" (lowest price per day)
-    best_value = None
-    if packages.exists():
-        best_value = min(packages, key=lambda x: x.price / (x.duration_days or 1))
-
-    return render(request, 'main/compare_packages.html', {
-        'packages': packages,
-        'best_value': best_value
-    })
-
-def clear_comparison(request):
-    if 'comparison_list' in request.session:
-        del request.session['comparison_list']
-    return redirect('package_list')

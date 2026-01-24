@@ -38,8 +38,4 @@ urlpatterns = [
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='main/password_reset_confirm.html'), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='main/password_reset_complete.html'), name='password_reset_complete'),
 
-    #comparision
-    path('compare/', views.compare_packages, name='compare_packages'),
-    path('compare/toggle/<int:package_id>/', views.toggle_comparison, name='toggle_comparison'),
-    path('compare/clear/', views.clear_comparison, name='clear_comparison'),
 ]

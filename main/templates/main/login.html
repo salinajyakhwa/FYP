@@ -23,19 +23,35 @@
     <!-- Right Form Column -->
     <div class="col-md-6 d-flex align-items-center justify-content-center form-container rounded-end-2">
         <div class="card" style="border: none; background: transparent;">
-            <div class="card-body p-5">
-                <h2 class="card-title text-center mb-4 fw-light">Welcome Back</h2>
-                {% if form.errors %}
-                    <div class="alert alert-danger" role="alert">
-                        Your username and password didn't match. Please try again.
+            <div class="auth-form-section">
+                        <h2 class="mb-4">Login</h2>
+            
+                        {% if request.GET.next %}
+                            <div class="alert alert-warning" role="alert">
+                                Please log in or create an account to continue.
+                            </div>
+                        {% endif %}
+            
+                        <form method="post">
+                            {% csrf_token %}
+                            
+<!-- Display Non-Field Errors -->
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
                     </div>
                 {% endif %}
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="id_username" class="form-label">Username</label>
-                        <input type="text" name="username" id="id_username" class="form-control">
-                    </div>
+
+                <!-- Username Field -->
+                <div class="mb-3">
+                    <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                    <input type="text" name="{{ form.username.name }}" id="{{ form.username.id_for_label }}" class="form-control" required>
+                    {% if form.username.errors %}
+                        <div class="text-danger small mt-1">{{ form.username.errors|striptags }}</div>
+                    {% endif %}
+                </div>
                     <div class="mb-3">
                         <label for="id_password" class="form-label">Password</label>
                         <input type="password" name="password" id="id_password" class="form-control">
