@@ -7,9 +7,9 @@
     <p class="fs-4">Compare and book travel packages from verified vendors. Find the best deals and plan your perfect trip with confidence.</p>
     <div class="row justify-content-center mt-4">
         <div class="col-md-8">
-            <form method="get" action="{% url 'package_list' %}">
+            <form id="search-form" action="{% url 'package_list' %}" method="get">
                 <div class="input-group">
-                    <input type="text" name="q" class="form-control" placeholder="Search for packages by name, destination, or vendor..." value="{{ query|default:'' }}">
+                    <input type="text" id="search-input" name="q" class="form-control" placeholder="Search for packages..." value="{{ query|default:'' }}">
                     <button class="btn btn-primary" type="submit">Search</button>
                 </div>
             </form>
@@ -17,20 +17,7 @@
     </div>
 </div>
 
-{% if query %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Search Results for "{{ query }}"</h2>
-        <a href="{% url 'package_list' %}" class="btn btn-secondary">Clear Search</a>
-    </div>
-{% else %}
-    <h2 class="mb-4">Available Travel Packages</h2>
-{% endif %}
-
-<form id="compare-form" action="{% url 'compare_packages' %}" method="post">
-    {% csrf_token %}
-    <div class="mb-3">
-        <button type="button" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>
-    </div>
+<div id="package-list-container">
     <div class="row">
         {% for package in packages %}
         <div class="col-md-6 mb-4">
@@ -67,46 +54,48 @@
         </div>
         {% endfor %}
     </div>
-</form>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM fully loaded. Attaching event listeners.');
+        const searchInput = document.getElementById('search-input');
+        const packageListContainer = document.getElementById('package-list-container');
+        const searchUrl = "{% url 'search_results' %}";
 
-        const compareButton = document.getElementById('compare-button');
-        const checkboxes = document.querySelectorAll('.compare-checkbox');
-        const compareForm = document.getElementById('compare-form');
-
-        if (!compareButton || !compareForm || checkboxes.length === 0) {
-            console.error('Compare functionality elements not found!');
-            return;
+        // Debounce function to limit how often we send requests
+        let debounceTimeout;
+        function debounce(func, delay) {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(func, delay);
         }
 
-        function updateCompareButtonState() {
-            const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-            console.log('Checked count:', checkedCount);
-            compareButton.disabled = checkedCount < 2;
+        function performSearch() {
+            const query = searchInput.value;
+            const url = `${searchUrl}?q=${query}`;
+
+            console.log(`Fetching results for query: "${query}" from ${url}`);
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    packageListContainer.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('There was a problem with the fetch operation:', error);
+                    packageListContainer.innerHTML = '<div class="alert alert-danger">Could not load search results. Please try again.</div>';
+                });
         }
 
-        checkboxes.forEach(function(checkbox) {
-            checkbox.addEventListener('change', updateCompareButtonState);
+        searchInput.addEventListener('keyup', function() {
+            debounce(performSearch, 300); // Wait 300ms after user stops typing
         });
-
-        compareButton.addEventListener('click', function(event) {
-            console.log('Compare button clicked');
-            const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-            if (checkedCount >= 2) {
-                console.log('Submitting form...');
-                compareForm.submit();
-            } else {
-                alert('Please select at least two packages to compare.');
-            }
-        });
-
-        // Initial state check on page load
-        updateCompareButtonState();
     });
 </script>
 {% endblock %}

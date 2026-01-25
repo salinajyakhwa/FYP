@@ -3,8 +3,8 @@ from . import views
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    # 1. LANDING PAGE (Root URL)
-    path('', views.home, name='home'), 
+    path('search/', views.search_results, name='search_results'),
+    path('', views.package_list, name='package_list'), 
 
     # 2. PACKAGES LIST (Moved to /tours/)
     path('tours/', views.package_list, name='package_list'),

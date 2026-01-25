@@ -46,32 +46,30 @@ def dashboard(request):
 def about(request):
     return render(request, 'main/about.html')
 
-def package_list(request):
-    """
-    The 'Search Results' or 'All Packages' page.
-    Includes Search + Pagination.
-    """
-    query = request.GET.get('q')
-    
-    # Optimization: select_related('vendor') prevents extra DB hits per package
-    packages_list = TravelPackage.objects.select_related('vendor').all().order_by('-created_at')
-
+def search_results(request):
+    query = request.GET.get('q', '')
     if query:
-        packages_list = packages_list.filter(
+        packages = TravelPackage.objects.filter(
             Q(name__icontains=query) |
             Q(description__icontains=query) |
-            Q(location__icontains=query)
+            Q(vendor__name__icontains=query)
         )
+    else:
+        packages = TravelPackage.objects.all()
+    
+    return render(request, 'main/_package_list_partial.html', {'packages': packages})
 
-    # Pagination: Show 9 packages per page
-    paginator = Paginator(packages_list, 9)
-    page_number = request.GET.get('page')
-    packages = paginator.get_page(page_number)
-
-    return render(request, 'main/package_list.html', {
-        'packages': packages, 
-        'query': query
-    })
+def package_list(request):
+    query = request.GET.get('q')
+    if query:
+        packages = TravelPackage.objects.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query) |
+            Q(vendor__name__icontains=query)
+        )
+    else:
+        packages = TravelPackage.objects.all()
+    return render(request, 'main/package_list.html', {'packages': packages, 'query': query})
 
 def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
