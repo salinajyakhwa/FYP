@@ -38,6 +38,16 @@
                 <h2>Description</h2>
                 <p>{{ package.description }}</p>
                 
+                <!-- New Package Details Section -->
+                <h3 class="mt-4">Package Details</h3>
+                <ul class="list-group list-group-flush mb-4">
+                    <li class="list-group-item"><strong>Location:</strong> {{ package.location }}</li>
+                    {% if package.hotel_info %}
+                    <li class="list-group-item"><strong>Hotel Info:</strong> {{ package.hotel_info }}</li>
+                    {% endif %}
+                    <li class="list-group-item"><strong>Travel Type:</strong> {{ package.get_travel_type_display }}</li>
+                </ul>
+
                 <h2>Itinerary</h2>
                 <div class="accordion" id="itineraryAccordion">
                     {% for day in package.itinerary %}

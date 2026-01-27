@@ -26,73 +26,39 @@ class Vendor(models.Model):
         return self.name
 
 class TravelPackage(models.Model):
-    CATEGORY_CHOICES = (
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='packages')
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    
+    # New fields
+    location = models.CharField(max_length=255, help_text="e.g., Paris, France")
+    hotel_info = models.TextField(blank=True, null=True, help_text="Details about accommodation")
+    
+    TRAVEL_TYPE_CHOICES = [
         ('adventure', 'Adventure'),
-        ('honeymoon', 'Honeymoon'),
-        ('family', 'Family'),
-        ('religious', 'Religious'),
-        ('luxury', 'Luxury'),
+        ('relax', 'Relaxation'),
+        ('cultural', 'Cultural'),
+        ('city_break', 'City Break'),
+        ('beach', 'Beach'),
+        ('nature', 'Nature & Wildlife'),
+        ('cruise', 'Cruise'),
+    ]
+    travel_type = models.CharField(
+        max_length=50,
+        choices=TRAVEL_TYPE_CHOICES,
+        default='relax',
+        help_text="Category of travel"
     )
 
-    vendor = models.ForeignKey('Vendor', on_delete=models.CASCADE, related_name='packages')
-    name = models.CharField(max_length=255)
-    slug = models.SlugField(unique=True, blank=True, null=True)
-    description = models.TextField()
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='adventure')
-    
-    # Improved Location
-    location = models.CharField(max_length=100) 
-    country = models.CharField(max_length=100, default="Nepal") # Helps with filtering
-    
-    # JSON Fields
     itinerary = models.JSONField(default=list)
-    inclusions = models.JSONField(default=list, help_text="e.g. ['Breakfast', 'Wifi', 'Guide']")
-    exclusions = models.JSONField(default=list, blank=True)
-    
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
     start_date = models.DateField()
     end_date = models.DateField()
-    duration_days = models.PositiveIntegerField(default=0, editable=False) # Auto-calculated
-    
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def save(self, *args, **kwargs):
-        # 1. Auto-calculate duration
-        if self.start_date and self.end_date:
-            delta = self.end_date - self.start_date
-            self.duration_days = delta.days + 1 # +1 to include the start day
-            
-        # 2. Auto-generate slug if missing (basic version)
-        if not self.slug:
-            from django.utils.text import slugify
-            self.slug = slugify(f"{self.name}-{self.vendor.id}")
-            
-        super().save(*args, **kwargs)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
-
-    @property
-    def savings_percent(self):
-        if self.discount_price and self.price > self.discount_price:
-            return int(((self.price - self.discount_price) / self.price) * 100)
-        return 0
-
-
-
-    # PRO TIP: Add these property methods to fix your templates
-    @property
-    def rating(self):
-        aggregate = self.reviews.aggregate(avg=Avg('rating'))
-        return round(aggregate['avg'] or 0, 1)
-
-    @property
-    def main_image(self):
-        # Returns the first image or None
-        img = self.images.first()
-        return img.image if img else None
 
 class PackageImage(models.Model):
     package = models.ForeignKey(TravelPackage, related_name='images', on_delete=models.CASCADE)
