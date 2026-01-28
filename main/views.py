@@ -3,7 +3,7 @@ from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.core.paginator import Paginator # Added for pagination
 
 # Models
@@ -258,15 +258,18 @@ def vendor_dashboard(request):
     total_bookings = vendor_bookings.count()
     pending_bookings = vendor_bookings.filter(status='pending').count()
     
-    # Calculate Revenue (Simple aggregation)
-    total_revenue = sum(b.total_price for b in vendor_bookings if b.status == 'confirmed')
+    # Calculate Revenue and Sales using Django's aggregation
+    confirmed_bookings = vendor_bookings.filter(status='confirmed')
+    total_revenue = confirmed_bookings.aggregate(Sum('total_price'))['total_price__sum'] or 0
+    total_sales = confirmed_bookings.count() # Count of confirmed bookings
 
     context = {
         'packages': packages,
         'total_packages': total_packages,
         'total_bookings': total_bookings,
         'pending_bookings': pending_bookings,
-        'total_revenue': total_revenue
+        'total_revenue': total_revenue,
+        'total_sales': total_sales,
     }
     return render(request, 'main/vendor_dashboard.html', context)
 
