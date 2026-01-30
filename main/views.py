@@ -26,6 +26,16 @@ from .decorators import role_required
 # 1. PUBLIC VIEWS (Landing, About, Listings)
 # ==========================================
 
+# New view for the root URL to handle redirection
+def root_redirect_view(request):
+    if request.user.is_authenticated:
+        if hasattr(request.user, 'userprofile') and request.user.userprofile.role == 'vendor':
+            return redirect('vendor_dashboard')
+        # Default for logged-in travelers
+        return redirect('dashboard')
+    # Default for non-logged-in users
+    return redirect('dashboard')
+
 def home(request):
     # Fetch top 4 packages
     packages = TravelPackage.objects.prefetch_related('images').all().order_by('-created_at')[:4]

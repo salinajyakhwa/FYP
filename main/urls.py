@@ -3,12 +3,10 @@ from . import views
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    path('search/', views.search_results, name='search_results'),
-    path('', views.package_list, name='package_list'), 
-
-    # 2. PACKAGES LIST (Moved to /tours/)
+    path('', views.root_redirect_view, name='root_redirect'),
     path('tours/', views.package_list, name='package_list'),
-
+    path('search/', views.search_results, name='search_results'),
+    
     # 3. AUTH & DASHBOARD
     path('dashboard/', views.dashboard, name='dashboard'),
     path('register/', views.register, name='register'),
