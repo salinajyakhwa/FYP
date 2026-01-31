@@ -4,154 +4,337 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vendor Dashboard</title>
+    <title>Vendor Dashboard | Voyger</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+        :root {
+            --voyger-green: #436850;
+            --voyger-light-green: #eef3f0;
+            --voyger-bg: #f8faf9;
+            --voyger-text: #1a1a1a;
+            --voyger-muted: #7d8481;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--voyger-bg);
+            color: var(--voyger-text);
+        }
+
+        /* Sidebar Styling */
+        .vendor-dashboard-wrapper {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .vendor-sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #eef0ef;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .brand-logo {
+            font-weight: 800;
+            font-size: 24px;
+            color: var(--voyger-green);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 40px;
+            text-decoration: none;
+        }
+
+        .nav-link {
+            color: var(--voyger-muted);
+            font-weight: 500;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin-bottom: 5px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-link i { font-size: 18px; }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: var(--voyger-green);
+            color: white !important;
+        }
+
+        /* Main Content Area */
+        .vendor-main-content {
+            margin-left: 260px;
+            padding: 40px;
+            width: calc(100% - 260px);
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .search-box {
+            background: white;
+            border-radius: 15px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            width: 400px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        }
+
+        .search-box input {
+            border: none;
+            outline: none;
+            width: 100%;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+
+        /* Stat Cards */
+        .stat-card {
+            background: white;
+            border-radius: 24px;
+            padding: 25px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover { transform: translateY(-5px); }
+
+        .stat-icon-box {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+
+        .icon-blue { background: #eef2ff; color: #4338ca; }
+        .icon-green { background: #ecfdf5; color: var(--voyger-green); }
+        .icon-orange { background: #fff7ed; color: #c2410c; }
+
+        .stat-title { color: var(--voyger-muted); font-size: 14px; font-weight: 500; margin: 0; }
+        .stat-value { font-size: 24px; font-weight: 800; margin-top: 5px; }
+
+        /* Package Cards (Replacing Table) */
+        .package-grid-card {
+            border: none;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            background: white;
+            height: 100%;
+        }
+
+        .package-img {
+            height: 150px;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .badge-pill {
+            border-radius: 50px;
+            padding: 5px 15px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Right Column UI */
+        .side-widget {
+            background: white;
+            border-radius: 24px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        }
+
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        .btn-add {
+            background: var(--voyger-green);
+            color: white;
+            border-radius: 12px;
+            padding: 10px 20px;
+            font-weight: 600;
+            border: none;
+            text-decoration: none;
+        }
+        .btn-add:hover { background: #355240; color: white; }
+
+    </style>
 </head>
 <body>
+
     <div class="vendor-dashboard-wrapper">
         <!-- Sidebar -->
         <nav class="vendor-sidebar">
-            <div>
-                <a href="{% url 'vendor_dashboard' %}" class="brand text-white text-decoration-none">
-                    <i class="bi bi-airplane-fill"></i> TravelBooker
+            <a href="{% url 'vendor_dashboard' %}" class="brand-logo">
+                <i class="bi bi-geo-alt-fill"></i> voyger
+            </a>
+            
+            <ul class="nav flex-column mb-auto">
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'vendor_dashboard' %}">
+                        <i class="bi bi-grid-fill"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'create_package' %}">
+                        <i class="bi bi-plus-square-fill"></i> Packages
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-journal-check"></i> Bookings
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-star-fill"></i> Reviews
+                    </a>
+                </li>
+            </ul>
+
+            <div class="mt-4">
+                <a class="nav-link" href="{% url 'profile' %}">
+                    <i class="bi bi-person-circle"></i> Profile
                 </a>
-                <ul class="nav flex-column">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="{% url 'vendor_dashboard' %}"><i class="fas fa-tachometer-alt"></i>Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'create_package' %}"><i class="fas fa-plus-circle"></i>Create Package</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#"><i class="fas fa-book"></i>Manage Bookings</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#"><i class="fas fa-star"></i>Manage Reviews</a>
-                    </li>
-                </ul>
-            </div>
-            <div class="mt-auto">
-                <ul class="nav flex-column">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'profile' %}"><i class="fas fa-user-circle"></i>Profile</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'logout' %}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fas fa-sign-out-alt"></i>Logout</a>
-                        <form id="logout-form" action="{% url 'logout' %}" method="post" style="display: none;">
-                            {% csrf_token %}
-                        </form>
-                    </li>
-                </ul>
+                <a class="nav-link text-danger" href="{% url 'logout' %}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </a>
+                <form id="logout-form" action="{% url 'logout' %}" method="post" style="display: none;">
+                    {% csrf_token %}
+                </form>
             </div>
         </nav>
 
         <!-- Main Content -->
         <main class="vendor-main-content">
-            <h1 class="mb-4">Vendor Dashboard</h1>
-
-            <!-- Statistics Cards -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <p class="stat-title">Total Packages</p>
-                                <p class="stat-value">{{ total_packages }}</p>
-                            </div>
-                            <i class="fas fa-box-open stat-icon"></i>
-                        </div>
+            
+            <div class="top-bar">
+                <div>
+                    <h2 class="fw-bold mb-0">Dashboard</h2>
+                    <p class="text-muted small">Welcome back, {{ request.user.username }}</p>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <div class="search-box">
+                        <i class="bi bi-search text-muted"></i>
+                        <input type="text" placeholder="Search anything...">
+                    </div>
+                    <div class="btn-add">
+                        <i class="bi bi-person-circle"></i>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
+            </div>
+
+            <div class="row g-4">
+                <!-- Statistics Column -->
+                <div class="col-lg-8">
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <div class="stat-icon-box icon-blue"><i class="bi bi-calendar-event"></i></div>
                                 <p class="stat-title">Total Bookings</p>
                                 <p class="stat-value">{{ total_bookings }}</p>
                             </div>
-                            <i class="fas fa-book stat-icon"></i>
                         </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <p class="stat-title">Pending Bookings</p>
-                                <p class="stat-value">{{ pending_bookings }}</p>
-                            </div>
-                            <i class="fas fa-hourglass-half stat-icon"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <div class="stat-icon-box icon-green"><i class="bi bi-currency-dollar"></i></div>
                                 <p class="stat-title">Total Revenue</p>
-                                <p class="stat-value">${{ total_revenue|floatformat:2 }}</p>
+                                <p class="stat-value">${{ total_revenue|floatformat:0 }}</p>
                             </div>
-                            <i class="fas fa-dollar-sign stat-icon"></i>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <div class="stat-icon-box icon-orange"><i class="bi bi-box-seam"></i></div>
+                                <p class="stat-title">Active Packages</p>
+                                <p class="stat-value">{{ total_packages }}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- Quick Actions -->
-            <div class="card mb-4">
-                <div class="card-body d-flex justify-content-center flex-wrap">
-                    <a href="{% url 'create_package' %}" class="btn btn-primary btn-lg me-3 mb-2"><i class="fas fa-plus-circle me-2"></i> Create New Package</a>
-                </div>
-            </div>
+                    <!-- Travel Packages Card Grid -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="fw-bold m-0">Your Packages</h4>
+                        <a href="{% url 'create_package' %}" class="btn-add">View All</a>
+                    </div>
 
-            <!-- Your Packages List -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="mb-0">Your Travel Packages</h3>
+                    <div class="row g-4">
+                        {% for package in packages|slice:":3" %}
+                        <div class="col-md-4">
+                            <div class="package-grid-card">
+                                <div class="package-img" style="background-image: url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=500');"></div>
+                                <div class="p-3">
+                                    <span class="badge badge-pill bg-light text-dark mb-2">{{ package.get_travel_type_display }}</span>
+                                    <h6 class="fw-bold mb-1">{{ package.name }}</h6>
+                                    <p class="text-muted small mb-3"><i class="bi bi-geo-alt"></i> {{ package.location }}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="fw-bold text-success">${{ package.price }}</span>
+                                        <a href="{% url 'package_detail' package.id %}" class="btn btn-sm btn-outline-dark rounded-pill">Manage</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-light text-center border-dashed p-5 rounded-4">
+                                <i class="bi bi-cloud-plus fs-1 text-muted"></i>
+                                <p class="mt-2">No packages yet. Create your first one!</p>
+                                <a href="{% url 'create_package' %}" class="btn btn-voyger btn-sm px-4">Create Now</a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
-                <div class="card-body">
-                    {% if packages %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Location</th>
-                                    <th>Type</th>
-                                    <th>Price</th>
-                                    <th>Dates</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for package in packages %}
-                                <tr>
-                                    <td>{{ package.name }}</td>
-                                    <td>{{ package.location }}</td>
-                                    <td>{{ package.get_travel_type_display }}</td>
-                                    <td>${{ package.price|floatformat:2 }}</td>
-                                    <td>{{ package.start_date }} - {{ package.end_date }}</td>
-                                    <td>
-                                        <a href="{% url 'package_detail' package.id %}" class="btn btn-sm btn-outline-info me-2"><i class="fas fa-eye"></i> View</a>
-                                        <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-sm btn-outline-secondary me-2"><i class="fas fa-route"></i> Itinerary</a>
-                                        <a href="#" class="btn btn-sm btn-outline-warning"><i class="fas fa-edit"></i> Edit Package</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+
+                <!-- Right Sidebar Widgets -->
+                <div class="col-lg-4">
+                    <div class="side-widget">
+                        <div class="calendar-header">
+                            <h6 class="fw-bold m-0">July 2028</h6>
+                            <div><i class="bi bi-chevron-left me-2"></i><i class="bi bi-chevron-right"></i></div>
+                        </div>
+                        <img src="https://i.imgur.com/K0S0U5I.png" class="img-fluid rounded-3" alt="Calendar Placeholder">
                     </div>
-                    {% else %}
-                    <div class="alert alert-info" role="alert">
-                        You haven't created any travel packages yet. <a href="{% url 'create_package' %}" class="alert-link">Create your first package now!</a>
+
+                    <div class="side-widget">
+                        <h6 class="fw-bold mb-3">Messages</h6>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="bg-light rounded-circle p-2"><i class="bi bi-person"></i></div>
+                            <div>
+                                <p class="mb-0 fw-bold small">Customer Inquiry</p>
+                                <p class="mb-0 text-muted extra-small" style="font-size: 11px;">"Is breakfast included?"</p>
+                            </div>
+                        </div>
+                        <button class="btn btn-light w-100 btn-sm rounded-pill">View Inbox</button>
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </main>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

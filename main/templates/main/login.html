@@ -1,69 +1,180 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Modern Font -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
 <style>
-    .login-container {
-        min-height: 80vh;
+    :root {
+        --voyger-green: #436850; /* The dark green from your image */
+        --voyger-light-gray: #f1f3f2;
+        --voyger-text: #1a1a1a;
     }
-    .img-container {
-        background-image: url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1470');
+
+    body {
+        background-color: #e9ecef;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .auth-wrapper {
+        min-height: 90vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .auth-card {
+        background: white;
+        border-radius: 40px; /* Extra rounded as per image */
+        overflow: hidden;
+        border: none;
+        max-width: 1000px;
+        width: 100%;
+        display: flex;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+
+    .form-side {
+        padding: 50px;
+        flex: 1;
+    }
+
+    .brand-logo {
+        color: #76a18d;
+        font-weight: 800;
+        font-size: 24px;
+        margin-bottom: 20px;
+        display: block;
+        text-decoration: none;
+    }
+
+    .auth-title {
+        font-weight: 800;
+        font-size: 32px;
+        line-height: 1.2;
+        margin-bottom: 30px;
+        color: var(--voyger-text);
+    }
+
+    /* Social Icons Pill */
+    .social-pill {
+        background: var(--voyger-light-gray);
+        border-radius: 50px;
+        padding: 10px 25px;
+        display: inline-flex;
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    .social-pill i { font-size: 18px; color: #333; cursor: pointer; }
+
+    .or-text {
+        color: #adb5bd;
+        font-size: 14px;
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    /* Pill-shaped Inputs */
+    .form-control-pill {
+        background-color: var(--voyger-light-gray) !important;
+        border: none !important;
+        border-radius: 15px !important;
+        padding: 14px 20px !important;
+        margin-bottom: 15px;
+        font-size: 15px;
+    }
+
+    .btn-voyger {
+        background-color: var(--voyger-green);
+        color: white;
+        border-radius: 15px;
+        padding: 14px;
+        font-weight: 600;
+        border: none;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .btn-voyger:hover {
+        background-color: #355240;
+        color: white;
+    }
+
+    /* Image Side */
+    .img-side {
+        flex: 1.4;
+        background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1470');
         background-size: cover;
         background-position: center;
+        border-radius: 30px;
+        margin: 12px;
+        position: relative;
     }
-    .form-container {
-        background-color: #f8f9fa; /* Light gray background */
+
+    /* Floating Markers */
+    .marker {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.25);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.4);
+        border-radius: 50px;
+        padding: 8px 18px;
+        color: white;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
     }
 </style>
 
-<div class="row g-0 login-container rounded-3 shadow-lg">
-    <!-- Left Image Column -->
-    <div class="col-md-6 d-none d-md-block img-container rounded-start-2">
-    </div>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <!-- Form -->
+        <div class="form-side text-center">
+            <a href="{% url 'package_list' %}" class="brand-logo">voyger</a>
+            <h1 class="auth-title">Welcome<br>Back</h1>
 
-    <!-- Right Form Column -->
-    <div class="col-md-6 d-flex align-items-center justify-content-center form-container rounded-end-2">
-        <div class="card" style="border: none; background: transparent;">
-            <div class="auth-form-section">
-                        <h2 class="mb-4">Login</h2>
-            
-                        {% if request.GET.next %}
-                            <div class="alert alert-warning" role="alert">
-                                Please log in or create an account to continue.
-                            </div>
-                        {% endif %}
-            
-                        <form method="post">
-                            {% csrf_token %}
-                            
-<!-- Display Non-Field Errors -->
+            <div class="social-pill">
+                <i class="bi bi-apple"></i>
+                <i class="bi bi-google"></i>
+                <i class="bi bi-facebook"></i>
+            </div>
+
+            <div class="or-text">or</div>
+
+            <form method="post">
+                {% csrf_token %}
+                
                 {% if form.non_field_errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.non_field_errors %}
-                            {{ error }}
-                        {% endfor %}
-                    </div>
+                    <div class="alert alert-danger py-2 small">{{ form.non_field_errors }}</div>
                 {% endif %}
 
-<!-- Username Field -->
-                <div class="mb-3">
-                    <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
-                    <input type="text" name="{{ form.username.name }}" id="{{ form.username.id_for_label }}" class="form-control" required>
-                </div>
+                <input type="text" name="{{ form.username.name }}" 
+                       placeholder="Username" 
+                       class="form-control-pill w-100" required>
 
-                <!-- Password Field -->
-                <div class="mb-3">
-                    <label for="{{ form.password.id_for_label }}" class="form-label">Password</label>
-                    <input type="password" name="{{ form.password.name }}" id="{{ form.password.id_for_label }}" class="form-control" required>
-                </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">Login</button>
-                    </div>
-                </form>
-                <hr class="my-4">
-                <div class="text-center">
-                    <p>Don't have an account? <a href="{% url 'register' %}">Register here</a>.</p>
-                    <p><a href="{% url 'password_reset' %}">Forgot password?</a></p>
-                </div>
+                <input type="password" name="{{ form.password.name }}" 
+                       placeholder="Password" 
+                       class="form-control-pill w-100" required>
+
+                <button type="submit" class="btn btn-voyger">Login</button>
+            </form>
+
+            <div class="mt-4 small">
+                <p class="text-muted">Don't have an account? <a href="{% url 'register' %}" class="text-dark fw-bold text-decoration-none">Sign Up</a></p>
+                <p><a href="{% url 'password_reset' %}" class="text-muted text-decoration-none">Forgot password?</a></p>
+            </div>
+        </div>
+
+        <!-- Image side with floating UI -->
+        <div class="img-side d-none d-md-block">
+            <div class="marker" style="top: 25%; left: 15%;">
+                <i class="bi bi-geo-alt-fill me-2"></i> Garsia Village
+            </div>
+            <div class="marker" style="bottom: 15%; right: 20%;">
+                Gringo Trail
             </div>
         </div>
     </div>
