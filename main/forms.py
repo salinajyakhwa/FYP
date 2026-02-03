@@ -6,7 +6,7 @@ from django.contrib.auth.forms import UserChangeForm, PasswordChangeForm, UserCr
 from .models import Review, TravelPackage, UserProfile
 
 class UserUpdateForm(UserChangeForm):
-    password = None # Remove the password field from this form
+    password = None
     class Meta:
         model = User
         fields = ['email', 'first_name', 'last_name']
@@ -25,7 +25,6 @@ class ReviewForm(forms.ModelForm):
             'comment': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
         }
 
-# New custom form for user registration with role selection
 class CustomUserCreationForm(UserCreationForm):
     role = forms.ChoiceField(choices=UserProfile.ROLE_CHOICES, initial='traveler', widget=forms.RadioSelect)
 
@@ -33,7 +32,6 @@ class CustomUserCreationForm(UserCreationForm):
         model = User
         fields = UserCreationForm.Meta.fields + ('role',)
 
-    # Override save method to create UserProfile
     def save(self, commit=True):
         user = super().save(commit=False)
         if commit:
@@ -49,28 +47,13 @@ class ItineraryDayForm(forms.Form):
 
 ItineraryFormSet = formset_factory(ItineraryDayForm, extra=1, can_delete=True)
 
-# class TravelPackageForm(forms.ModelForm):
-#     class Meta:
-#         model = TravelPackage
-#         fields = ['name', 'description', 'price', 'start_date', 'end_date']
-#         widgets = {
-#             'name': forms.TextInput(attrs={'class': 'form-control'}),
-#             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
-#             'price': forms.NumberInput(attrs={'class': 'form-control'}),
-#             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-#             'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-#         }
-
 class TravelPackageForm(forms.ModelForm):
     class Meta:
         model = TravelPackage
-        fields = ['name', 'description', 'location', 'hotel_info', 'travel_type', 'price', 'start_date', 'end_date']
+        fields = ['name', 'description', 'price', 'start_date', 'end_date']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
-            'location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Paris, France'}),
-            'hotel_info': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'e.g., 5-star hotel, breakfast included'}),
-            'travel_type': forms.Select(attrs={'class': 'form-select'}),
             'price': forms.NumberInput(attrs={'class': 'form-control'}),
             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),

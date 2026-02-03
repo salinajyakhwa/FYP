@@ -274,8 +274,11 @@
             
             <div class="d-flex align-items-center gap-4">
                 <div class="search-wrapper d-none d-lg-flex">
-                    <i class="bi bi-search text-muted"></i>
-                    <input type="text" placeholder="Search bookings, packages, reports...">
+                    <form method="get" action="{% url 'vendor_dashboard' %}" class="d-flex w-100 align-items-center">
+                        <i class="bi bi-search text-muted"></i>
+                        <input type="text" name="q" placeholder="Search your packages..." class="w-100" value="{{ query|default:'' }}">
+                        <button type="submit" class="btn btn-sm btn-link text-muted"><i class="bi bi-arrow-right"></i></button>
+                    </form>
                 </div>
                 <div class="user-profile-pill">
                     <img src="https://ui-avatars.com/api/?name={{ request.user.username }}&background=436850&color=fff" class="avatar-sm">

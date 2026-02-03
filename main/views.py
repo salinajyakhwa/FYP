@@ -259,27 +259,11 @@ def add_review(request, package_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_dashboard(request):
-    vendor_profile = request.user.userprofile.vendor # Assumes OneToOne link
-    packages = TravelPackage.objects.filter(vendor=vendor_profile)
-
-    # Stats
-    total_packages = packages.count()
-    vendor_bookings = Booking.objects.filter(package__vendor=vendor_profile)
-    total_bookings = vendor_bookings.count()
-    pending_bookings = vendor_bookings.filter(status='pending').count()
-    
-    # Calculate Revenue and Sales using Django's aggregation
-    confirmed_bookings = vendor_bookings.filter(status='confirmed')
-    total_revenue = confirmed_bookings.aggregate(Sum('total_price'))['total_price__sum'] or 0
-    total_sales = confirmed_bookings.count() # Count of confirmed bookings
+    vendor = request.user.userprofile.vendor
+    packages = TravelPackage.objects.filter(vendor=vendor)
 
     context = {
         'packages': packages,
-        'total_packages': total_packages,
-        'total_bookings': total_bookings,
-        'pending_bookings': pending_bookings,
-        'total_revenue': total_revenue,
-        'total_sales': total_sales,
     }
     return render(request, 'main/vendor_dashboard.html', context)
 
