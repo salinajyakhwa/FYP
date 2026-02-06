@@ -5,9 +5,17 @@ from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.db.models import Q, Count, Sum
 from django.core.paginator import Paginator # Added for pagination
+from django.contrib.sites.shortcuts import get_current_site
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import EmailMessage
+from django.contrib.auth import get_user_model # Replaced direct User import
 
 # Models
-from .models import TravelPackage, Booking, Review
+from .models import TravelPackage, Booking, Review, UserProfile
+
+User = get_user_model() # Get the User model
 
 # Forms
 from .forms import (
@@ -38,20 +46,17 @@ def root_redirect_view(request):
 
 def home(request):
     # Fetch top 4 packages
-    packages = TravelPackage.objects.prefetch_related('images').all().order_by('-created_at')[:4]
+    packages = TravelPackage.objects.all().order_by('-created_at')[:4]
     
     # OLD: return render(request, 'home.html', {'packages': packages})
     # NEW: Add 'main/' prefix
     return render(request, 'main/home.html', {'packages': packages})
 
-@login_required
-def dashboard(request):
-    # Redirect vendors
-    if hasattr(request.user, 'userprofile') and request.user.userprofile.role == 'vendor':
-        return redirect('vendor_dashboard')
-    
-    # Regular users go to their bookings
-    return redirect('my_bookings')
+def _get_vendor_or_403(request):
+    try:
+        return request.user.userprofile.vendor
+    except Exception:
+        raise PermissionDenied
 
 def about(request):
     return render(request, 'main/about.html')
@@ -121,16 +126,16 @@ def compare_packages(request):
 
 def register(request):
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect('dashboard')
 
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            # UserProfile creation is handled via signals (best practice) or form save
-            login(request, user)
-            messages.success(request, f"Welcome, {user.username}!")
-            return redirect('home')
+            user = form.save() # user is now inactive
+            profile = user.userprofile # Get the user profile
+            send_verification_email(request, user, profile) # Send verification email
+            messages.success(request, f"Please confirm your email address to complete the registration. Check your inbox at {user.email}.")
+            return redirect('check_email') # Redirect to a page informing user to check email
     else:
         form = CustomUserCreationForm()
     return render(request, 'main/register.html', {'form': form})
@@ -141,6 +146,10 @@ def register(request):
 
 @login_required
 def dashboard(request):
+    # Redirect vendors to vendor dashboard
+    if hasattr(request.user, 'userprofile') and request.user.userprofile.role == 'vendor':
+        return redirect('vendor_dashboard')
+
     recent_bookings = Booking.objects.filter(user=request.user).order_by('-booking_date')[:5]
     
     # Booking statistics
@@ -252,6 +261,52 @@ def add_review(request, package_id):
     # Redirect if not a POST request or form is invalid
     return redirect('package_detail', package_id=package.id)
 
+# --- NEW FUNCTION FOR EMAIL VERIFICATION ---
+def send_verification_email(request, user, profile):
+    current_site = get_current_site(request)
+    mail_subject = "Activate your account."
+    message = render_to_string('main/acc_active_email.html', {
+        'user': user,
+        'domain': current_site.domain,
+        'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+        'token': profile.verification_token, # Use the token from the UserProfile
+    })
+    to_email = user.email
+    email = EmailMessage(
+        mail_subject, message, to=[to_email]
+    )
+    email.send()
+
+# --- NEW VIEW FOR EMAIL VERIFICATION ---
+def check_email(request):
+    return render(request, 'main/check_email.html')
+
+def verify_email(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None:
+        profile = UserProfile.objects.get(user=user)
+        if profile.verification_token == token and (timezone.now() - profile.token_created_at).total_seconds() < 3600: # Token valid for 1 hour
+            user.is_active = True
+            user.save()
+            profile.is_verified = True
+            profile.verification_token = None
+            profile.token_created_at = None
+            profile.save()
+            login(request, user)
+            messages.success(request, 'Your account has been activated!')
+            return redirect('dashboard')
+        else:
+            messages.error(request, 'Activation link is invalid or expired!')
+    else:
+        messages.error(request, 'Activation link is invalid!')
+
+    return render(request, 'main/verification_status.html')
+
 # ==========================================
 # 4. VENDOR VIEWS
 # ==========================================
@@ -259,7 +314,7 @@ def add_review(request, package_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_dashboard(request):
-    vendor = request.user.userprofile.vendor
+    vendor = _get_vendor_or_403(request)
     packages = TravelPackage.objects.filter(vendor=vendor)
 
     context = {
@@ -274,7 +329,7 @@ def create_package(request):
         form = TravelPackageForm(request.POST, request.FILES) # Added request.FILES for images
         if form.is_valid():
             package = form.save(commit=False)
-            package.vendor = request.user.userprofile.vendor
+            package.vendor = _get_vendor_or_403(request)
             package.save()
             messages.success(request, "Package created successfully!")
             return redirect('vendor_dashboard')
@@ -287,7 +342,7 @@ def create_package(request):
 def manage_itinerary(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
     
-    if package.vendor != request.user.userprofile.vendor:
+    if package.vendor != _get_vendor_or_403(request):
         raise PermissionDenied
 
     if request.method == 'POST':

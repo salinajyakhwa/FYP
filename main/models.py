@@ -11,6 +11,9 @@ class UserProfile(models.Model):
         ('admin', 'Admin'),
     )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+    is_verified = models.BooleanField(default=False)
+    verification_token = models.CharField(max_length=100, blank=True, null=True)
+    token_created_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.get_role_display()}"
@@ -30,6 +33,9 @@ class TravelPackage(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='packages')
     name = models.CharField(max_length=255)
     description = models.TextField()
+    location = models.CharField(max_length=255, blank=True, null=True)
+    travel_type = models.CharField(max_length=255, blank=True, null=True)
+    image = models.ImageField(upload_to='packages/', blank=True, null=True)
     itinerary = models.JSONField(default=list)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     start_date = models.DateField()
@@ -68,3 +74,11 @@ class Review(models.Model):
 
     def __str__(self):
         return f"Review for {self.package.name} by {self.user.username}"
+
+# Represents an image for a travel package. (Dummy model for migration cleanup)
+class PackageImage(models.Model):
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='packages/gallery/', blank=True, null=True)
+
+    class Meta:
+        app_label = 'main' # Explicitly set app_label

@@ -236,9 +236,7 @@
                             <div class="price-badge">From ${{ package.price }}</div>
                             
                             <!-- Background Image -->
-                            {% with first_image=package.images.first %}
-                                <div class="tour-bg" style="background-image: url('{% if first_image %}{{ first_image.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');2"></div>
-                            {% endwith %}
+                            <div class="tour-bg" style="background-image: url('{% if package.image %}{{ package.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');2"></div>
                             
                             <!-- Overlay Content -->
                             <div class="tour-overlay">

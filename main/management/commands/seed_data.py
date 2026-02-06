@@ -3,7 +3,7 @@ from datetime import timedelta, date
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.db import transaction
-from main.models import UserProfile, Vendor, TravelPackage, Booking, Review
+from main.models import UserProfile, Vendor, TravelPackage, Booking, Review, PackageImage
 
 USER_COUNT = 5
 PASSWORD = 'password123'
@@ -15,11 +15,16 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         self.stdout.write("Deleting old data...")
         # Keep superusers
-        User.objects.filter(is_superuser=False).delete()
-        Vendor.objects.all().delete()
-        TravelPackage.objects.all().delete()
-        Booking.objects.all().delete()
+        # Delete in this specific order to avoid Foreign Key errors
         Review.objects.all().delete()
+        Booking.objects.all().delete()
+        PackageImage.objects.all().delete()  # <--- CRITICAL: Delete images before packages
+        TravelPackage.objects.all().delete()
+        Vendor.objects.all().delete()
+        UserProfile.objects.all().delete()
+
+        # Optionally delete users (excluding superusers)
+        User.objects.filter(is_superuser=False).delete()
 
         self.stdout.write("Creating new data...")
 
@@ -54,24 +59,43 @@ class Command(BaseCommand):
 
         # --- Create Travel Packages ---
         package_names = ['Parisian Dream', 'Roman Holiday', 'Tokyo Express', 'Jungle Expedition', 'Beach Paradise']
+        package_locations = ['Paris', 'Rome', 'Tokyo', 'Amazon Rainforest', 'Maldives'] # New list of locations
+        package_travel_types = ['Adventure', 'Relaxation', 'Cultural', 'Exploration', 'Luxury'] # New list of travel types
         packages = []
+        
+        import requests
+        from django.core.files.base import ContentFile
+
         for i in range(USER_COUNT):
             start_date = date.today() + timedelta(days=random.randint(30, 90))
+            
+            # Fetch image from Unsplash
+            image_url = "https://source.unsplash.com/random/800x600?query=travel"
+            response = requests.get(image_url)
+            image_name = f"travel_package_{i+1}.jpg"
+            
             package = TravelPackage.objects.create(
                 vendor=random.choice(vendors),
                 name=package_names[i],
                 description=f'An unforgettable journey: {package_names[i]}.',
+                location=random.choice(package_locations), # Assign a dummy location here
+                travel_type=random.choice(package_travel_types), # Assign a dummy travel type here
                 itinerary=[
-                    {"day": 1, "title": "Arrival and Welcome", "description": "Arrive at your destination, check into your hotel, and enjoy a welcome dinner."},
-                    {"day": 2, "title": "City Exploration", "description": "A guided tour of the city's main attractions and landmarks."},
-                    {"day": 3, "title": "Cultural Experience", "description": "Visit local markets and museums, and experience the local culture."},
-                    {"day": 4, "title": "Free Day", "description": "Enjoy a free day to explore on your own or relax."},
-                    {"day": 5, "title": "Departure", "description": "Enjoy a final breakfast before heading to the airport for your departure."}
-                ],
-                price=random.uniform(999.99, 4999.99),
-                start_date=start_date,
-                end_date=start_date + timedelta(days=random.randint(5, 14))
-            )
+                        {"day": 1, "title": "Arrival and Welcome", "description": "Arrive at your destination, check into your hotel, and enjoy a welcome dinner."},
+                        {"day": 2, "title": "City Exploration", "description": "A guided tour of the city's main attractions and landmarks."},
+                        {"day": 3, "title": "Cultural Experience", "description": "Visit local markets and museums, and experience the local culture."},
+                        {"day": 4, "title": "Free Day", "description": "Enjoy a free day to explore on your own or relax."},
+                        {"day": 5, "title": "Departure", "description": "Enjoy a final breakfast before heading to the airport for your departure."}
+                    ],
+                    price=random.uniform(999.99, 4999.99),
+                    start_date=start_date,
+                    end_date=start_date + timedelta(days=random.randint(5, 14))
+                )
+                
+            # Save the downloaded image to the package
+            if response.status_code == 200:
+                package.image.save(image_name, ContentFile(response.content), save=True)
+            
             packages.append(package)
         self.stdout.write(f"{len(packages)} travel packages created.")
 

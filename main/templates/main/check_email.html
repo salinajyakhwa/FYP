@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Check Your Email{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3>Check Your Email</h3>
+                </div>
+                <div class="card-body text-center">
+                    <p class="lead">
+                        Thank you for registering! We've sent an activation link to your email address.
+                    </p>
+                    <p>
+                        Please check your inbox (and spam folder) to activate your account.
+                    </p>
+                    <p>
+                        Once activated, you can <a href="{% url 'login' %}">log in here</a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

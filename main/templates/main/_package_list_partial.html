@@ -3,15 +3,13 @@
 {% for package in packages %}
 <div class="col-md-6 mb-4">
     <div class="card h-100">
-        {% with first_image=package.images.first %}
-            {% if first_image %}
-                <img src="{{ first_image.image.url }}" class="card-img-top" alt="{{ package.name }}" style="height: 225px; object-fit: cover;">
-            {% else %}
-                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 225px;">
-                    <span class="text-muted">No Image Available</span>
-                </div>
-            {% endif %}
-        {% endwith %}
+        {% if package.image %}
+            <img src="{{ package.image.url }}" class="card-img-top" alt="{{ package.name }}" style="height: 225px; object-fit: cover;">
+        {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 225px;">
+                <span class="text-muted">No Image Available</span>
+            </div>
+        {% endif %}
         <div class="card-body d-flex flex-column">
             <h5 class="card-title">{{ package.name }}</h5>
             <h6 class="card-subtitle mb-2 text-muted">Offered by: {{ package.vendor.name }}</h6>

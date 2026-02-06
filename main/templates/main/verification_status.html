@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}Verification Status{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3>Email Verification Status</h3>
+                </div>
+                <div class="card-body text-center">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    <p>
+                        You can now <a href="{% url 'login' %}">log in</a> or go to the <a href="{% url 'dashboard' %}">dashboard</a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

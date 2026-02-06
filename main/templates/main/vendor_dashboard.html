@@ -369,7 +369,7 @@
                     {% for package in packages|slice:":3" %}
                     <div class="col-md-6 col-xl-4">
                         <div class="package-card">
-                            <div class="package-img-wrap" style="background: url('https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400') center/cover;">
+                            <div class="package-img-wrap" style="background: url('{% if package.image %}{{ package.image.url }}{% else %}https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400{% endif %}') center/cover;">
                                 <span class="package-badge">{{ package.get_travel_type_display }}</span>
                             </div>
                             <div class="p-4">
