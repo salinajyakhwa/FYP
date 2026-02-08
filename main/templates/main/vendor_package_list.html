@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Packages - Vendor Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Tour Cards (Zourney Style - Text over Image) */
+    .tour-card {
+        height: 450px;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+        transition: transform 0.3s ease;
+    }
+
+    .tour-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .tour-bg {
+        width: 100%;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+        transition: transform 0.5s ease;
+    }
+
+    .tour-card:hover .tour-bg {
+        transform: scale(1.05); /* Zoom effect on hover */
+    }
+
+    .tour-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.9) 10%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0) 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 1.5rem;
+        color: white;
+    }
+
+    .price-badge {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255,255,255,0.2);
+        backdrop-filter: blur(5px);
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">My Packages</h2>
+        <a href="{% url 'create_package' %}" class="btn btn-primary">Create New Package</a>
+    </div>
+
+    <div class="row g-4">
+        {% for package in packages %}
+        <div class="col-md-3 col-sm-6">
+            <div class="tour-card shadow-sm">
+                <a href="{% url 'package_detail' package.id %}" class="text-decoration-none">
+                    <!-- Price Badge -->
+                    <div class="price-badge">From ${{ package.price }}</div>
+                    
+                    <!-- Background Image -->
+                    <div class="tour-bg" style="background-image: url('{% if package.image %}{{ package.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');"></div>
+                    
+                    <!-- Overlay Content -->
+                    <div class="tour-overlay">
+                        <span class="small text-warning mb-1">
+                            <i class="bi bi-geo-alt-fill"></i> {{ package.location }}
+                        </span>
+                        <h5 class="fw-bold mb-1">{{ package.name }}</h5>
+                        <span class="small text-light opacity-75"><i class="bi bi-tag"></i> {{ package.travel_type }}</span>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-2 small">
+                            <span class="text-light opacity-75"><i class="bi bi-clock"></i> 5 days</span> {# Placeholder for duration #}
+                            <span class="text-warning"><i class="bi bi-star-fill"></i> 4.5</span> {# Placeholder for rating #}
+                        </div>
+                        
+                        <div class="mt-3 pt-3 border-top border-light border-opacity-25">
+                            <span class="text-white text-decoration-none small text-uppercase fw-bold">
+                                More Information <i class="bi bi-arrow-right ms-1"></i>
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-sm btn-outline-secondary" title="Manage Itinerary">
+                    <i class="bi bi-journal-text"></i> Itinerary
+                </a>
+                <a href="#" class="btn btn-sm btn-outline-secondary" title="Edit Package">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+                <a href="#" class="btn btn-sm btn-outline-danger" title="Delete Package">
+                    <i class="bi bi-trash"></i> Delete
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info text-center" role="alert">
+                You haven't created any packages yet. <a href="{% url 'create_package' %}" class="alert-link">Create your first package!</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

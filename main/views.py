@@ -315,12 +315,62 @@ def verify_email(request, uidb64, token):
 @role_required(allowed_roles=['vendor'])
 def vendor_dashboard(request):
     vendor = _get_vendor_or_403(request)
+    
+    query = request.GET.get('q', '')
     packages = TravelPackage.objects.filter(vendor=vendor)
+
+    if query:
+        packages = packages.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query) |
+            Q(location__icontains=query) |
+            Q(travel_type__icontains=query)
+        )
 
     context = {
         'packages': packages,
+        'query': query, # Pass the query back to the template
     }
     return render(request, 'main/vendor_dashboard.html', context)
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def vendor_bookings(request):
+    vendor = _get_vendor_or_403(request)
+    # Get all bookings for packages owned by the vendor
+    bookings = Booking.objects.filter(package__vendor=vendor).select_related('package', 'user').order_by('-booking_date')
+    
+    context = {
+        'bookings': bookings
+    }
+    return render(request, 'main/vendor_bookings.html', context)
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def update_booking_status(request, booking_id, new_status):
+    vendor = _get_vendor_or_403(request)
+    booking = get_object_or_404(Booking, id=booking_id, package__vendor=vendor)
+
+    if request.method == 'POST':
+        if new_status in ['confirmed', 'cancelled']:
+            booking.status = new_status
+            booking.save()
+            messages.success(request, f"Booking status updated to {new_status}.")
+        else:
+            messages.error(request, "Invalid status.")
+    
+    return redirect('vendor_bookings')
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def vendor_package_list(request):
+    vendor = _get_vendor_or_403(request)
+    packages = TravelPackage.objects.filter(vendor=vendor).order_by('-created_at')
+    
+    context = {
+        'packages': packages
+    }
+    return render(request, 'main/vendor_package_list.html', context)
 
 @login_required
 @role_required(allowed_roles=['vendor'])

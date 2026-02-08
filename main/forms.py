@@ -76,10 +76,12 @@ ItineraryFormSet = formset_factory(ItineraryDayForm, extra=1, can_delete=True)
 class TravelPackageForm(forms.ModelForm):
     class Meta:
         model = TravelPackage
-        fields = ['name', 'description', 'image', 'price', 'start_date', 'end_date']
+        fields = ['name', 'description', 'location', 'travel_type', 'image', 'price', 'start_date', 'end_date']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'travel_type': forms.TextInput(attrs={'class': 'form-control'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'price': forms.NumberInput(attrs={'class': 'form-control'}),
             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),

@@ -230,10 +230,10 @@
             <a href="{% url 'vendor_dashboard' %}" class="menu-link active">
                 <i class="bi bi-grid-alt"></i> Dashboard
             </a>
-            <a href="{% url 'create_package' %}" class="menu-link">
+            <a href="{% url 'vendor_package_list' %}" class="menu-link">
                 <i class="bi bi-briefcase"></i> My Packages
             </a>
-            <a href="#" class="menu-link">
+            <a href="{% url 'vendor_bookings' %}" class="menu-link">
                 <i class="bi bi-calendar-check"></i> Bookings
             </a>
             <a href="#" class="menu-link">
@@ -335,10 +335,47 @@
             </div>
         </div>
 
+        {% if query %}
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold m-0">Search Results for "{{ query }}"</h4>
+            <a href="{% url 'create_package' %}" class="btn btn-dark btn-sm rounded-pill px-4">Create New</a>
+        </div>
+
+        <div class="row g-4 mb-5">
+            {% for package in packages %}
+            <div class="col-md-6 col-xl-4">
+                <div class="package-card">
+                    <div class="package-img-wrap" style="background: url('{% if package.image %}{{ package.image.url }}{% else %}https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400{% endif %}') center/cover;">
+                        <span class="package-badge">{{ package.get_travel_type_display }}</span>
+                    </div>
+                    <div class="p-4">
+                        <h6 class="fw-bold text-truncate">{{ package.name }}</h6>
+                        <p class="text-muted small mb-3"><i class="bi bi-geo-alt me-1"></i> {{ package.location }}</p>
+                        <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                            <span class="fw-bold text-dark">${{ package.price }}</span>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'package_detail' package.id %}" class="action-btn"><i class="bi bi-eye"></i></a>
+                                <a href="#" class="action-btn"><i class="bi bi-pencil"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info text-center" role="alert">
+                    No packages found matching your search criteria.
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <div class="row g-4">
             <!-- Left Side: Performance & Portfolio -->
             <div class="col-lg-8">
                 
+                {% if not query %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h4 class="fw-bold m-0">Performance Overview</h4>
                     <select class="form-select form-select-sm w-auto rounded-pill px-3">
@@ -366,7 +403,7 @@
                 </div>
 
                 <div class="row g-4">
-                    {% for package in packages|slice:":3" %}
+                    {% for package in packages %}
                     <div class="col-md-6 col-xl-4">
                         <div class="package-card">
                             <div class="package-img-wrap" style="background: url('{% if package.image %}{{ package.image.url }}{% else %}https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=400{% endif %}') center/cover;">
@@ -387,6 +424,7 @@
                     </div>
                     {% endfor %}
                 </div>
+                {% endif %}
             </div>
 
             <!-- Right Side Widgets -->

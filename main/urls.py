@@ -24,6 +24,9 @@ urlpatterns = [
 
     # 5. VENDOR
     path('vendor/dashboard/', views.vendor_dashboard, name='vendor_dashboard'),
+    path('vendor/bookings/', views.vendor_bookings, name='vendor_bookings'),
+    path('vendor/booking/<int:booking_id>/update/<str:new_status>/', views.update_booking_status, name='update_booking_status'),
+    path('vendor/packages/', views.vendor_package_list, name='vendor_package_list'),
     path('vendor/package/create/', views.create_package, name='create_package'),
     path('vendor/package/<int:package_id>/manage-itinerary/', views.manage_itinerary, name='manage_itinerary'),
 
