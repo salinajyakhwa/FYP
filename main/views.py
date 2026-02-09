@@ -10,10 +10,11 @@ from django.template.loader import render_to_string
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import EmailMessage
+from django.utils import timezone # Added this import
 from django.contrib.auth import get_user_model # Replaced direct User import
 
 # Models
-from .models import TravelPackage, Booking, Review, UserProfile
+from .models import TravelPackage, Booking, Review, UserProfile, Vendor
 
 User = get_user_model() # Get the User model
 
@@ -37,8 +38,11 @@ from .decorators import role_required
 # New view for the root URL to handle redirection
 def root_redirect_view(request):
     if request.user.is_authenticated:
-        if hasattr(request.user, 'userprofile') and request.user.userprofile.role == 'vendor':
-            return redirect('vendor_dashboard')
+        if hasattr(request.user, 'userprofile'):
+            if request.user.userprofile.role == 'admin':
+                return redirect('admin_dashboard')
+            if request.user.userprofile.role == 'vendor':
+                return redirect('vendor_dashboard')
         # Default for logged-in travelers
         return redirect('dashboard')
     # Default for non-logged-in users
@@ -420,3 +424,66 @@ def manage_itinerary(request, package_id):
         'formset': formset
     }
     return render(request, 'main/manage_itinerary.html', context)
+
+# ==========================================
+# 5. ADMIN VIEWS
+# ==========================================
+@login_required
+@role_required(allowed_roles=['admin'])
+def admin_dashboard(request):
+    # Statistics
+    total_users = User.objects.count()
+    total_vendors = Vendor.objects.count()
+    total_packages = TravelPackage.objects.count()
+    total_bookings = Booking.objects.count()
+
+    # Recent Activity
+    recent_users = User.objects.order_by('-date_joined')[:5]
+    recent_packages = TravelPackage.objects.order_by('-created_at')[:5]
+
+    context = {
+        'total_users': total_users,
+        'total_vendors': total_vendors,
+        'total_packages': total_packages,
+        'total_bookings': total_bookings,
+        'recent_users': recent_users,
+        'recent_packages': recent_packages,
+    }
+    return render(request, 'main/admin_dashboard.html', context)
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def manage_users(request):
+    users = User.objects.filter(is_superuser=False).order_by('-date_joined')
+    return render(request, 'main/manage_users.html', {'users': users})
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def delete_user(request, user_id):
+    if request.method == 'POST':
+        user_to_delete = get_object_or_404(User, id=user_id)
+        if not user_to_delete.is_superuser:
+            user_to_delete.delete()
+            messages.success(request, f"User {user_to_delete.username} has been deleted.")
+        else:
+            messages.error(request, "Superusers cannot be deleted.")
+    return redirect('manage_users')
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def manage_vendors(request):
+    vendors = Vendor.objects.all().select_related('user_profile__user').order_by('name')
+    return render(request, 'main/manage_vendors.html', {'vendors': vendors})
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def update_vendor_status(request, vendor_id, new_status):
+    if request.method == 'POST':
+        vendor = get_object_or_404(Vendor, id=vendor_id)
+        if new_status in ['approved', 'rejected', 'pending']:
+            vendor.status = new_status
+            vendor.save()
+            messages.success(request, f"Vendor {vendor.name} has been {new_status}.")
+        else:
+            messages.error(request, "Invalid status.")
+    return redirect('manage_vendors')

@@ -24,6 +24,12 @@ class Vendor(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     website = models.URLField(blank=True, null=True)
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
 
     def __str__(self):
         return self.name

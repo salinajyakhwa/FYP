@@ -30,6 +30,13 @@ urlpatterns = [
     path('vendor/package/create/', views.create_package, name='create_package'),
     path('vendor/package/<int:package_id>/manage-itinerary/', views.manage_itinerary, name='manage_itinerary'),
 
+    # 5.1 MANAGEMENT
+    path('management/dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('management/users/', views.manage_users, name='manage_users'),
+    path('management/users/delete/<int:user_id>/', views.delete_user, name='delete_user'),
+    path('management/vendors/', views.manage_vendors, name='manage_vendors'),
+    path('management/vendor/<int:vendor_id>/update/<str:new_status>/', views.update_vendor_status, name='update_vendor_status'),
+
     # 6. EXTRAS
     path('about/', views.about, name='about'),
     path('compare/', views.compare_packages, name='compare_packages'),
