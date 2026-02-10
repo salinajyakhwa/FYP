@@ -3,96 +3,210 @@
 
 {% block title %}Admin Dashboard{% endblock %}
 
+{% block extra_css %}
+<!-- Include Google Fonts and Chart.js -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+    body {
+        background-color: #f8f9fa;
+        font-family: 'Inter', sans-serif;
+        color: #333;
+    }
+    
+    /* Sidebar Layout Fix */
+    .wrapper { display: flex; width: 100%; align-items: stretch; }
+    #sidebar { min-width: 250px; max-width: 250px; background: #fff; min-height: 100vh; border-right: 1px solid #eee; }
+    #content { width: 100%; padding: 20px 40px; }
+
+    /* Custom UI Components */
+    .brand-logo { padding: 20px; font-weight: 700; color: #007367; display: flex; align-items: center; gap: 10px; }
+    .nav-link-custom { padding: 12px 20px; color: #666; display: flex; align-items: center; text-decoration: none; border-radius: 8px; margin: 4px 15px; }
+    .nav-link-custom:hover, .nav-link-custom.active { background-color: #e6f1f0; color: #007367; }
+    .nav-link-custom i { margin-right: 12px; font-size: 1.1rem; }
+
+    /* Top Bar */
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .search-container { position: relative; width: 400px; }
+    .search-container input { border-radius: 10px; border: 1px solid #eee; padding: 10px 10px 10px 40px; width: 100%; background: #fcfcfc; }
+    .search-container i { position: absolute; left: 15px; top: 13px; color: #aaa; }
+
+    /* Cards */
+    .stat-card { background: #fff; border: none; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.02); padding: 24px; height: 100%; }
+    .stat-card .card-title { font-size: 0.9rem; color: #666; font-weight: 600; margin-bottom: 15px; }
+    .stat-card .main-val { font-size: 2rem; font-weight: 700; color: #111; }
+    .stat-icon-wrapper { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .trend-indicator { font-size: 0.85rem; font-weight: 600; margin-top: 10px; }
+    .trend-up { color: #2ecc71; }
+
+    /* Buttons */
+    .btn-action { border-radius: 10px; padding: 8px 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .btn-export { background-color: #009688; color: white; border: none; }
+    .btn-filter { background: white; border: 1px solid #eee; color: #444; }
+
+    /* Colors from screenshot */
+    .bg-teal-light { background-color: #e6f5f3; color: #007367; }
+    .bg-blue-light { background-color: #eef2ff; color: #4f46e5; }
+    .bg-yellow-light { background-color: #fffbeb; color: #d97706; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Admin Dashboard</h2>
+<div class="wrapper">
+    <!-- Sidebar -->
+    <nav id="sidebar">
+        <div class="brand-logo">
+            <i class="bi bi-airplane-fill"></i> TravelBooker
+        </div>
+        <div class="mt-4">
+            <a href="#" class="nav-link-custom active"><i class="bi bi-grid-fill"></i> Dashboard</a>
+            <a href="{% url 'manage_users' %}" class="nav-link-custom"><i class="bi bi-people"></i> Users Management</a>
+            <a href="{% url 'manage_vendors' %}" class="nav-link-custom"><i class="bi bi-shop"></i> Vendors Management</a>
+            <a href="#" class="nav-link-custom"><i class="bi bi-journal-text"></i> Packages</a>
+            <a href="#" class="nav-link-custom"><i class="bi bi-chat-left-text"></i> Feedback</a>
+        </div>
+    </nav>
 
-    <!-- Statistics Cards -->
-    <div class="row g-4 mb-5">
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-people-fill me-2"></i>Total Users</h5>
-                    <p class="card-text fs-4 fw-bold">{{ total_users }}</p>
+    <!-- Main Content -->
+    <div id="content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="search-container">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Search For Anything...">
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-light border"><i class="bi bi-sun"></i></button>
+                    <button class="btn btn-sm btn-light border"><i class="bi bi-moon"></i></button>
                 </div>
+                <span class="fw-bold"><img src="https://flagcdn.com/w20/gb.png" class="me-1"> English</span>
+                <i class="bi bi-bell fs-5 text-muted"></i>
+                <img src="https://ui-avatars.com/api/?name=Admin&background=random" class="rounded-circle" width="35">
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-shop me-2"></i>Total Vendors</h5>
-                    <p class="card-text fs-4 fw-bold">{{ total_vendors }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-briefcase-fill me-2"></i>Total Packages</h5>
-                    <p class="card-text fs-4 fw-bold">{{ total_packages }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-calendar-check-fill me-2"></i>Total Bookings</h5>
-                    <p class="card-text fs-4 fw-bold">{{ total_bookings }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Quick Actions -->
-    <div class="row g-4 mb-5">
-        <div class="col-md-6">
-            <div class="d-grid gap-2">
-                <a href="{% url 'manage_users' %}" class="btn btn-lg btn-primary">Manage Users</a>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold m-0">Dashboard</h2>
+            <div class="d-flex gap-2">
+                <button class="btn btn-filter btn-action"><i class="bi bi-filter"></i> Filters</button>
+                <button class="btn btn-export btn-action"><i class="bi bi-upload"></i> Export</button>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="d-grid gap-2">
-                <a href="{% url 'manage_vendors' %}" class="btn btn-lg btn-secondary">Manage Vendors</a>
-            </div>
-        </div>
-    </div>
 
-    <!-- Recent Activity -->
-    <div class="row g-4">
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0">Recent Users</h5>
+        <!-- Stats Cards -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="card-title text-uppercase">Total Users</div>
+                            <div class="main-val">{{ total_users }}</div>
+                            <div class="trend-indicator trend-up">
+                                <i class="bi bi-arrow-up"></i> 8.2% <span class="text-muted fw-normal">last 7 days</span>
+                            </div>
+                        </div>
+                        <div class="stat-icon-wrapper bg-teal-light">
+                            <i class="bi bi-people"></i>
+                        </div>
+                    </div>
                 </div>
-                <ul class="list-group list-group-flush">
-                    {% for user in recent_users %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ user.username }}
-                            <span class="badge bg-secondary rounded-pill">{{ user.date_joined|timesince }} ago</span>
-                        </li>
-                    {% empty %}
-                        <li class="list-group-item">No recent users.</li>
-                    {% endfor %}
-                </ul>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="card-title text-uppercase">Total Bookings</div>
+                            <div class="main-val">{{ total_bookings }}</div>
+                            <div class="trend-indicator trend-up">
+                                <i class="bi bi-arrow-up"></i> 5.4% <span class="text-muted fw-normal">last 7 days</span>
+                            </div>
+                        </div>
+                        <div class="stat-icon-wrapper bg-blue-light">
+                            <i class="bi bi-calendar-check"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="card-title text-uppercase">Vendor Session Time</div>
+                            <div class="main-val">1h 30m</div>
+                            <div class="trend-indicator trend-up">
+                                <i class="bi bi-arrow-up"></i> 12% <span class="text-muted fw-normal">last 7 days</span>
+                            </div>
+                        </div>
+                        <div class="stat-icon-wrapper bg-yellow-light">
+                            <i class="bi bi-clock"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0">Recent Packages</h5>
+
+        <!-- Charts Row -->
+        <div class="row g-4">
+            <div class="col-md-8">
+                <div class="stat-card">
+                    <h5 class="fw-bold mb-4">Demographic data</h5>
+                    <canvas id="demographicChart" height="250"></canvas>
                 </div>
-                <ul class="list-group list-group-flush">
-                    {% for package in recent_packages %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ package.name }}
-                            <span class="badge bg-secondary rounded-pill">{{ package.created_at|timesince }} ago</span>
-                        </li>
-                    {% empty %}
-                        <li class="list-group-item">No recent packages.</li>
-                    {% endfor %}
-                </ul>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <h5 class="fw-bold mb-4">Devices used</h5>
+                    <canvas id="devicesChart" height="250"></canvas>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Chart.js scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Demographic Bar Chart
+    const ctx1 = document.getElementById('demographicChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: ['0-17', '18-24', '25-34', '35-44', '45-54', '+55'],
+            datasets: [{
+                label: 'Male',
+                data: [300, 700, 250, 450, 550, 550],
+                backgroundColor: '#007367',
+                borderRadius: 5,
+            }, {
+                label: 'Female',
+                data: [200, 450, 400, 350, 200, 150],
+                backgroundColor: '#FFAD99',
+                borderRadius: 5,
+            }]
+        },
+        options: {
+            plugins: { legend: { position: 'top', align: 'start' } },
+            scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
+        }
+    });
+
+    // Devices Pie Chart
+    const ctx2 = document.getElementById('devicesChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['Desktop', 'Mobile', 'Tablet'],
+            datasets: [{
+                data: [45, 35, 20],
+                backgroundColor: ['#007367', '#FFC107', '#00BCD4'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+</script>
 {% endblock %}

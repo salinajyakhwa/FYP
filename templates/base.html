@@ -27,7 +27,7 @@
         <div class="container">
             {% if user.is_authenticated and user.userprofile.role == 'admin' %}
                 <a class="navbar-brand fw-bold text-primary" href="{% url 'admin_dashboard' %}">
-                    <i class="bi bi-shield-lock-fill"></i> Admin Panel
+                    <i class="bi bi-airplane-fill"></i> TravelBooker
                 </a>
                 <div class="ms-auto">
                     <form action="{% url 'logout' %}" method="post" class="d-inline">
