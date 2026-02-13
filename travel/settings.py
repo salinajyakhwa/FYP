@@ -38,6 +38,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    
+    # Third-party apps
+    'widget_tweaks',
+    'django_filters',
+
+    # My apps
     'main',
 ]
 

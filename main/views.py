@@ -78,17 +78,21 @@ def search_results(request):
     
     return render(request, 'main/_package_list_partial.html', {'packages': packages})
 
+from .filters import TravelPackageFilter
+
 def package_list(request):
-    query = request.GET.get('q')
-    if query:
-        packages = TravelPackage.objects.filter(
-            Q(name__icontains=query) |
-            Q(description__icontains=query) |
-            Q(vendor__name__icontains=query)
-        )
-    else:
-        packages = TravelPackage.objects.all()
-    return render(request, 'main/package_list.html', {'packages': packages, 'query': query})
+    packages_list = TravelPackage.objects.all().order_by('-created_at')
+    package_filter = TravelPackageFilter(request.GET, queryset=packages_list)
+    
+    paginator = Paginator(package_filter.qs, 9) # Show 9 packages per page
+    page_number = request.GET.get('page')
+    packages = paginator.get_page(page_number)
+
+    context = {
+        'packages': packages,
+        'filter': package_filter
+    }
+    return render(request, 'main/package_list.html', context)
 
 def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
@@ -97,11 +101,18 @@ def package_detail(request, package_id):
     
     user_can_review = False
     if request.user.is_authenticated:
-        # Check if user has a confirmed booking AND has not already reviewed
-        has_confirmed_booking = Booking.objects.filter(user=request.user, package=package, status='confirmed').exists()
-        has_already_reviewed = Review.objects.filter(user=request.user, package=package).exists()
-        if has_confirmed_booking and not has_already_reviewed:
-            user_can_review = True
+        # Check if user has a confirmed booking for a completed trip AND has not already reviewed
+        completed_booking_exists = Booking.objects.filter(
+            user=request.user,
+            package=package,
+            status='confirmed',
+            package__end_date__lt=timezone.now().date()
+        ).exists()
+
+        if completed_booking_exists:
+            has_already_reviewed = Review.objects.filter(user=request.user, package=package).exists()
+            if not has_already_reviewed:
+                user_can_review = True
             
     context = {
         'package': package,
@@ -251,13 +262,25 @@ def add_review(request, package_id):
         messages.error(request, 'You have already submitted a review for this package.')
         return redirect('package_detail', package_id=package.id)
 
+    # Server-side check to ensure user has a completed, confirmed booking
+    can_review = Booking.objects.filter(
+        user=request.user,
+        package=package,
+        status='confirmed',
+        package__end_date__lt=timezone.now().date()
+    ).exists()
+
+    if not can_review:
+        messages.error(request, 'You can only review packages after you have completed the trip.')
+        return redirect('package_detail', package_id=package.id)
+
     if request.method == 'POST':
         form = ReviewForm(request.POST)
         if form.is_valid():
             review = form.save(commit=False)
             review.package = package
             review.user = request.user
-            review.is_verified = True # Assuming booking implies verification
+            review.is_verified = True # The checks above imply verification
             review.save()
             messages.success(request, 'Thank you for your review!')
             return redirect('package_detail', package_id=package.id)
