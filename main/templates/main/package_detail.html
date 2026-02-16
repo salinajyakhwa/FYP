@@ -62,10 +62,11 @@
                         <h4 class="card-title">Booking Information</h4>
                         <p class="card-text fs-4"><strong>${{ package.price|floatformat:2 }}</strong></p>
                         <p><strong>Dates:</strong><br>{{ package.start_date }} to {{ package.end_date }}</p>
-                        <form action="{% url 'book_package' package.id %}" method="post">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-success w-100">Book Now</button>
-                        </form>
+                        <div class="d-grid">
+                            <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-success btn-lg">
+                                <i class="bi bi-credit-card-fill"></i> Proceed to Payment
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

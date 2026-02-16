@@ -17,7 +17,7 @@ urlpatterns = [
     
     # 4. PACKAGE DETAILS & BOOKING
     path('package/<int:package_id>/', views.package_detail, name='package_detail'),
-    path('book/<int:package_id>/', views.book_package, name='book_package'),
+
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),
     path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
@@ -48,4 +48,8 @@ urlpatterns = [
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='main/password_reset_confirm.html'), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='main/password_reset_complete.html'), name='password_reset_complete'),
 
+    # 8 PAYMENT
+    path('create-checkout-session/<int:package_id>/', views.create_checkout_session, name='create_checkout_session'),
+    path('payment-success/', views.payment_success, name= 'payment_success'),
+    path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),
 ]

@@ -12,6 +12,9 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import EmailMessage
 from django.utils import timezone # Added this import
 from django.contrib.auth import get_user_model # Replaced direct User import
+import stripe
+from django.conf import settings
+from django.urls import reverse
 
 # Models
 from .models import TravelPackage, Booking, Review, UserProfile, Vendor
@@ -220,21 +223,7 @@ def my_bookings(request):
     bookings = Booking.objects.filter(user=request.user).select_related('package').order_by('-booking_date')
     return render(request, 'main/my_bookings.html', {'bookings': bookings})
 
-@login_required
-def book_package(request, package_id):
-    package = get_object_or_404(TravelPackage, pk=package_id)
-    
-    # Logic to prevent double booking if needed
-    # ...
 
-    Booking.objects.create(
-        user=request.user,
-        package=package,
-        number_of_travelers=1, # Default to 1, ideally should come from a form
-        total_price=package.price
-    )
-    messages.success(request, f"Successfully booked {package.name}!")
-    return redirect('my_bookings')
 
 @login_required
 def cancel_booking(request, booking_id):
@@ -510,3 +499,101 @@ def update_vendor_status(request, vendor_id, new_status):
         else:
             messages.error(request, "Invalid status.")
     return redirect('manage_vendors')
+
+
+# ==========================================
+# 6. PAYMENT VIEWS
+# ==========================================
+
+@login_required
+def create_checkout_session(request, package_id):
+    """
+    Creates a Stripe Checkout session and redirects the user to the
+    Stripe-hosted payment page.
+    """
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    # Define the URLs for success and cancellation
+    success_url = request.build_absolute_uri(
+        reverse('payment_success')
+    ) + '?session_id={CHECKOUT_SESSION_ID}'
+    
+    cancel_url = request.build_absolute_uri(
+        reverse('payment_cancelled')
+    )
+
+    try:
+        # Create a new Checkout Session for the order
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': package.name,
+                        'description': f"Travel Package by {package.vendor.name}",
+                    },
+                    # Stripe expects amount in cents
+                    'unit_amount': int(package.price * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            customer_email=request.user.email,  # Pre-fill customer email
+        )
+
+        # Store package_id in session to retrieve after success
+        request.session['pending_booking_package_id'] = package.id
+
+        return redirect(checkout_session.url, code=303)
+
+    except Exception as e:
+        messages.error(
+            request,
+            f"Something went wrong with the payment process. Error: {e}"
+        )
+        return redirect('package_detail', package_id=package.id)
+
+
+def payment_success(request):
+    """
+    Handles successful payments. Creates the booking record and shows a
+    confirmation page.
+    """
+    package_id = request.session.get('pending_booking_package_id')
+
+    if not package_id:
+        messages.error(request, "Could not find a pending booking. Please try again.")
+        return redirect('package_list')
+
+    package = get_object_or_404(TravelPackage, pk=package_id)
+
+    # Create booking after successful payment
+    Booking.objects.create(
+        user=request.user,
+        package=package,
+        number_of_travelers=1,  # You can replace with form value later
+        total_price=package.price,
+        status='confirmed'
+    )
+
+    # Clear session variable
+    del request.session['pending_booking_package_id']
+
+    messages.success(request, f"Your booking for {package.name} is confirmed!")
+
+    return render(request, 'main/payment_success.html')
+
+
+def payment_cancelled(request):
+    """
+    Handles cancelled payments.
+    """
+    messages.warning(
+        request,
+        "Your payment was cancelled. You have not been charged."
+    )
+    return render(request, 'main/payment_cancelled.html')
