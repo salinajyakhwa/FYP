@@ -2,153 +2,265 @@
 {% load widget_tweaks %}
 
 {% block content %}
-<div class="p-4 p-md-5 mb-4 rounded text-body-emphasis bg-body-secondary">
-    <div class="col-lg-8 px-0">
-        <h1 class="display-4 fst-italic">Your Next Adventure Awaits</h1>
-        <p class="lead my-3">Filter, compare, and book travel packages from verified vendors. Find the best deals and plan your perfect trip with confidence.</p>
-    </div>
-</div>
 
-<!-- Filter Form -->
-<div class="card mb-4">
-    <div class="card-header">
-        Filter Packages
+<!-- 🌿 Hero Section -->
+<section class="hero-section mb-5">
+    <div class="hero-overlay"></div>
+    <div class="container text-center position-relative text-white">
+        <h1 class="hero-title">Find Your Perfect Journey</h1>
+        <p class="hero-subtitle">
+            Discover, compare, and book trusted travel experiences with confidence.
+        </p>
     </div>
-    <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
+</section>
+
+
+<!-- 🌿 Filter Card -->
+<div class="card filter-card mb-5 border-0">
+    <div class="card-body p-4">
+
+        <h5 class="section-title text-success mb-4">
+            Filter Travel Packages
+        </h5>
+
+        <form method="get" class="row g-3">
+
             <div class="col-md-4">
-                {{ filter.form.name.label_tag }}
-                {% render_field filter.form.name class="form-control" %}
+                <label class="form-label">Package Name</label>
+                {% render_field filter.form.name class="form-control input-green" placeholder="Search package..." %}
             </div>
+
             <div class="col-md-4">
-                {{ filter.form.location.label_tag }}
-                {% render_field filter.form.location class="form-control" %}
+                <label class="form-label">Location</label>
+                {% render_field filter.form.location class="form-control input-green" placeholder="Destination..." %}
             </div>
+
             <div class="col-md-4">
-                {{ filter.form.travel_type.label_tag }}
-                {% render_field filter.form.travel_type class="form-select" %}
+                <label class="form-label">Travel Type</label>
+                {% render_field filter.form.travel_type class="form-select input-green" %}
             </div>
+
             <div class="col-md-3">
-                {{ filter.form.price__gt.label_tag }}
-                {% render_field filter.form.price__gt class="form-control" placeholder="e.g., 500" %}
+                <label class="form-label">Min Price</label>
+                {% render_field filter.form.price__gt class="form-control input-green" placeholder="$500" %}
             </div>
+
             <div class="col-md-3">
-                {{ filter.form.price__lt.label_tag }}
-                {% render_field filter.form.price__lt class="form-control" placeholder="e.g., 1500" %}
+                <label class="form-label">Max Price</label>
+                {% render_field filter.form.price__lt class="form-control input-green" placeholder="$5000" %}
             </div>
+
             <div class="col-md-3">
-                {{ filter.form.start_date__gt.label_tag }}
-                {% render_field filter.form.start_date__gt class="form-control" type="date" %}
+                <label class="form-label">Start Date</label>
+                {% render_field filter.form.start_date__gt class="form-control input-green" type="date" %}
             </div>
+
             <div class="col-md-3">
-                {{ filter.form.start_date__lt.label_tag }}
-                {% render_field filter.form.start_date__lt class="form-control" type="date" %}
+                <label class="form-label">End Date</label>
+                {% render_field filter.form.start_date__lt class="form-control input-green" type="date" %}
             </div>
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary">Apply Filters</button>
-                <a href="{% url 'package_list' %}" class="btn btn-secondary">Clear Filters</a>
+
+            <div class="col-12 mt-3">
+
+                <button type="submit" class="btn btn-success px-4">
+                    Apply Filters
+                </button>
+
+                <a href="{% url 'package_list' %}"
+                   class="btn btn-outline-success px-4 ms-2">
+                    Clear
+                </a>
+
             </div>
+
         </form>
+
     </div>
 </div>
 
-<h2 class="mb-4">Available Travel Packages</h2>
 
+<!-- 🌿 Results Header + Compare Button -->
 <form id="compare-form" action="{% url 'compare_packages' %}" method="post">
-    {% csrf_token %}
-    <div class="mb-3 d-flex justify-content-between align-items-center">
-        <button type="submit" id="compare-button" class="btn btn-success" disabled>Compare Selected</button>
-        <span class="text-muted">Showing {{ packages.start_index }}-{{ packages.end_index }} of {{ packages.paginator.count }} results</span>
+{% csrf_token %}
+
+<div class="results-header mb-4">
+
+    <div>
+        <h3 class="fw-semibold text-success mb-1">
+            Available Packages
+        </h3>
+
+        <small class="text-muted">
+            Showing {{ packages.start_index }} – {{ packages.end_index }}
+            of {{ packages.paginator.count }} packages
+        </small>
     </div>
-    <div class="row">
-        {% for package in packages %}
-        <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title">{{ package.name }}</h5>
-                    <h6 class="card-subtitle mb-2 text-muted">Offered by: {{ package.vendor.name }}</h6>
-                    <p class="card-text">{{ package.description|truncatewords:20 }}</p>
-                    <div class="mt-auto">
-                        <p class="card-text fs-5"><strong>${{ package.price|floatformat:2 }}</strong></p>
-                        <a href="{% url 'package_detail' package.id %}" class="btn btn-primary">View Details</a>
-                        <div class="form-check mt-2">
-                            <input class="form-check-input compare-checkbox" type="checkbox" name="package_ids" value="{{ package.id }}" id="compare-{{ package.id }}">
-                            <label class="form-check-label" for="compare-{{ package.id }}">
-                                Compare
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% empty %}
-        <div class="col">
-            <p>No travel packages match your filter criteria.</p>
-        </div>
-        {% endfor %}
-    </div>
+
+    <button type="submit"
+            id="compare-button"
+            class="btn compare-btn"
+            disabled>
+
+        Compare Selected
+
+    </button>
+
+</div>
+
+
+<!-- 🌿 Package Cards -->
+<div class="row">
+
+    {% include "main/_package_list_partial.html" %}
+
+</div>
+
 </form>
 
-<!-- Pagination -->
+
+<!-- 🌿 Pagination -->
 {% if packages.has_other_pages %}
-<nav aria-label="Page navigation">
+<nav class="mt-5">
     <ul class="pagination justify-content-center">
+
         {% if packages.has_previous %}
-            <li class="page-item"><a class="page-link" href="?page=1">&laquo; First</a></li>
-            <li class="page-item"><a class="page-link" href="?page={{ packages.previous_page_number }}">Previous</a></li>
+            <li class="page-item">
+                <a class="page-link text-success"
+                   href="?page={{ packages.previous_page_number }}">
+                    Previous
+                </a>
+            </li>
         {% endif %}
 
-        <li class="page-item disabled"><a class="page-link" href="#">Page {{ packages.number }} of {{ packages.paginator.num_pages }}</a></li>
+        <li class="page-item active">
+            <span class="page-link bg-success border-success">
+                {{ packages.number }}
+            </span>
+        </li>
 
         {% if packages.has_next %}
-            <li class="page-item"><a class="page-link" href="?page={{ packages.next_page_number }}">Next</a></li>
-            <li class="page-item"><a class="page-link" href="?page={{ packages.paginator.num_pages }}">Last &raquo;</a></li>
+            <li class="page-item">
+                <a class="page-link text-success"
+                   href="?page={{ packages.next_page_number }}">
+                    Next
+                </a>
+            </li>
         {% endif %}
+
     </ul>
 </nav>
 {% endif %}
 
+
 {% endblock %}
+
+
 
 {% block scripts %}
 <script>
-    const compareButton = document.getElementById('compare-button');
-    const checkboxes = document.querySelectorAll('.compare-checkbox');
-    const compareForm = document.getElementById('compare-form');
 
-    function updateCompareButtonState() {
-        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-        compareButton.disabled = checkedCount < 2;
-    }
+const compareButton = document.getElementById('compare-button');
+const checkboxes = document.querySelectorAll('.compare-checkbox');
 
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateCompareButtonState);
-    });
+function updateCompareButtonState() {
 
-    compareForm.addEventListener('submit', function(event) {
-        const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-        if (checkedCount < 2) {
-            event.preventDefault();
-            alert('Please select at least two packages to compare.');
-        }
-    });
+    const checkedCount =
+        document.querySelectorAll('.compare-checkbox:checked').length;
 
-    // Preserve filters on pagination
-    document.querySelectorAll('.pagination a').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            let url = new URL(this.href);
-            let currentParams = new URLSearchParams(window.location.search);
-            currentParams.forEach((value, key) => {
-                if (key !== 'page') {
-                    url.searchParams.set(key, value);
-                }
-            });
-            window.location.href = url.toString();
-        });
-    });
+    compareButton.disabled = checkedCount < 2;
 
-    // Initial state check
-    updateCompareButtonState();
+}
+
+checkboxes.forEach(cb =>
+    cb.addEventListener('change', updateCompareButtonState)
+);
+
+updateCompareButtonState();
+
 </script>
 {% endblock %}
+
+
+
+<!-- 🌿 Green Theme Styling -->
+<style>
+
+/* Hero */
+.hero-section {
+    background: linear-gradient(rgba(25,135,84,0.7), rgba(25,135,84,0.7)),
+                url('/static/images/hero.jpg') center/cover no-repeat;
+    padding: 100px 20px;
+    border-radius: 12px;
+}
+
+.hero-title {
+    font-size: 2.5rem;
+    font-weight: 600;
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+}
+
+/* Filter Card */
+.filter-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* Section Title */
+.section-title {
+    font-weight: 600;
+}
+
+/* Inputs */
+.input-green:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.2rem rgba(25,135,84,0.15);
+}
+
+/* Results Header */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Compare Button */
+.compare-btn {
+
+    background: #198754;
+    color: white;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+
+    font-weight: 500;
+
+    transition: all 0.2s ease;
+
+}
+
+.compare-btn:hover:not(:disabled) {
+
+    background: #157347;
+    transform: translateY(-1px);
+
+}
+
+.compare-btn:disabled {
+
+    background: #cfd8dc;
+    cursor: not-allowed;
+
+}
+
+/* Pagination */
+.pagination .page-link {
+
+    border-radius: 6px;
+    margin: 0 3px;
+
+}
+
+</style>
