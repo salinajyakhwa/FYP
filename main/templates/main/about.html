@@ -97,7 +97,34 @@
 <section class="container text-center py-4">
     <h3 class="mb-4">Ready for Your Next Adventure?</h3>
     <a href="{% url 'package_list' %}" class="btn btn-primary btn-lg me-3">Explore Packages</a>
-    <a href="{% url 'register' %}" class="btn btn-outline-primary btn-lg">Become a Vendor</a>
+    
+    <!-- Button to trigger the modal -->
+    <button type="button" class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#confirmVendorRegisterModal">
+        Become a Vendor
+    </button>
 </section>
+
+<!-- Confirm Vendor Register Modal -->
+<div class="modal fade" id="confirmVendorRegisterModal" tabindex="-1" aria-labelledby="confirmVendorRegisterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmVendorRegisterModalLabel">Confirm Vendor Registration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if user.is_authenticated %}
+                    You are currently logged in. Are you sure you want to log out and register a new vendor account?
+                {% else %}
+                    Are you sure you want to register as a vendor?
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="{% url 'register' %}?role=vendor" class="btn btn-primary">Yes, Register as Vendor</a>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
