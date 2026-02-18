@@ -1,73 +1,103 @@
 {% extends "base.html" %}
 
+{% block title %}About Us - TravelBooker{% endblock %}
+
 {% block content %}
 
-<!-- ================= ABOUT HERO ================= -->
-<section class="hero-banner py-5">
-    <div class="container text-center text-white">
-        <h1 class="fw-bold">About TravelBooker</h1>
-        <p class="lead mt-3">
-            Making travel planning simple, transparent, and trustworthy.
-        </p>
+<!-- Hero Section -->
+<section class="bg-primary text-white text-center py-5 mb-5">
+    <div class="container">
+        <h1 class="display-4 fw-bold">Your Journey, Our Passion</h1>
+        <p class="lead mt-3">Redefining travel planning with transparency, trust, and unparalleled choice.</p>
     </div>
 </section>
 
-<!-- ================= ABOUT CONTENT ================= -->
-<section class="py-5">
+<!-- Our Mission Section -->
+<section class="container mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+            <h2 class="mb-4 fw-bold">Our Mission</h2>
+            <p class="fs-5 text-muted">
+                At TravelBooker, we believe that planning your next adventure should be as exciting as the trip itself.
+                We're here to cut through the clutter of fragmented information and unreliable reviews, offering a
+                centralized platform where you can effortlessly discover, compare, and book travel packages from
+                a diverse range of trusted vendors.
+            </p>
+            <p class="fs-5 text-muted">
+                Our goal is to empower travelers with clear, honest information and to provide a fair marketplace
+                for travel service providers of all sizes.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Why Choose TravelBooker? Section -->
+<section class="bg-light py-5 mb-5">
     <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-lg-9">
-
-                <!-- Intro -->
-                <p class="lead text-center mb-5">
-                    TravelBooker is a travel package comparison platform designed to help travelers
-                    discover, compare, and book trips from verified vendors — all in one place.
-                    Our goal is to remove confusion and bring clarity to your travel decisions.
-                </p>
-
-                <!-- Vision -->
-                <div class="mb-5">
-                    <h3 class="text-center mb-3">Our Vision</h3>
-                    <p class="text-muted text-center">
-                        We believe planning a trip should feel inspiring, not overwhelming.
-                        In a crowded travel market, TravelBooker serves as a reliable guide —
-                        offering transparent pricing, real reviews, and carefully curated travel options
-                        so you can focus on what truly matters: the journey.
-                    </p>
+        <h2 class="text-center mb-5 fw-bold">Why Choose TravelBooker?</h2>
+        <div class="row text-center">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <i class="bi bi-arrow-left-right text-primary mb-3" style="font-size: 3rem;"></i>
+                        <h4 class="fw-bold">Seamless Package Comparison</h4>
+                        <p class="text-muted">
+                            Instantly compare travel packages from multiple vendors side-by-side.
+                            Find the best deals, itineraries, and services tailored to your preferences,
+                            all in one convenient place.
+                        </p>
+                    </div>
                 </div>
-
-                <!-- Reviews -->
-                <div class="mb-5">
-                    <h3 class="text-center mb-3">Verified Reviews</h3>
-                    <p class="text-muted text-center">
-                        Trust is at the core of our platform. That’s why only travelers who have
-                        completed a booking through TravelBooker can leave a review.
-                        This ensures every rating and review reflects a genuine travel experience,
-                        helping you make confident, informed choices.
-                    </p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <i class="bi bi-shield-check text-success mb-3" style="font-size: 3rem;"></i>
+                        <h4 class="fw-bold">Verified & Trusted Reviews</h4>
+                        <p class="text-muted">
+                            Our unique system ensures that only travelers who have completed their bookings
+                            through TravelBooker can leave reviews. This guarantees authentic feedback
+                            you can truly rely on.
+                        </p>
+                    </div>
                 </div>
-
-                <!-- Vendors -->
-                <div class="mb-5">
-                    <h3 class="text-center mb-3">For Our Vendors</h3>
-                    <p class="text-muted text-center">
-                        We partner with travel vendors of all sizes to create a fair and open marketplace.
-                        TravelBooker gives vendors the tools to showcase their packages to a wider audience,
-                        build credibility through verified feedback, and grow their business sustainably.
-                    </p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <i class="bi bi-people-fill text-info mb-3" style="font-size: 3rem;"></i>
+                        <h4 class="fw-bold">Empowering All Vendors</h4>
+                        <p class="text-muted">
+                            We provide an equitable marketplace for small and mid-sized travel service providers
+                            to showcase their unique offerings to a wider audience, fostering growth and diversity.
+                        </p>
+                    </div>
                 </div>
-
-                <!-- Closing -->
-                <div class="text-center mt-5">
-                    <h5 class="fw-semibold">Why TravelBooker?</h5>
-                    <p class="text-muted">
-                        Transparent comparisons · Trusted reviews · Seamless booking experience
-                    </p>
-                </div>
-
             </div>
         </div>
     </div>
+</section>
+
+<!-- Our Story Section -->
+<section class="container mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+            <h2 class="mb-4 fw-bold">Our Story</h2>
+            <p class="fs-5 text-muted">
+                TravelBooker was born out of a simple frustration: the overwhelming complexity of planning a trip online.
+                We envisioned a platform where travelers could make informed decisions without endless searching,
+                and where genuine experiences were celebrated through honest feedback. From that vision,
+                TravelBooker emerged – a commitment to clarity, trust, and making every journey memorable.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="container text-center py-4">
+    <h3 class="mb-4">Ready for Your Next Adventure?</h3>
+    <a href="{% url 'package_list' %}" class="btn btn-primary btn-lg me-3">Explore Packages</a>
+    <a href="{% url 'register' %}" class="btn btn-outline-primary btn-lg">Become a Vendor</a>
 </section>
 
 {% endblock %}
