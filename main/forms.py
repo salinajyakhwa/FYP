@@ -8,6 +8,15 @@ from django.utils import timezone
 
 from .models import Review, TravelPackage, UserProfile, Vendor
 
+class UserProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['bio', 'profile_picture']
+        widgets = {
+            'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'profile_picture': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }
+
 class UserUpdateForm(UserChangeForm):
     password = None
     class Meta:
