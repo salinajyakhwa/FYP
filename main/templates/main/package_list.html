@@ -1,266 +1,246 @@
 {% extends "base.html" %}
 {% load widget_tweaks %}
 
-{% block content %}
+{% block title %}Explore Journeys | TravelBooker{% endblock %}
 
-<!-- 🌿 Hero Section -->
-<section class="hero-section mb-5">
-    <div class="hero-overlay"></div>
-    <div class="container text-center position-relative text-white">
-        <h1 class="hero-title">Find Your Perfect Journey</h1>
-        <p class="hero-subtitle">
-            Discover, compare, and book trusted travel experiences with confidence.
-        </p>
-    </div>
-</section>
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --brand-primary: #1b4332; /* Deep Forest */
+        --brand-accent: #2d6a4f;  /* Medium Sea */
+        --brand-light: #f0fdf4;   /* Mint Mist */
+        --text-main: #1a1c1e;
+        --text-muted: #64748b;
+        --surface: #ffffff;
+        --border-color: #e2e8f0;
+        --radius-lg: 16px;
+        --radius-md: 12px;
+        --shadow-subtle: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+    }
 
+    body { 
+        background-color: #f8faf9; 
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: var(--text-main);
+    }
 
-<!-- 🌿 Filter Card -->
-<div class="card filter-card mb-5 border-0">
-    <div class="card-body p-4">
+    /* 🌿 Seamless Hero & Search */
+    .hero-wrap {
+        background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('/static/images/hero.jpg') center/cover no-repeat;
+        height: 320px;
+        display: flex;
+        align-items: center;
+        border-bottom-left-radius: 40px;
+        border-bottom-right-radius: 40px;
+        margin-bottom: -60px; /* Pulls search bar up */
+    }
 
-        <h5 class="section-title text-success mb-4">
-            Filter Travel Packages
-        </h5>
+    .search-container {
+        background: var(--surface);
+        padding: 30px;
+        border-radius: var(--radius-lg);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        border: 1px solid var(--border-color);
+        position: relative;
+        z-index: 10;
+    }
 
-        <form method="get" class="row g-3">
+    .form-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+    }
 
-            <div class="col-md-4">
-                <label class="form-label">Package Name</label>
-                {% render_field filter.form.name class="form-control input-green" placeholder="Search package..." %}
-            </div>
+    .input-pro {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 12px 16px;
+        font-size: 0.9rem;
+        background-color: #fcfdfe;
+        transition: all 0.2s;
+    }
 
-            <div class="col-md-4">
-                <label class="form-label">Location</label>
-                {% render_field filter.form.location class="form-control input-green" placeholder="Destination..." %}
-            </div>
+    .input-pro:focus {
+        border-color: var(--brand-accent);
+        box-shadow: 0 0 0 4px rgba(45, 106, 79, 0.1);
+        background-color: #fff;
+    }
 
-            <div class="col-md-4">
-                <label class="form-label">Travel Type</label>
-                {% render_field filter.form.travel_type class="form-select input-green" %}
-            </div>
+    /* 🌿 Results Toolbar */
+    .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-top: 100px; /* Space for overlapped search */
+        margin-bottom: 24px;
+    }
 
-            <div class="col-md-3">
-                <label class="form-label">Min Price</label>
-                {% render_field filter.form.price__gt class="form-control input-green" placeholder="$500" %}
-            </div>
+    /* 🌿 Floating Compare Bar (The "Pro" Feature) */
+    #compare-drawer {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(150%);
+        background: var(--brand-primary);
+        color: white;
+        padding: 16px 32px;
+        border-radius: 100px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        z-index: 1000;
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
 
-            <div class="col-md-3">
-                <label class="form-label">Max Price</label>
-                {% render_field filter.form.price__lt class="form-control input-green" placeholder="$5000" %}
-            </div>
+    #compare-drawer.active { transform: translateX(-50%) translateY(0); }
 
-            <div class="col-md-3">
-                <label class="form-label">Start Date</label>
-                {% render_field filter.form.start_date__gt class="form-control input-green" type="date" %}
-            </div>
+    .compare-btn-pill {
+        background: #fff;
+        color: var(--brand-primary);
+        border: none;
+        padding: 8px 20px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        transition: background 0.2s;
+    }
 
-            <div class="col-md-3">
-                <label class="form-label">End Date</label>
-                {% render_field filter.form.start_date__lt class="form-control input-green" type="date" %}
-            </div>
+    .compare-btn-pill:hover { background: var(--brand-light); }
 
-            <div class="col-12 mt-3">
+    /* 🌿 Pagination Styling */
+    .page-link {
+        border: none;
+        color: var(--text-muted);
+        padding: 10px 18px;
+        font-weight: 600;
+        border-radius: 8px !important;
+        margin: 0 4px;
+    }
 
-                <button type="submit" class="btn btn-success px-4">
-                    Apply Filters
-                </button>
-
-                <a href="{% url 'package_list' %}"
-                   class="btn btn-outline-success px-4 ms-2">
-                    Clear
-                </a>
-
-            </div>
-
-        </form>
-
-    </div>
-</div>
-
-
-<!-- 🌿 Results Header + Compare Button -->
-<form id="compare-form" action="{% url 'compare_packages' %}" method="post">
-{% csrf_token %}
-
-<div class="results-header mb-4">
-
-    <div>
-        <h3 class="fw-semibold text-success mb-1">
-            Available Packages
-        </h3>
-
-        <small class="text-muted">
-            Showing {{ packages.start_index }} – {{ packages.end_index }}
-            of {{ packages.paginator.count }} packages
-        </small>
-    </div>
-
-    <button type="submit"
-            id="compare-button"
-            class="btn compare-btn"
-            disabled>
-
-        Compare Selected
-
-    </button>
-
-</div>
-
-
-<!-- 🌿 Package Cards -->
-<div class="row">
-
-    {% include "main/_package_list_partial.html" %}
-
-</div>
-
-</form>
-
-
-<!-- 🌿 Pagination -->
-{% if packages.has_other_pages %}
-<nav class="mt-5">
-    <ul class="pagination justify-content-center">
-
-        {% if packages.has_previous %}
-            <li class="page-item">
-                <a class="page-link text-success"
-                   href="?page={{ packages.previous_page_number }}">
-                    Previous
-                </a>
-            </li>
-        {% endif %}
-
-        <li class="page-item active">
-            <span class="page-link bg-success border-success">
-                {{ packages.number }}
-            </span>
-        </li>
-
-        {% if packages.has_next %}
-            <li class="page-item">
-                <a class="page-link text-success"
-                   href="?page={{ packages.next_page_number }}">
-                    Next
-                </a>
-            </li>
-        {% endif %}
-
-    </ul>
-</nav>
-{% endif %}
-
-
+    .page-item.active .page-link {
+        background-color: var(--brand-primary);
+        color: #fff;
+    }
+</style>
 {% endblock %}
 
+{% block content %}
+<div class="hero-wrap">
+    <div class="container text-center text-white">
+        <h1 class="display-5 fw-bold mb-2">Find Your Perfect Journey</h1>
+        <p class="opacity-75">Curated experiences from trusted local experts</p>
+    </div>
+</div>
 
+<div class="container">
+    <!-- 🌿 Advanced Filter Bar -->
+    <div class="search-container">
+        <form method="get" class="row g-3">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Where to?</label>
+                {% render_field filter.form.location class="form-control input-pro" placeholder="Destination name..." %}
+            </div>
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label">Travel Type</label>
+                {% render_field filter.form.travel_type class="form-select input-pro" %}
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Price Range</label>
+                <div class="input-group">
+                    {% render_field filter.form.price__gt class="form-control input-pro" placeholder="Min" %}
+                    {% render_field filter.form.price__lt class="form-control input-pro" placeholder="Max" %}
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label">Timeline</label>
+                {% render_field filter.form.start_date__gt class="form-control input-pro" type="date" %}
+            </div>
+            <div class="col-lg-2 col-md-12 d-flex align-items-end">
+                <button type="submit" class="btn btn-dark w-100 py-2 fw-bold" style="border-radius: 12px; background: var(--brand-primary);">
+                    Search
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 🌿 Results Header -->
+    <div class="toolbar">
+        <div>
+            <h4 class="fw-bold mb-0">Discover Packages</h4>
+            <p class="text-muted small mb-0">{{ packages.paginator.count }} unique journeys found</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'package_list' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Clear Filters</a>
+        </div>
+    </div>
+
+    <!-- 🌿 Grid -->
+    <form id="compare-form" action="{% url 'compare_packages' %}" method="post">
+        {% csrf_token %}
+        <div class="row g-4">
+            {% include "main/_package_list_partial.html" %}
+        </div>
+
+        <!-- 🌿 Sticky Compare Notification Bar -->
+        <div id="compare-drawer">
+            <span class="small fw-medium"><span id="compare-count">0</span> packages selected for comparison</span>
+            <button type="submit" class="compare-btn-pill">Compare Now</button>
+            <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.7rem;" onclick="uncheckAll()"></button>
+        </div>
+    </form>
+
+    <!-- 🌿 Pagination -->
+    {% if packages.has_other_pages %}
+    <nav class="py-5">
+        <ul class="pagination justify-content-center">
+            {% if packages.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ packages.previous_page_number }}"><i class="bi bi-chevron-left"></i></a>
+            </li>
+            {% endif %}
+            
+            <li class="page-item active"><span class="page-link">{{ packages.number }}</span></li>
+            
+            {% if packages.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ packages.next_page_number }}"><i class="bi bi-chevron-right"></i></a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
 
 {% block scripts %}
 <script>
+    const drawer = document.getElementById('compare-drawer');
+    const countSpan = document.getElementById('compare-count');
+    const checkboxes = document.querySelectorAll('.compare-checkbox');
 
-const compareButton = document.getElementById('compare-button');
-const checkboxes = document.querySelectorAll('.compare-checkbox');
+    function updateDrawer() {
+        const checked = document.querySelectorAll('.compare-checkbox:checked');
+        const count = checked.length;
+        
+        countSpan.innerText = count;
+        
+        if (count >= 1) {
+            drawer.classList.add('active');
+        } else {
+            drawer.classList.remove('active');
+        }
+    }
 
-function updateCompareButtonState() {
+    function uncheckAll() {
+        checkboxes.forEach(cb => cb.checked = false);
+        updateDrawer();
+    }
 
-    const checkedCount =
-        document.querySelectorAll('.compare-checkbox:checked').length;
-
-    compareButton.disabled = checkedCount < 2;
-
-}
-
-checkboxes.forEach(cb =>
-    cb.addEventListener('change', updateCompareButtonState)
-);
-
-updateCompareButtonState();
-
+    checkboxes.forEach(cb => cb.addEventListener('change', updateDrawer));
 </script>
 {% endblock %}
-
-
-
-<!-- 🌿 Green Theme Styling -->
-<style>
-
-/* Hero */
-.hero-section {
-    background: linear-gradient(rgba(25,135,84,0.7), rgba(25,135,84,0.7)),
-                url('/static/images/hero.jpg') center/cover no-repeat;
-    padding: 100px 20px;
-    border-radius: 12px;
-}
-
-.hero-title {
-    font-size: 2.5rem;
-    font-weight: 600;
-}
-
-.hero-subtitle {
-    font-size: 1.1rem;
-}
-
-/* Filter Card */
-.filter-card {
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-}
-
-/* Section Title */
-.section-title {
-    font-weight: 600;
-}
-
-/* Inputs */
-.input-green:focus {
-    border-color: #198754;
-    box-shadow: 0 0 0 0.2rem rgba(25,135,84,0.15);
-}
-
-/* Results Header */
-.results-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Compare Button */
-.compare-btn {
-
-    background: #198754;
-    color: white;
-    border: none;
-    padding: 10px 22px;
-    border-radius: 8px;
-
-    font-weight: 500;
-
-    transition: all 0.2s ease;
-
-}
-
-.compare-btn:hover:not(:disabled) {
-
-    background: #157347;
-    transform: translateY(-1px);
-
-}
-
-.compare-btn:disabled {
-
-    background: #cfd8dc;
-    cursor: not-allowed;
-
-}
-
-/* Pagination */
-.pagination .page-link {
-
-    border-radius: 6px;
-    margin: 0 3px;
-
-}
-
-</style>
