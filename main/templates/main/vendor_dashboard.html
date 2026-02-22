@@ -1,162 +1,355 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Vendor Dashboard{% endblock %}
+{% block title %}Analytics Overview | Vendor Portal{% endblock %}
+
+{% block extra_css %}
+<!-- Google Fonts: Inter for that clean UI look -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --base-bg: #f9fafb;
+        --surface-card: #ffffff;
+        --primary-main: #4f46e5; /* Indigo 600 */
+        --primary-hover: #4338ca;
+        --text-heading: #111827;
+        --text-body: #4b5563;
+        --text-light: #9ca3af;
+        --border-color: #e5e7eb;
+        --success-soft: #ecfdf5;
+        --success-solid: #059669;
+    }
+
+    body { 
+        background-color: var(--base-bg); 
+        color: var(--text-body); 
+        font-family: 'Inter', sans-serif; 
+        letter-spacing: -0.01em;
+    }
+
+    /* Subtle Page Header */
+    .page-header {
+        padding: 2rem 0;
+        border-bottom: 1px solid var(--border-color);
+        background: #fff;
+        margin-bottom: 2rem;
+    }
+
+    /* Professional Card Styling */
+    .app-card {
+        background: var(--surface-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+
+    /* KPI Stats */
+    .stat-label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .stat-value {
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: var(--text-heading);
+        margin: 0.25rem 0;
+    }
+    .stat-icon-box {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: var(--base-bg);
+        color: var(--primary-main);
+    }
+
+    /* Data Table Refinement */
+    .table { margin-bottom: 0; }
+    .table thead th {
+        background: var(--base-bg);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-light);
+        padding: 12px 24px;
+        border-top: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .table tbody td {
+        padding: 16px 24px;
+        vertical-align: middle;
+        font-size: 0.875rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    /* Professional Status Dots */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 10px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .status-pill::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .status-confirmed { background: #dcfce7; color: #166534; }
+    .status-confirmed::before { background: #22c55e; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
+    .status-pending::before { background: #eab308; }
+
+    /* Buttons */
+    .btn-indigo {
+        background-color: var(--primary-main);
+        color: white;
+        font-weight: 500;
+        border-radius: 8px;
+        padding: 10px 18px;
+        border: none;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .btn-indigo:hover { background-color: var(--primary-hover); color: white; }
+
+    .chart-container { padding: 1rem; position: relative; height: 320px; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">Vendor Dashboard</h1>
+<!-- Top Navigation Header -->
+<div class="page-header">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item small"><a href="#" class="text-decoration-none text-muted">Organization</a></li>
+                        <li class="breadcrumb-item small active">Dashboard</li>
+                    </ol>
+                </nav>
+                <h1 class="h3 fw-bold text-dark mb-0">Analytics Overview</h1>
+            </div>
+            <div class="mt-3 mt-md-0 d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                    <i class="bi bi-download me-2"></i>Export
+                </button>
+                <a href="{% url 'create_package' %}" class="btn btn-indigo d-flex align-items-center">
+                    <i class="bi bi-plus-lg me-2"></i>New Package
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <!-- Stat Cards -->
-    <div class="row mb-4">
+<div class="container pb-5">
+    <!-- Stat Grid -->
+    <div class="row g-4 mb-4">
         <div class="col-md-6">
-            <div class="card text-white bg-success shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-cash-coin"></i> Total Revenue</h5>
-                    <p class="card-text fs-3 fw-bold">${{ total_revenue|floatformat:2 }}</p>
+            <div class="app-card p-4">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <span class="stat-label">Total Net Revenue</span>
+                        <div class="stat-value">${{ total_revenue|floatformat:2 }}</div>
+                        <span class="text-success small fw-medium">
+                            <i class="bi bi-arrow-up-short"></i>12% vs last month
+                        </span>
+                    </div>
+                    <div class="stat-icon-box">
+                        <i class="bi bi-bank fs-4"></i>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card text-white bg-primary shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-ticket-perforated-fill"></i> Total Bookings</h5>
-                    <p class="card-text fs-3 fw-bold">{{ total_bookings_count }}</p>
+            <div class="app-card p-4">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <span class="stat-label">Confirmed Bookings</span>
+                        <div class="stat-value">{{ total_bookings_count }}</div>
+                        <span class="text-muted small">Active reservations</span>
+                    </div>
+                    <div class="stat-icon-box text-primary">
+                        <i class="bi bi-calendar-event fs-4"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Charts Section -->
-    <div class="row mb-4">
-        <!-- Monthly Revenue Chart -->
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
         <div class="col-lg-8">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    Monthly Revenue (Last 12 Months)
+            <div class="app-card">
+                <div class="px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0">Revenue Growth</h6>
+                    <select class="form-select form-select-sm w-auto border-0 bg-light">
+                        <option>Last 12 Months</option>
+                    </select>
                 </div>
-                <div class="card-body">
+                <div class="chart-container">
                     <canvas id="monthlyRevenueChart"></canvas>
                 </div>
             </div>
         </div>
-        <!-- Bookings by Package Chart -->
         <div class="col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    Top 5 Packages by Bookings
+            <div class="app-card">
+                <div class="px-4 py-3 border-bottom">
+                    <h6 class="fw-bold mb-0">Top Performing Packages</h6>
                 </div>
-                <div class="card-body">
+                <div class="chart-container">
                     <canvas id="packageBookingsChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Package List Section -->
-    <div class="card shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Your Packages</h5>
-            <a href="{% url 'create_package' %}" class="btn btn-primary btn-sm">
-                <i class="bi bi-plus-circle-fill"></i> Create New Package
-            </a>
+    <!-- Recent Transactions Table -->
+    <div class="app-card overflow-hidden">
+        <div class="px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0">Recent Activity</h6>
+            <a href="{% url 'vendor_bookings' %}" class="btn btn-link btn-sm text-decoration-none p-0">View all activity</a>
         </div>
-        <div class="card-body">
-            <!-- Search form can go here if you want to keep it -->
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Package Name</th>
-                            <th>Location</th>
-                            <th>Price</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for package in packages %}
-                        <tr>
-                            <td>{{ package.name }}</td>
-                            <td>{{ package.location }}</td>
-                            <td>${{ package.price|floatformat:2 }}</td>
-                            <td>
-                                <a href="{% url 'package_detail' package.id %}" class="btn btn-sm btn-outline-secondary">View</a>
-                                <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-sm btn-outline-primary">Manage Itinerary</a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center">You have not created any packages yet.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Package</th>
+                        <th>Customer</th>
+                        <th>Transaction Date</th>
+                        <th>Status</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in recent_bookings %}
+                    <tr>
+                        <td><span class="fw-600 text-dark">{{ booking.package.name }}</span></td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="avatar-circle me-2">{{ booking.user.username|slice:":1"|upper }}</span>
+                                {{ booking.user.username }}
+                            </div>
+                        </td>
+                        <td class="text-muted">{{ booking.booking_date|date:"M d, Y" }}</td>
+                        <td>
+                            <span class="status-pill {% if booking.status == 'confirmed' %}status-confirmed{% else %}status-pending{% endif %}">
+                                {{ booking.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="text-end fw-bold text-dark">${{ booking.total_price|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <p class="text-muted mb-0">No booking records found for this period.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+
+<style>
+    /* Table specific micro-styles */
+    .avatar-circle {
+        width: 28px; height: 28px; background: #f3f4f6; 
+        border-radius: 50%; display: flex; align-items: center; 
+        justify-content: center; font-size: 0.7rem; font-weight: 700; color: #6b7280;
+    }
+    .fw-600 { font-weight: 600; }
+</style>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Safely parse the JSON data from the template
     const monthlyRevenueLabels = JSON.parse('{{ monthly_revenue_labels|escapejs }}');
     const monthlyRevenueValues = JSON.parse('{{ monthly_revenue_values|escapejs }}');
     const packageBookingLabels = JSON.parse('{{ package_booking_labels|escapejs }}');
     const packageBookingValues = JSON.parse('{{ package_booking_values|escapejs }}');
 
-    // 1. Monthly Revenue Chart (Line Chart)
+    // Chart Global Defaults
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#9ca3af';
+    Chart.defaults.plugins.tooltip.padding = 12;
+    Chart.defaults.plugins.tooltip.borderRadius = 8;
+
+    // 1. Revenue Chart
     const monthlyCtx = document.getElementById('monthlyRevenueChart').getContext('2d');
     new Chart(monthlyCtx, {
         type: 'line',
         data: {
             labels: monthlyRevenueLabels,
             datasets: [{
-                label: 'Revenue ($)',
+                label: 'Monthly Revenue',
                 data: monthlyRevenueValues,
-                backgroundColor: 'rgba(40, 167, 69, 0.2)',
-                borderColor: 'rgba(40, 167, 69, 1)',
+                borderColor: '#4f46e5',
                 borderWidth: 2,
                 fill: true,
-                tension: 0.1
+                backgroundColor: (context) => {
+                    const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 300);
+                    gradient.addColorStop(0, 'rgba(79, 70, 229, 0.1)');
+                    gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
+                    return gradient;
+                },
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHitRadius: 20,
+                pointHoverBackgroundColor: '#4f46e5',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 3,
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value, index, values) {
-                            return '$' + value;
-                        }
-                    }
-                }
+                y: { 
+                    border: { display: false },
+                    grid: { color: '#f3f4f6' },
+                    ticks: { callback: v => '$' + v.toLocaleString() } 
+                },
+                x: { grid: { display: false } }
             }
         }
     });
 
-    // 2. Bookings by Package Chart (Doughnut Chart)
+    // 2. Package Chart
     const packageCtx = document.getElementById('packageBookingsChart').getContext('2d');
     new Chart(packageCtx, {
         type: 'doughnut',
         data: {
             labels: packageBookingLabels,
             datasets: [{
-                label: 'Number of Bookings',
                 data: packageBookingValues,
-                backgroundColor: [
-                    'rgba(40, 167, 69, 0.8)',
-                    'rgba(23, 162, 184, 0.8)',
-                    'rgba(255, 193, 7, 0.8)',
-                    'rgba(220, 53, 69, 0.8)',
-                    'rgba(108, 117, 125, 0.8)'
-                ],
-                hoverOffset: 4
+                backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#6366f1'],
+                borderWidth: 2,
+                borderColor: '#ffffff'
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            cutout: '80%',
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 15 } }
+            }
         }
     });
 });

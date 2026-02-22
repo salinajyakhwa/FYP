@@ -44,20 +44,28 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'package_list' %}active{% endif %}" href="{% url 'package_list' %}">Package List</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}" href="{% url 'about' %}">About Us</a>
-                        </li>
-                        {% if user.is_authenticated %}
-                        <li class="nav-item">
-                            {% if user.userprofile.role == 'vendor' %}
+                        {% if user.is_authenticated and user.userprofile.role == 'vendor' %}
+                            <li class="nav-item">
                                 <a class="nav-link {% if request.resolver_match.url_name == 'vendor_dashboard' %}active{% endif %}" href="{% url 'vendor_dashboard' %}">Dashboard</a>
-                            {% else %}
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'vendor_package_list' %}active{% endif %}" href="{% url 'vendor_package_list' %}">My Packages</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'vendor_bookings' %}active{% endif %}" href="{% url 'vendor_bookings' %}">Bookings</a>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'package_list' %}active{% endif %}" href="{% url 'package_list' %}">Package List</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}" href="{% url 'about' %}">About Us</a>
+                            </li>
+                            {% if user.is_authenticated %}
+                            <li class="nav-item">
                                 <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                            </li>
                             {% endif %}
-                        </li>
                         {% endif %}
                     </ul>
                     <div class="d-flex align-items-center gap-2">

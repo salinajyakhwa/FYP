@@ -1,67 +1,212 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Vendor Bookings{% endblock %}
+{% block title %}Manage Bookings | Vendor Portal{% endblock %}
+
+{% block extra_css %}
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --text-main: #111827;
+        --text-muted: #6b7280;
+        --bg-subtle: #f9fafb;
+        --border-color: #e5e7eb;
+        --primary-indigo: #4f46e5;
+        --success-green: #10b981;
+        --warning-amber: #f59e0b;
+        --danger-red: #ef4444;
+    }
+
+    body { 
+        background-color: #f3f4f6; 
+        font-family: 'Inter', sans-serif; 
+        color: var(--text-main);
+    }
+
+    /* Page Header */
+    .page-title { font-weight: 700; letter-spacing: -0.02em; color: var(--text-main); }
+    .breadcrumb-item { font-size: 0.85rem; font-weight: 500; }
+
+    /* Card & Table Styling */
+    .content-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+
+    .table { margin-bottom: 0; }
+    .table thead th {
+        background-color: var(--bg-subtle);
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 12px 24px;
+        border-top: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .table tbody td {
+        padding: 16px 24px;
+        vertical-align: middle;
+        font-size: 0.9rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    /* Professional Status Badges */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .status-confirmed { background: #ecfdf5; color: #065f46; }
+    .status-pending { background: #fffbeb; color: #92400e; }
+    .status-cancelled { background: #fef2f2; color: #991b1b; }
+
+    /* Package and User Meta */
+    .package-name { font-weight: 600; color: var(--text-main); display: block; }
+    .user-meta { color: var(--text-muted); font-size: 0.8rem; }
+    
+    /* Numeric Data Styling */
+    .tabular-nums { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+    /* Action Buttons */
+    .btn-action {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+    .btn-confirm { background-color: white; border-color: var(--border-color); color: var(--success-green); }
+    .btn-confirm:hover { background-color: var(--success-green); color: white; border-color: var(--success-green); }
+    
+    .btn-cancel { background-color: white; border-color: var(--border-color); color: var(--text-muted); }
+    .btn-cancel:hover { background-color: var(--danger-red); color: white; border-color: var(--danger-red); }
+
+    .empty-state { padding: 80px 0; text-align: center; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">My Bookings</h2>
-    <div class="card shadow">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col">Package Name</th>
-                            <th scope="col">Traveler</th>
-                            <th scope="col">Booking Date</th>
-                            <th scope="col">Status</th>
-                            <th scope="col"># Travelers</th>
-                            <th scope="col">Total Price</th>
-                            <th scope="col">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for booking in bookings %}
-                        <tr>
-                            <td>{{ booking.package.name }}</td>
-                            <td>{{ booking.user.username }}</td>
-                            <td>{{ booking.booking_date|date:"Y-m-d" }}</td>
-                            <td>
-                                <span class="badge 
-                                    {% if booking.status == 'confirmed' %}bg-success
-                                    {% elif booking.status == 'pending' %}bg-warning text-dark
-                                    {% elif booking.status == 'cancelled' %}bg-danger
-                                    {% endif %}">
-                                    {{ booking.get_status_display }}
-                                </span>
-                            </td>
-                            <td>{{ booking.number_of_travelers }}</td>
-                            <td>${{ booking.total_price|floatformat:2 }}</td>
-                            <td>
-                                {% if booking.status == 'pending' %}
-                                <div class="d-flex gap-2">
-                                    <form action="{% url 'update_booking_status' booking.id 'confirmed' %}" method="post" class="d-inline">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-success btn-sm">Confirm</button>
-                                    </form>
-                                    <form action="{% url 'update_booking_status' booking.id 'cancelled' %}" method="post" class="d-inline">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
-                                    </form>
+<div class="container py-5">
+    <!-- Header Section -->
+    <div class="row align-items-end mb-4">
+        <div class="col-md-6">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{% url 'vendor_dashboard' %}" class="text-decoration-none text-muted">Dashboard</a></li>
+                    <li class="breadcrumb-item active text-dark">Bookings</li>
+                </ol>
+            </nav>
+            <h2 class="page-title mb-0">Package Bookings</h2>
+        </div>
+        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+            <span class="text-muted small me-3">Total Volume: <strong>{{ bookings|length }}</strong></span>
+            <button class="btn btn-outline-dark btn-sm rounded-2">
+                <i class="bi bi-download me-2"></i>Export CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-card">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th scope="col">Booking Details</th>
+                        <th scope="col">Traveler</th>
+                        <th scope="col">Travel Date</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-center">Guests</th>
+                        <th scope="col" class="text-end">Revenue</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in bookings %}
+                    <tr>
+                        <td>
+                            <span class="package-name">{{ booking.package.name }}</span>
+                            <span class="user-meta">ID: #BOK-{{ booking.id|stringformat:"05d" }}</span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.75rem; font-weight: 700; color: var(--primary-indigo);">
+                                    {{ booking.user.username|slice:":1"|upper }}
                                 </div>
-                                {% else %}
-                                <span class="text-muted small">No actions available</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center">You have no bookings for your packages yet.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-medium text-dark">{{ booking.user.username }}</span>
+                                    <span class="user-meta">{{ booking.user.email|default:"No email provided" }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tabular-nums text-dark">
+                                {{ booking.booking_date|date:"M d, Y" }}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-pill 
+                                {% if booking.status == 'confirmed' %}status-confirmed
+                                {% elif booking.status == 'pending' %}status-pending
+                                {% elif booking.status == 'cancelled' %}status-cancelled
+                                {% endif %}">
+                                <i class="bi bi-circle-fill me-2" style="font-size: 6px;"></i>
+                                {{ booking.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="text-center tabular-nums text-muted">
+                            {{ booking.number_of_travelers }}
+                        </td>
+                        <td class="text-end fw-bold text-dark tabular-nums">
+                            ${{ booking.total_price|floatformat:2 }}
+                        </td>
+                        <td class="text-end">
+                            {% if booking.status == 'pending' %}
+                            <div class="d-flex justify-content-end gap-2">
+                                <form action="{% url 'update_booking_status' booking.id 'confirmed' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-action btn-confirm d-flex align-items-center">
+                                        <i class="bi bi-check2 me-1"></i> Confirm
+                                    </button>
+                                </form>
+                                <form action="{% url 'update_booking_status' booking.id 'cancelled' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-action btn-cancel d-flex align-items-center">
+                                        <i class="bi bi-x-lg me-1"></i> Cancel
+                                    </button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <span class="text-muted small">Processed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox text-muted display-4 mb-3 d-block"></i>
+                                <h5 class="fw-bold">No bookings found</h5>
+                                <p class="text-muted">You haven't received any bookings for your packages yet.</p>
+                                <a href="{% url 'create_package' %}" class="btn btn-primary btn-sm mt-2">Create New Package</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

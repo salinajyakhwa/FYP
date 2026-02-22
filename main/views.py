@@ -341,24 +341,8 @@ def verify_email(request, uidb64, token):
 def vendor_dashboard(request):
     vendor = _get_vendor_or_403(request)
     
-    # === Original Package Query (for the list) ===
-    query = request.GET.get('q', '')
-    packages = TravelPackage.objects.filter(vendor=vendor)
-    if query:
-        packages = packages.filter(
-            Q(name__icontains=query) |
-            Q(description__icontains=query) |
-            Q(location__icontains=query) |
-            Q(travel_type__icontains=query)
-        )
-
-    # === NEW: Sales Data Calculation ===
-    
-    # Get all confirmed bookings for this vendor's packages
-    confirmed_bookings = Booking.objects.filter(
-        package__vendor=vendor,
-        status='confirmed'
-    )
+    # === Sales Data Calculation ===
+    confirmed_bookings = Booking.objects.filter(package__vendor=vendor, status='confirmed')
 
     # 1. Total Revenue and Bookings
     total_stats = confirmed_bookings.aggregate(
@@ -378,31 +362,28 @@ def vendor_dashboard(request):
         revenue=Sum('total_price')
     ).order_by('month')
 
-    # Format data for Chart.js
     monthly_labels = [item['month'].strftime('%b %Y') for item in monthly_revenue_data]
     monthly_values = [float(item['revenue']) for item in monthly_revenue_data]
 
     # 3. Bookings per Package Chart Data (Top 5 packages)
-    package_booking_data = confirmed_bookings.values(
-        'package__name'
-    ).annotate(
+    package_booking_data = confirmed_bookings.values('package__name').annotate(
         count=Count('id')
-    ).order_by('-count')[:5] # Get top 5 most booked packages
+    ).order_by('-count')[:5]
 
     package_labels = [item['package__name'] for item in package_booking_data]
     package_values = [item['count'] for item in package_booking_data]
 
-    # === Pass all data to the template ===
+    # 4. Recent Bookings for the table
+    recent_bookings = Booking.objects.filter(package__vendor=vendor).order_by('-booking_date')[:5]
+
     context = {
-        'packages': packages,
-        'query': query,
         'total_revenue': total_revenue,
         'total_bookings_count': total_bookings_count,
-        # Pass chart data as JSON strings to be safely used in JavaScript
         'monthly_revenue_labels': json.dumps(monthly_labels),
         'monthly_revenue_values': json.dumps(monthly_values),
         'package_booking_labels': json.dumps(package_labels),
         'package_booking_values': json.dumps(package_values),
+        'recent_bookings': recent_bookings,
     }
     return render(request, 'main/vendor_dashboard.html', context)
 
