@@ -76,9 +76,18 @@ class CustomUserCreationForm(UserCreationForm):
         return user
 
 class ItineraryDayForm(forms.Form):
-    day = forms.IntegerField(widget=forms.NumberInput(attrs={'class': 'form-control'}))
-    title = forms.CharField(max_length=200, widget=forms.TextInput(attrs={'class': 'form-control'}))
-    description = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}))
+    ACTIVITY_CHOICES = [
+        ('tour', 'Tour'),
+        ('meal', 'Meal'),
+        ('free_time', 'Free Time'),
+        ('accommodation', 'Accommodation'),
+        ('travel', 'Travel'),
+    ]
+    day = forms.IntegerField(widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Day'}))
+    title = forms.CharField(max_length=200, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Activity Title'}))
+    activity_type = forms.ChoiceField(choices=ACTIVITY_CHOICES, widget=forms.Select(attrs={'class': 'form-select'}))
+    description = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Describe the day\'s events...'}))
+    inclusions = forms.CharField(max_length=255, required=False, help_text="Comma-separated items, e.g., Breakfast, Museum Tickets", widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Breakfast, Museum Tickets'}))
 
 ItineraryFormSet = formset_factory(ItineraryDayForm, extra=1, can_delete=True)
 

@@ -1,52 +1,121 @@
 {% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Manage Itinerary{% endblock %}
 
 {% block content %}
-<h1>Manage Itinerary for {{ package.name }}</h1>
-
-<form method="post">
-    {% csrf_token %}
-    {{ formset.management_form }}
-
-    <div id="itinerary-forms">
-        {% for form in formset %}
-        <div class="itinerary-form mb-3 p-3 border rounded">
-            <div class="row">
-                <div class="col-md-1">{{ form.day.label_tag }} {{ form.day }}</div>
-                <div class="col-md-5">{{ form.title.label_tag }} {{ form.title }}</div>
-                <div class="col-md-5">{{ form.description.label_tag }} {{ form.description }}</div>
-                <div class="col-md-1">{{ form.DELETE.label_tag }} {{ form.DELETE }}</div>
-            </div>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">Manage Itinerary</h1>
+            <p class="text-muted">For package: {{ package.name }}</p>
         </div>
-        {% endfor %}
+        <a href="{% url 'vendor_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
     </div>
 
-    <button type="button" id="add-form" class="btn btn-secondary">Add Another Day</button>
-    <button type="submit" class="btn btn-primary">Save Itinerary</button>
-    <a href="{% url 'vendor_dashboard' %}" class="btn btn-light">Cancel</a>
-</form>
+    <form method="post" id="itinerary-form-container">
+        {% csrf_token %}
+        {{ formset.management_form }}
 
-<div id="empty-form" style="display:none">
-    <div class="itinerary-form mb-3 p-3 border rounded">
-        <div class="row">
-            <div class="col-md-1">{{ formset.empty_form.day.label_tag }} {{ formset.empty_form.day }}</div>
-            <div class="col-md-5">{{ formset.empty_form.title.label_tag }} {{ formset.empty_form.title }}</div>
-            <div class="col-md-6">{{ formset.empty_form.description.label_tag }} {{ formset.empty_form.description }}</div>
+        <div id="itinerary-forms">
+            {% for form in formset %}
+            <div class="card shadow-sm mb-3 itinerary-form">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-1">
+                            <label class="form-label">Day</label>
+                            {% render_field form.day class="form-control" %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Title</label>
+                            {% render_field form.title class="form-control" %}
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Activity Type</label>
+                            {% render_field form.activity_type class="form-select" %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Inclusions</label>
+                            {% render_field form.inclusions class="form-control" %}
+                        </div>
+                        <div class="col-md-11">
+                            <label class="form-label">Description</label>
+                            {% render_field form.description class="form-control" %}
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            {% if form.instance.id or formset.can_delete %}
+                            <div class="form-check">
+                                {% render_field form.DELETE class="form-check-input" %}
+                                <label class="form-check-label" for="{{ form.DELETE.id_for_label }}">Delete</label>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4">
+            <button type="button" id="add-form" class="btn btn-secondary">
+                <i class="bi bi-plus-circle me-2"></i>Add Another Day
+            </button>
+            <button type="submit" class="btn btn-primary">Save Itinerary</button>
+        </div>
+    </form>
+
+    <!-- Hidden template for new forms -->
+    <div id="empty-form" style="display:none">
+        <div class="card shadow-sm mb-3 itinerary-form">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-1">
+                        <label class="form-label">Day</label>
+                        {% render_field formset.empty_form.day class="form-control" %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Title</label>
+                        {% render_field formset.empty_form.title class="form-control" %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Activity Type</label>
+                        {% render_field formset.empty_form.activity_type class="form-select" %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Inclusions</label>
+                        {% render_field formset.empty_form.inclusions class="form-control" %}
+                    </div>
+                    <div class="col-md-11">
+                        <label class="form-label">Description</label>
+                        {% render_field formset.empty_form.description class="form-control" %}
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <div class="form-check">
+                            {% render_field formset.empty_form.DELETE class="form-check-input" %}
+                            <label class="form-check-label" for="{{ formset.empty_form.DELETE.id_for_label }}">Delete</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
 document.getElementById('add-form').addEventListener('click', function() {
-    var formsetContainer = document.getElementById('itinerary-forms');
-    var totalForms = document.getElementById('id_form-TOTAL_FORMS');
-    var formIdx = totalForms.value;
+    const formsetContainer = document.getElementById('itinerary-forms');
+    const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
+    const formIdx = parseInt(totalFormsInput.value);
     
-    var emptyFormHtml = document.getElementById('empty-form').innerHTML.replace(/__prefix__/g, formIdx);
-    var newForm = document.createElement('div');
-    newForm.innerHTML = emptyFormHtml;
-    formsetContainer.appendChild(newForm);
+    const emptyFormHtml = document.getElementById('empty-form').innerHTML.replace(/__prefix__/g, formIdx);
     
-    totalForms.value = parseInt(formIdx) + 1;
+    const newFormDiv = document.createElement('div');
+    newFormDiv.innerHTML = emptyFormHtml;
+    formsetContainer.appendChild(newFormDiv.firstElementChild);
+    
+    totalFormsInput.value = formIdx + 1;
 });
 </script>
 {% endblock %}

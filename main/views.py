@@ -459,7 +459,9 @@ def manage_itinerary(request, package_id):
                     new_itinerary.append({
                         'day': form.cleaned_data.get('day'),
                         'title': form.cleaned_data.get('title'),
+                        'activity_type': form.cleaned_data.get('activity_type'),
                         'description': form.cleaned_data.get('description'),
+                        'inclusions': form.cleaned_data.get('inclusions'),
                     })
             package.itinerary = new_itinerary
             package.save()

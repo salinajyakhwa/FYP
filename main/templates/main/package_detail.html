@@ -96,7 +96,16 @@
                                         </button>
                                     </h2>
                                     <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#itineraryAccordion">
-                                        <div class="accordion-body">{{ day.description }}</div>
+                                        <div class="accordion-body">
+                                            <span class="badge bg-primary mb-2">{{ day.activity_type|title }}</span>
+                                            <p>{{ day.description }}</p>
+                                            {% if day.inclusions %}
+                                                <p class="mb-0">
+                                                    <strong>Inclusions:</strong> 
+                                                    <small class="text-muted">{{ day.inclusions }}</small>
+                                                </p>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                                 {% empty %}
