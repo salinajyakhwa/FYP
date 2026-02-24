@@ -90,3 +90,14 @@ class PackageImage(models.Model):
 
     class Meta:
         app_label = 'main' # Explicitly set app_label
+
+class Wishlist(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='wishlist')
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='wishlisted_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'package') # Prevents adding the same package to a wishlist multiple times
+
+    def __str__(self):
+        return f'{self.user.username}\'s wishlist: {self.package.name}'
