@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Your Booking{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Confirm Your Booking</h4>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ package.name }}</h5>
+                    <p class="card-text">{{ package.description|truncatewords:30 }}</p>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Location:</strong> {{ package.location }}</li>
+                        <li class="list-group-item"><strong>Price:</strong> ${{ package.price|floatformat:2 }}</li>
+                        <li class="list-group-item"><strong>Dates:</strong> {{ package.start_date|date:"M j, Y" }} to {{ package.end_date|date:"M j, Y" }}</li>
+                    </ul>
+                    <p class="mt-3">Are you sure you want to proceed with this booking?</p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-success">Proceed to Payment</a>
+                        <a href="{% url 'package_detail' package.id %}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

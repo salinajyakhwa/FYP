@@ -18,6 +18,7 @@ urlpatterns = [
     # 4. PACKAGE DETAILS & BOOKING
     path('package/<int:package_id>/', views.package_detail, name='package_detail'),
 
+    path('package/<int:package_id>/book/', views.booking_confirmation, name='booking_confirmation'),
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),
     path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),

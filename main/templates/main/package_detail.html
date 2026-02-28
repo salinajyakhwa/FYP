@@ -166,8 +166,8 @@
                         <p class="mb-0">{{ package.start_date|date:"M j, Y" }} to {{ package.end_date|date:"M j, Y" }}</p>
                     </div>
                     <div class="d-grid mt-4">
-                        <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-primary btn-lg">
-                            Proceed to Payment
+                        <a href="{% url 'booking_confirmation' package.id %}" class="btn btn-primary btn-lg">
+                            Book Now
                         </a>
                     </div>
                 </div>

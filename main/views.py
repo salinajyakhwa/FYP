@@ -128,6 +128,14 @@ def package_detail(request, package_id):
     }
     return render(request, 'main/package_detail.html', context)
 
+@login_required
+def booking_confirmation(request, package_id):
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    context = {
+        'package': package
+    }
+    return render(request, 'main/booking_confirmation.html', context)
+
 def compare_packages(request):
     if request.method == 'POST':
         package_ids = request.POST.getlist('package_ids')
