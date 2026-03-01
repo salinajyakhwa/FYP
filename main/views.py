@@ -157,6 +157,9 @@ def register(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
 
+    # Get role from URL parameter
+    initial_data = {'role': request.GET.get('role', 'traveler')}
+
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
@@ -166,8 +169,9 @@ def register(request):
             messages.success(request, f"Please confirm your email address to complete the registration. Check your inbox at {user.email}.")
             return redirect('check_email') # Redirect to a page informing user to check email
     else:
-        form = CustomUserCreationForm()
-    return render(request, 'main/register.html', {'form': form})
+        form = CustomUserCreationForm(initial=initial_data)
+    
+    return render(request, 'main/register.html', {'form': form, 'preselected_role': initial_data.get('role')})
 
 # ==========================================
 # 3. PRIVATE USER VIEWS (Dashboard, Profile)

@@ -128,18 +128,25 @@
                 {% csrf_token %}
 
                 <!-- Professional Role Selection -->
+                {% if not preselected_role or preselected_role == 'traveler' %}
                 <div class="role-selection-container">
                     <label class="role-card">
-                        <input type="radio" name="role" value="traveler" checked>
+                        <input type="radio" name="role" value="traveler" {% if form.initial.role == 'traveler' %}checked{% endif %}>
                         <i class="bi bi-person-walking"></i>
                         <span>Traveler</span>
                     </label>
                     <label class="role-card">
-                        <input type="radio" name="role" value="vendor">
+                        <input type="radio" name="role" value="vendor" {% if form.initial.role == 'vendor' %}checked{% endif %}>
                         <i class="bi bi-shop"></i>
                         <span>Vendor</span>
                     </label>
                 </div>
+                {% else %}
+                    <input type="hidden" name="role" value="{{ preselected_role }}">
+                    <div class="alert alert-info text-center">
+                        You are registering as a <strong>{{ preselected_role|title }}</strong>.
+                    </div>
+                {% endif %}
 
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger py-2 small">{{ form.non_field_errors }}</div>
