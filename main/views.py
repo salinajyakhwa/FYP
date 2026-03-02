@@ -136,6 +136,16 @@ def booking_confirmation(request, package_id):
     }
     return render(request, 'main/booking_confirmation.html', context)
 
+def vendor_profile_detail(request, vendor_id):
+    vendor = get_object_or_404(Vendor, id=vendor_id)
+    packages = TravelPackage.objects.filter(vendor=vendor).order_by('-created_at')
+    
+    context = {
+        'vendor': vendor,
+        'packages': packages,
+    }
+    return render(request, 'main/vendor_profile_detail.html', context)
+
 def compare_packages(request):
     if request.method == 'POST':
         package_ids = request.POST.getlist('package_ids')

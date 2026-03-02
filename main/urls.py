@@ -31,6 +31,9 @@ urlpatterns = [
     path('vendor/package/create/', views.create_package, name='create_package'),
     path('vendor/package/<int:package_id>/manage-itinerary/', views.manage_itinerary, name='manage_itinerary'),
 
+    # Public Vendor Profile
+    path('vendor/<int:vendor_id>/', views.vendor_profile_detail, name='vendor_profile_detail'),
+
     # 5.1 MANAGEMENT
     path('management/dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('management/users/', views.manage_users, name='manage_users'),

@@ -39,7 +39,7 @@
         <div class="d-flex align-items-center text-muted">
             <span><i class="bi bi-geo-alt-fill me-2"></i>{{ package.location }}</span>
             <span class="mx-2">|</span>
-            <span>Offered by: {{ package.vendor.name }}</span>
+            <span>Offered by: <a href="{% url 'vendor_profile_detail' package.vendor.id %}" class="text-decoration-none">{{ package.vendor.name }}</a></span>
         </div>
     </div>
 
