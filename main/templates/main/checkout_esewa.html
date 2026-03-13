@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Checkout - eSewa{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h5 class="card-title">Pay with eSewa</h5>
+                <p class="mb-3">You will be redirected to eSewa to complete the payment.</p>
+
+                <form action="{{ esewa_url }}" method="POST">
+                    {% csrf_token %}
+                    {{ form_fields|safe }}
+                    <button type="submit" class="btn btn-success">Pay with eSewa</button>
+                </form>
+
+                <div class="mt-3 small text-muted">
+                    Sandbox mode: use test credentials from eSewa developer docs.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

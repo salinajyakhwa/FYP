@@ -598,11 +598,93 @@ def create_checkout_session(request, package_id):
         return redirect('package_detail', package_id=package.id)
 
 
+@login_required
+def create_esewa_session(request, package_id):
+    """
+    Initiates an eSewa (ePay v2) payment by generating required hidden fields
+    (including the HMAC signature) using django-esewa and rendering a form
+    that posts to eSewa's payment URL.
+    """
+    package = get_object_or_404(TravelPackage, pk=package_id)
+
+    try:
+        from django_esewa import EsewaPayment
+    except Exception:
+        messages.error(request, "eSewa integration library not installed. Run 'pip install django-esewa'.")
+        return redirect('package_detail', package_id=package.id)
+
+    import uuid
+    txn_id = str(uuid.uuid4())
+
+    success_url = request.build_absolute_uri(reverse('payment_success'))
+    failure_url = request.build_absolute_uri(reverse('payment_cancelled'))
+
+    payment = EsewaPayment(
+        product_code=settings.ESEWA_PRODUCT_CODE,
+        amount=float(package.price),
+        total_amount=float(package.price),
+        transaction_uuid=txn_id,
+        success_url=success_url,
+        failure_url=failure_url,
+        secret_key=settings.ESEWA_SECRET_KEY
+    )
+
+    context = {
+        'form_fields': payment.generate_form(),
+        'esewa_url': settings.ESEWA_EPAY_URL
+    }
+
+    # Store pending booking info to create booking after success
+    request.session['pending_booking_package_id'] = package.id
+    request.session['pending_payment_txn'] = txn_id
+
+    return render(request, 'main/checkout_esewa.html', context)
+
+
 def payment_success(request):
     """
-    Handles successful payments. Creates the booking record and shows a
-    confirmation page.
+    Handles successful payments from Stripe and eSewa. For eSewa, the gateway
+    returns a Base64-encoded `data` GET parameter containing JSON with a
+    `status` field. If status is COMPLETE, the booking is confirmed.
     """
+    # eSewa returns a base64 'data' parameter
+    encoded_data = request.GET.get('data')
+    if encoded_data:
+        import base64, json
+        try:
+            decoded_bytes = base64.b64decode(encoded_data)
+            decoded_str = decoded_bytes.decode('utf-8')
+            response_data = json.loads(decoded_str)
+        except Exception:
+            messages.error(request, "Invalid response from payment gateway.")
+            return redirect('package_list')
+
+        if response_data.get('status') == 'COMPLETE':
+            package_id = request.session.get('pending_booking_package_id')
+            if not package_id:
+                messages.error(request, "Could not find a pending booking. Please contact support.")
+                return redirect('package_list')
+
+            package = get_object_or_404(TravelPackage, pk=package_id)
+            Booking.objects.create(
+                user=request.user,
+                package=package,
+                number_of_travelers=1,
+                total_price=package.price,
+                status='confirmed'
+            )
+
+            # Clear session variables
+            request.session.pop('pending_booking_package_id', None)
+            request.session.pop('pending_payment_txn', None)
+
+            messages.success(request, f"Your booking for {package.name} is confirmed!")
+            return render(request, 'main/payment_success.html', {'data': response_data})
+
+        messages.error(request, "Payment not completed.")
+        return render(request, 'main/payment_cancelled.html')
+
+    # Fallback — existing Stripe flow that relied on session data
     package_id = request.session.get('pending_booking_package_id')
 
     if not package_id:
@@ -611,7 +693,7 @@ def payment_success(request):
 
     package = get_object_or_404(TravelPackage, pk=package_id)
 
-    # Create booking after successful payment
+    # Create booking after successful payment (Stripe)
     Booking.objects.create(
         user=request.user,
         package=package,
