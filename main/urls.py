@@ -50,6 +50,7 @@ urlpatterns = [
 
     # 8 PAYMENT
     path('create-checkout-session/<int:package_id>/', views.create_checkout_session, name='create_checkout_session'),
+    path('checkout/<int:package_id>/', views.create_payment_options, name='create_payment_options'),
     path('create-esewa-session/<int:package_id>/', views.create_esewa_session, name='create_esewa_session'),
     path('payment-success/', views.payment_success, name= 'payment_success'),
     path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),

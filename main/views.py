@@ -546,6 +546,21 @@ def update_vendor_status(request, vendor_id, new_status):
 # ==========================================
 
 @login_required
+def create_payment_options(request, package_id):
+    """
+    Presents payment method choices (Stripe or eSewa) for a package.
+    """
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    stripe_url = reverse('create_checkout_session', args=[package.id])
+    esewa_url = reverse('create_esewa_session', args=[package.id])
+    context = {
+        'package': package,
+        'stripe_url': stripe_url,
+        'esewa_url': esewa_url,
+    }
+    return render(request, 'main/payment_options.html', context)
+
+@login_required
 def create_checkout_session(request, package_id):
     """
     Creates a Stripe Checkout session and redirects the user to the
@@ -563,11 +578,25 @@ def create_checkout_session(request, package_id):
         reverse('payment_cancelled')
     )
 
+    # Validate user email before sending to Stripe
+    from django.core.validators import validate_email
+    from django.core.exceptions import ValidationError
+
+    customer_email = None
+    user_email = getattr(request.user, 'email', '') or ''
+    if user_email:
+        try:
+            validate_email(user_email)
+            customer_email = user_email
+        except ValidationError:
+            customer_email = None
+            messages.warning(request, 'Your account email is invalid or empty; Stripe may ask for an email during payment.')
+
     try:
         # Create a new Checkout Session for the order
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
+        checkout_kwargs = {
+            'payment_method_types': ['card'],
+            'line_items': [{
                 'price_data': {
                     'currency': 'usd',
                     'product_data': {
@@ -579,11 +608,15 @@ def create_checkout_session(request, package_id):
                 },
                 'quantity': 1,
             }],
-            mode='payment',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            customer_email=request.user.email,  # Pre-fill customer email
-        )
+            'mode': 'payment',
+            'success_url': success_url,
+            'cancel_url': cancel_url,
+        }
+
+        if customer_email:
+            checkout_kwargs['customer_email'] = customer_email
+
+        checkout_session = stripe.checkout.Session.create(**checkout_kwargs)
 
         # Store package_id in session to retrieve after success
         request.session['pending_booking_package_id'] = package.id
@@ -607,31 +640,63 @@ def create_esewa_session(request, package_id):
     """
     package = get_object_or_404(TravelPackage, pk=package_id)
 
-    try:
-        from django_esewa import EsewaPayment
-    except Exception:
-        messages.error(request, "eSewa integration library not installed. Run 'pip install django-esewa'.")
-        return redirect('package_detail', package_id=package.id)
+    import uuid, hmac, hashlib, base64, html
 
-    import uuid
     txn_id = str(uuid.uuid4())
-
     success_url = request.build_absolute_uri(reverse('payment_success'))
     failure_url = request.build_absolute_uri(reverse('payment_cancelled'))
 
-    payment = EsewaPayment(
-        product_code=settings.ESEWA_PRODUCT_CODE,
-        amount=float(package.price),
-        total_amount=float(package.price),
-        transaction_uuid=txn_id,
-        success_url=success_url,
-        failure_url=failure_url,
-        secret_key=settings.ESEWA_SECRET_KEY
+    # Prepare amounts and charges (eSewa requires tax/service/delivery fields; send 0 if unused)
+    # Format amounts with two decimal places
+    amount = float(package.price)
+    total_amount = float(package.price)
+    tax_amount = 0.0
+    product_service_charge = 0.0
+    product_delivery_charge = 0.0
+
+    amount_str = f"{amount:.2f}"
+    total_amount_str = f"{total_amount:.2f}"
+    tax_amount_str = f"{tax_amount:.2f}"
+    product_service_charge_str = f"{product_service_charge:.2f}"
+    product_delivery_charge_str = f"{product_delivery_charge:.2f}"
+
+    # Build the string to sign according to eSewa ePay v2 expectations.
+    # New order includes tax/service/delivery and uses 2-decimal formatting.
+    string_to_sign = (
+        f"{settings.ESEWA_PRODUCT_CODE}|{amount_str}|{tax_amount_str}|{product_service_charge_str}|{product_delivery_charge_str}|{total_amount_str}|{txn_id}|{success_url}|{failure_url}"
     )
 
+    # Compute HMAC-SHA256 and produce lowercase hex digest (some eSewa integrations expect hex)
+    secret = settings.ESEWA_SECRET_KEY or ''
+    digest = hmac.new(secret.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).digest()
+    signature_hex = digest.hex()
+
+    # Build hidden input fields (escaped values)
+    fields = {
+        'product_code': settings.ESEWA_PRODUCT_CODE,
+        'amount': amount_str,
+        'total_amount': total_amount_str,
+        'transaction_uuid': txn_id,
+        'success_url': success_url,
+        'failure_url': failure_url,
+        'tax_amount': tax_amount_str,
+        'product_service_charge': product_service_charge_str,
+        'product_delivery_charge': product_delivery_charge_str,
+        'signature': signature_hex,
+    }
+
+    form_inputs = []
+    for k, v in fields.items():
+        form_inputs.append(f"<input type=\"hidden\" name=\"{html.escape(k)}\" value=\"{html.escape(str(v))}\">")
+
+    form_fields_html = "\n".join(form_inputs)
+
     context = {
-        'form_fields': payment.generate_form(),
-        'esewa_url': settings.ESEWA_EPAY_URL
+        'form_fields': form_fields_html,
+        'esewa_url': settings.ESEWA_EPAY_URL,
+        'signature': signature_hex,
+        'string_to_sign': string_to_sign,
+        'debug_fields': form_fields_html,
     }
 
     # Store pending booking info to create booking after success

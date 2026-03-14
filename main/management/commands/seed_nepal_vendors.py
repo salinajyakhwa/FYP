@@ -11,9 +11,9 @@ class Command(BaseCommand):
         self.stdout.write('Seeding detailed Nepal data...')
 
         # Clear existing data for a clean slate
-        TravelPackage.objects.all().delete()
-        Vendor.objects.all().delete()
-        User.objects.filter(is_superuser=False).delete()
+        #TravelPackage.objects.all().delete()
+        #vendor.objects.all().delete()
+        #User.objects.filter(is_superuser=False).delete()
 
         vendors_data = [
             {

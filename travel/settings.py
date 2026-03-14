@@ -163,3 +163,9 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 os.environ.get('STRIPE_PUBLISHABLE_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
+
+# eSewa (ePay v2) configuration
+# For sandbox use product code EPAYTEST and the sandbox secret key. In production set these via environment variables.
+ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
+ESEWA_SECRET_KEY = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
+ESEWA_EPAY_URL = os.getenv('ESEWA_EPAY_URL', 'https://rc-epay.esewa.com.np/api/epay/main/v2/form')

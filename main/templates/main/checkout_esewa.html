@@ -18,6 +18,18 @@
                 <div class="mt-3 small text-muted">
                     Sandbox mode: use test credentials from eSewa developer docs.
                 </div>
+
+                <!-- Debug: show signature and generated hidden inputs -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Debug info (visible only for debugging)</h6>
+                        <p><strong>String to sign:</strong></p>
+                        <pre style="white-space:pre-wrap;background:#f8f9fa;padding:8px;border-radius:4px;">{{ string_to_sign }}</pre>
+                        <p><strong>Signature (hex):</strong> <code>{{ signature }}</code></p>
+                        <p><strong>Hidden inputs:</strong></p>
+                        <pre style="white-space:pre-wrap;background:#f8f9fa;padding:8px;border-radius:4px;">{{ debug_fields|escape }}</pre>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
