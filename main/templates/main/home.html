@@ -184,7 +184,7 @@
 
     function updateCompareButtonState() {
         const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-        compareButton.disabled = checkedCount < 2;
+        compareButton.disabled = checkedCount < 1;
     }
 
     checkboxes.forEach(checkbox => {
@@ -193,9 +193,9 @@
 
     compareForm.addEventListener('submit', function(event) {
         const checkedCount = document.querySelectorAll('.compare-checkbox:checked').length;
-        if (checkedCount < 2) {
+        if (checkedCount < 1) {
             event.preventDefault();
-            alert('Please select at least two packages to compare.');
+            alert('Please select at least one package to compare.');
         }
     });
 
