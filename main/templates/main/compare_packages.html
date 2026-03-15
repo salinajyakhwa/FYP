@@ -3,6 +3,12 @@
 {% block content %}
 <h1 class="mb-4">Compare Packages</h1>
 
+{% if auto_generated and base_package %}
+<div class="alert alert-info">
+    Auto-compare mode: You selected <strong>{{ base_package.name }}</strong>. We found similar packages based on travel type, location, and price range.
+</div>
+{% endif %}
+
 <div class="table-responsive">
     <table class="table table-bordered table-striped">
         <thead class="table-dark">

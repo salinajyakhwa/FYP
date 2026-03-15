@@ -4,7 +4,7 @@ from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, Case, When, Value, IntegerField
 from django.core.paginator import Paginator # Added for pagination
 from django.contrib.sites.shortcuts import get_current_site
 from django.template.loader import render_to_string
@@ -137,15 +137,66 @@ def package_detail(request, package_id):
     return render(request, 'main/package_detail.html', context)
 
 def compare_packages(request):
+    def _find_similar_packages(base_package, limit=3):
+        base_queryset = TravelPackage.objects.exclude(id=base_package.id)
+        similarity_score = Case(
+            When(travel_type=base_package.travel_type, then=Value(3)),
+            default=Value(0),
+            output_field=IntegerField(),
+        ) + Case(
+            When(location=base_package.location, then=Value(2)),
+            default=Value(0),
+            output_field=IntegerField(),
+        ) + Case(
+            When(price__gte=base_package.price * Decimal('0.80'), price__lte=base_package.price * Decimal('1.20'), then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+
+        deluxe_q = Q(name__icontains='deluxe') | Q(description__icontains='deluxe') | Q(travel_type__icontains='deluxe')
+        base_is_deluxe = TravelPackage.objects.filter(id=base_package.id).filter(deluxe_q).exists()
+
+        if base_is_deluxe:
+            base_queryset = base_queryset.filter(deluxe_q)
+
+        return list(
+            base_queryset
+            .annotate(similarity_score=similarity_score)
+            .order_by('-similarity_score', '-created_at')[:limit]
+        )
+
+    if request.method == 'GET' and request.GET.get('package_id'):
+        base_package = get_object_or_404(TravelPackage, id=request.GET.get('package_id'))
+        similar_packages = _find_similar_packages(base_package)
+        packages = [base_package] + similar_packages
+        return render(request, 'main/compare_packages.html', {
+            'packages': packages,
+            'base_package': base_package,
+            'auto_generated': True,
+        })
+
     if request.method == 'POST':
         package_ids = request.POST.getlist('package_ids')
-
-        if len(package_ids) < 2:
-            messages.warning(request, "Select at least two packages to compare.")
+        if not package_ids:
+            messages.warning(request, "Select at least one package to compare.")
             return redirect('package_list')
 
-        packages = TravelPackage.objects.filter(id__in=package_ids)
-        return render(request, 'main/compare_packages.html', {'packages': packages})
+        selected_packages = list(TravelPackage.objects.filter(id__in=package_ids))
+
+        if len(selected_packages) == 1:
+            base_package = selected_packages[0]
+            packages = [base_package] + _find_similar_packages(base_package)
+            messages.info(request, "Showing similar packages automatically based on your selected package.")
+            return render(request, 'main/compare_packages.html', {
+                'packages': packages,
+                'base_package': base_package,
+                'auto_generated': True,
+            })
+
+        return render(request, 'main/compare_packages.html', {
+            'packages': selected_packages,
+            'auto_generated': False,
+        })
 
     return redirect('package_list')
 
