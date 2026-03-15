@@ -29,9 +29,11 @@ SECRET_KEY = 'django-insecure-uvid+q4tghqi)&71-0rbe+0bvwc#i_^127r)s8gg7qxxmyv^9)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", "localhost","kimberlie-unsplit-nonreversibly.ngrok-free.dev"]
 
-
+CSRF_TRUSTED_ORIGINS = [
+   "https://kimberlie-unsplit-nonreversibly.ngrok-free.dev",
+   ]
 # Application definition
 
 INSTALLED_APPS = [

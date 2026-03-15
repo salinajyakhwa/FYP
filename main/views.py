@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -13,10 +14,17 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
 import json
+import hmac
+import hashlib
+import base64
+import logging
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import get_user_model # Replaced direct User import
 import stripe
 from django.conf import settings
 from django.urls import reverse
+import uuid
+from decimal import Decimal, ROUND_HALF_UP
 
 # Models
 from .models import TravelPackage, Booking, Review, UserProfile, Vendor
@@ -546,11 +554,60 @@ def update_vendor_status(request, vendor_id, new_status):
 # ==========================================
 
 @login_required
+def esewa_checkout(request, package_id):
+    """Render an eSewa sandbox checkout form and post to eSewa gateway.
+
+    Uses sandbox credentials and builds absolute success/failure URLs so
+    eSewa can redirect back (works with ngrok).
+    This normalizes amounts to two decimal places to match eSewa signing.
+    """
+    package = get_object_or_404(TravelPackage, pk=package_id)
+
+    # Use Decimal for precise formatting
+    price_dec = Decimal(str(package.price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    tax_dec = Decimal('10.00')
+    total_dec = (price_dec + tax_dec).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    # String representations must exactly match what's signed
+    amount = format(price_dec, 'f')        # e.g. '100.00'
+    tax_amount = format(tax_dec, 'f')      # '10.00'
+    total_amount = format(total_dec, 'f')  # '110.00'
+
+    transaction_uuid = str(uuid.uuid4())
+    product_code = ESEWA_PRODUCT_CODE
+
+    # Generate signature using the formatted total_amount
+    signature = _esewa_calc_signature(total_amount, transaction_uuid, product_code)
+
+    success_url = request.build_absolute_uri(reverse('esewa_verify'))
+    failure_url = request.build_absolute_uri(reverse('payment_cancelled'))
+
+    context = {
+        'amount': amount,
+        'tax_amount': tax_amount,
+        'total_amount': total_amount,
+        'transaction_uuid': transaction_uuid,
+        'product_code': product_code,
+        'signature': signature,
+        'success_url': success_url,
+        'failure_url': failure_url,
+    }
+    return render(request, 'main/esewa_checkout.html', context)
+
+@login_required
 def create_checkout_session(request, package_id):
     """
     Creates a Stripe Checkout session and redirects the user to the
     Stripe-hosted payment page.
     """
+
+
+@login_required
+def choose_payment(request, package_id):
+    """Show a choice between Stripe and eSewa payment methods."""
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    return render(request, 'main/choose_payment.html', {'package': package})
+
     package = get_object_or_404(TravelPackage, pk=package_id)
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -637,3 +694,97 @@ def payment_cancelled(request):
         "Your payment was cancelled. You have not been charged."
     )
     return render(request, 'main/payment_cancelled.html')
+
+
+# === eSewa ePay V2 verification (sandbox) ===
+# Uses sandbox secret and product code provided for demo/testing
+ESEWA_SECRET_KEY = "8gBm/:&EnhH.1/q"
+ESEWA_PRODUCT_CODE = "EPAYTEST"
+
+
+def _esewa_calc_signature(total_amount, transaction_uuid, product_code):
+    """Calculate base64-encoded HMAC-SHA256 signature matching eSewa spec."""
+    msg = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
+    mac = hmac.new(ESEWA_SECRET_KEY.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).digest()
+    return base64.b64encode(mac).decode('utf-8')
+
+
+@csrf_exempt
+def esewa_verify(request):
+    """Endpoint to receive eSewa redirect (success/failure) with ?data=BASE64_JSON.
+
+    Decodes payload, verifies signature and status, and allows the app to
+    record the payment (update Booking/Payment models as appropriate).
+    """
+    data_b64 = request.GET.get('data') or request.POST.get('data')
+    if not data_b64:
+        return HttpResponseBadRequest("missing data param")
+
+    try:
+        decoded = base64.b64decode(data_b64)
+        payload = json.loads(decoded)
+    except Exception:
+        return HttpResponseBadRequest("invalid data encoding")
+
+    logger = logging.getLogger(__name__)
+
+    # Prefer signed_field_names from payload to reconstruct exact message ordering
+    signed_fields_raw = payload.get('signed_field_names')
+    if signed_fields_raw:
+        # signed_field_names may be a comma-separated string
+        if isinstance(signed_fields_raw, str):
+            signed_fields = [f.strip() for f in signed_fields_raw.split(',') if f.strip()]
+        elif isinstance(signed_fields_raw, list):
+            signed_fields = signed_fields_raw
+        else:
+            signed_fields = ['total_amount', 'transaction_uuid', 'product_code']
+    else:
+        signed_fields = ['total_amount', 'transaction_uuid', 'product_code']
+
+    # Reconstruct message using values returned by eSewa (to match their signing)
+    parts = []
+    for field in signed_fields:
+        val = payload.get(field, '')
+        # Ensure value is a string and strip excess whitespace
+        if val is None:
+            val = ''
+        parts.append(f"{field}={val}")
+    message = ",".join(parts)
+
+    remote_sig = payload.get('signature') or payload.get('merchant_signature') or payload.get('merchantSig')
+
+    if not remote_sig:
+        logger.warning("eSewa payload missing signature: %s", payload)
+        return HttpResponseBadRequest("missing signature")
+
+    # Compute local signature using reconstructed message
+    mac = hmac.new(ESEWA_SECRET_KEY.encode('utf-8'), message.encode('utf-8'), hashlib.sha256).digest()
+    local_sig = base64.b64encode(mac).decode('utf-8')
+
+    # Log for debugging (development only)
+    logger.debug("eSewa payload: %s", payload)
+    logger.debug("Signed fields: %s", signed_fields)
+    logger.debug("Reconstructed message: %s", message)
+    logger.debug("Remote signature: %s", remote_sig)
+    logger.debug("Local signature: %s", local_sig)
+
+    if not hmac.compare_digest(local_sig, remote_sig):
+        # Helpful debug response while developing — remove in production
+        return HttpResponseBadRequest(
+            f"signature mismatch\nremote={remote_sig}\nlocal={local_sig}\nmessage={message}",
+            content_type='text/plain'
+        )
+
+    status = payload.get('status')
+    transaction_uuid = payload.get('transaction_uuid')
+
+    if status == "COMPLETE":
+        # TODO: update your DB here. Example (uncomment & adapt):
+        # from .models import Payment
+        # Payment.objects.update_or_create(
+        #     transaction_uuid=transaction_uuid,
+        #     defaults={'status':'complete', 'amount': payload.get('total_amount'), 'raw_response': payload}
+        # )
+        return HttpResponse("Payment verified and complete", status=200)
+
+    return HttpResponse(f"Payment status: {status}", status=400)
