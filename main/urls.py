@@ -50,8 +50,13 @@ urlpatterns = [
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='main/password_reset_complete.html'), name='password_reset_complete'),
 
     # 8 PAYMENT
+    path('payment/choose/<int:package_id>/', views.choose_payment, name='choose_payment'),
+    path('payment/choose/custom-itinerary/<int:custom_itinerary_id>/', views.choose_custom_itinerary_payment, name='choose_custom_itinerary_payment'),
     path('create-checkout-session/<int:package_id>/', views.create_checkout_session, name='create_checkout_session'),
     path('create-checkout-session/custom-itinerary/<int:custom_itinerary_id>/', views.create_custom_itinerary_checkout_session, name='create_custom_itinerary_checkout_session'),
+    path('payment/esewa-checkout/<int:package_id>/', views.esewa_checkout, name='esewa_checkout'),
+    path('payment/esewa-checkout/custom-itinerary/<int:custom_itinerary_id>/', views.esewa_custom_itinerary_checkout, name='esewa_custom_itinerary_checkout'),
+    path('payment/esewa-verify/', views.esewa_verify, name='esewa_verify'),
     path('payment-success/', views.payment_success, name= 'payment_success'),
     path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),
 

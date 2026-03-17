@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponseBadRequest
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -14,11 +15,16 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal
+import base64
+import hashlib
+import hmac
 import json
+import uuid
 from django.contrib.auth import get_user_model # Replaced direct User import
 import stripe
 from django.conf import settings
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
 
 
 # Models
@@ -114,6 +120,111 @@ def _build_selected_options_summary(selected_options):
         }
         for package_day, selected_option in selected_options
     ]
+
+
+def _build_payment_context(*, package, custom_itinerary=None):
+    amount = custom_itinerary.final_price if custom_itinerary else package.price
+    return {
+        'package': package,
+        'custom_itinerary': custom_itinerary,
+        'amount': amount,
+        'display_name': f"{package.name} (Custom Itinerary)" if custom_itinerary else package.name,
+    }
+
+
+def _store_pending_payment_session(request, *, package_id=None, custom_itinerary_id=None, transaction_uuid=None, provider=None):
+    request.session['pending_booking_package_id'] = package_id
+    request.session['pending_custom_itinerary_id'] = custom_itinerary_id
+    request.session['pending_payment_provider'] = provider
+    request.session['pending_payment_transaction_uuid'] = transaction_uuid
+
+
+def _clear_pending_payment_session(request):
+    for key in [
+        'pending_booking_package_id',
+        'pending_custom_itinerary_id',
+        'pending_payment_provider',
+        'pending_payment_transaction_uuid',
+    ]:
+        request.session.pop(key, None)
+
+
+def _create_or_update_booking_from_pending_payment(request):
+    custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
+    package_id = request.session.get('pending_booking_package_id')
+
+    if not custom_itinerary_id and not package_id:
+        raise ValueError('No pending payment target found.')
+
+    if custom_itinerary_id:
+        custom_itinerary = get_object_or_404(
+            CustomItinerary.objects.select_related('package'),
+            pk=custom_itinerary_id,
+            user=request.user,
+        )
+
+        booking, _ = Booking.objects.get_or_create(
+            custom_itinerary=custom_itinerary,
+            defaults={
+                'user': request.user,
+                'package': custom_itinerary.package,
+                'number_of_travelers': 1,
+                'total_price': custom_itinerary.final_price,
+                'status': 'confirmed',
+            }
+        )
+        if booking.status != 'confirmed' or booking.total_price != custom_itinerary.final_price:
+            booking.status = 'confirmed'
+            booking.total_price = custom_itinerary.final_price
+            booking.package = custom_itinerary.package
+            booking.user = request.user
+            booking.save(update_fields=['status', 'total_price', 'package', 'user'])
+        if custom_itinerary.status != 'confirmed':
+            custom_itinerary.status = 'confirmed'
+            custom_itinerary.save(update_fields=['status', 'updated_at'])
+
+        return booking, custom_itinerary.package, True
+
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    booking = Booking.objects.create(
+        user=request.user,
+        package=package,
+        number_of_travelers=1,
+        total_price=package.price,
+        status='confirmed'
+    )
+    return booking, package, False
+
+
+def _generate_esewa_signature(total_amount, transaction_uuid, product_code):
+    message = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
+    digest = hmac.new(
+        settings.ESEWA_SECRET_KEY.encode('utf-8'),
+        message.encode('utf-8'),
+        hashlib.sha256,
+    ).digest()
+    return base64.b64encode(digest).decode('utf-8')
+
+
+def _verify_esewa_payload(payload):
+    signed_field_names = payload.get('signed_field_names', '')
+    signature = payload.get('signature')
+
+    if not signed_field_names or not signature:
+        return False
+
+    message = ','.join(
+        f"{field}={payload.get(field, '')}"
+        for field in signed_field_names.split(',')
+    )
+    expected_signature = base64.b64encode(
+        hmac.new(
+            settings.ESEWA_SECRET_KEY.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256,
+        ).digest()
+    ).decode('utf-8')
+    return hmac.compare_digest(signature, expected_signature)
 
 def about(request):
     return render(request, 'main/about.html')
@@ -288,8 +399,32 @@ def custom_itinerary_detail(request, custom_itinerary_id):
     context = {
         'custom_itinerary': custom_itinerary,
         'selections': custom_itinerary.selections.all(),
+        'payment_context': _build_payment_context(
+            package=custom_itinerary.package,
+            custom_itinerary=custom_itinerary,
+        ),
     }
     return render(request, 'main/custom_itinerary_detail.html', context)
+
+
+@login_required
+def choose_payment(request, package_id):
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    return render(request, 'main/choose_payment.html', _build_payment_context(package=package))
+
+
+@login_required
+def choose_custom_itinerary_payment(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package'),
+        pk=custom_itinerary_id,
+        user=request.user,
+    )
+    return render(
+        request,
+        'main/choose_payment.html',
+        _build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
+    )
 
 def compare_packages(request):
     if request.method == 'POST':
@@ -751,6 +886,121 @@ def update_vendor_status(request, vendor_id, new_status):
 # ==========================================
 
 @login_required
+def esewa_checkout(request, package_id):
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    transaction_uuid = str(uuid.uuid4())
+    amount = Decimal(package.price).quantize(Decimal('0.01'))
+    tax_amount = Decimal('0.00')
+    total_amount = amount + tax_amount
+
+    _store_pending_payment_session(
+        request,
+        package_id=package.id,
+        transaction_uuid=transaction_uuid,
+        provider='esewa',
+    )
+
+    context = {
+        **_build_payment_context(package=package),
+        'amount': f"{amount:.2f}",
+        'tax_amount': f"{tax_amount:.2f}",
+        'total_amount': f"{total_amount:.2f}",
+        'transaction_uuid': transaction_uuid,
+        'product_code': settings.ESEWA_PRODUCT_CODE,
+        'signature': _generate_esewa_signature(
+            f"{total_amount:.2f}",
+            transaction_uuid,
+            settings.ESEWA_PRODUCT_CODE,
+        ),
+        'success_url': request.build_absolute_uri(reverse('esewa_verify')),
+        'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
+        'esewa_form_url': settings.ESEWA_FORM_URL,
+    }
+    return render(request, 'main/esewa_checkout.html', context)
+
+
+@login_required
+def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package'),
+        pk=custom_itinerary_id,
+        user=request.user,
+    )
+    transaction_uuid = str(uuid.uuid4())
+    amount = Decimal(custom_itinerary.final_price).quantize(Decimal('0.01'))
+    tax_amount = Decimal('0.00')
+    total_amount = amount + tax_amount
+
+    _store_pending_payment_session(
+        request,
+        custom_itinerary_id=custom_itinerary.id,
+        transaction_uuid=transaction_uuid,
+        provider='esewa',
+    )
+
+    context = {
+        **_build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
+        'amount': f"{amount:.2f}",
+        'tax_amount': f"{tax_amount:.2f}",
+        'total_amount': f"{total_amount:.2f}",
+        'transaction_uuid': transaction_uuid,
+        'product_code': settings.ESEWA_PRODUCT_CODE,
+        'signature': _generate_esewa_signature(
+            f"{total_amount:.2f}",
+            transaction_uuid,
+            settings.ESEWA_PRODUCT_CODE,
+        ),
+        'success_url': request.build_absolute_uri(reverse('esewa_verify')),
+        'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
+        'esewa_form_url': settings.ESEWA_FORM_URL,
+    }
+    return render(request, 'main/esewa_checkout.html', context)
+
+
+@csrf_exempt
+@login_required
+def esewa_verify(request):
+    data_b64 = request.GET.get('data') or request.POST.get('data')
+    if not data_b64:
+        messages.error(request, 'Missing eSewa verification payload.')
+        return redirect('package_list')
+
+    try:
+        payload = json.loads(base64.b64decode(data_b64).decode('utf-8'))
+    except Exception:
+        messages.error(request, 'Invalid eSewa verification payload.')
+        return redirect('package_list')
+
+    if not _verify_esewa_payload(payload):
+        return HttpResponseBadRequest('Invalid eSewa signature.')
+
+    transaction_uuid = payload.get('transaction_uuid')
+    status = payload.get('status')
+    pending_transaction_uuid = request.session.get('pending_payment_transaction_uuid')
+
+    if not pending_transaction_uuid or pending_transaction_uuid != transaction_uuid:
+        messages.error(request, 'Could not match the eSewa payment to a pending checkout.')
+        return redirect('package_list')
+
+    if status != 'COMPLETE':
+        messages.error(request, f'eSewa payment did not complete successfully. Status: {status}')
+        return redirect('payment_cancelled')
+
+    try:
+        booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
+    except ValueError:
+        messages.error(request, 'Could not find a pending booking after eSewa verification.')
+        return redirect('package_list')
+
+    _clear_pending_payment_session(request)
+    if is_custom:
+        messages.success(request, f"Your custom booking for {package.name} is confirmed!")
+    else:
+        messages.success(request, f"Your booking for {package.name} is confirmed!")
+
+    return redirect('booking_confirmation', booking_id=booking.id)
+
+@login_required
 def create_checkout_session(request, package_id):
     """
     Creates a Stripe Checkout session and redirects the user to the
@@ -790,9 +1040,7 @@ def create_checkout_session(request, package_id):
             customer_email=request.user.email,  # Pre-fill customer email
         )
 
-        # Store package_id in session to retrieve after success
-        request.session['pending_booking_package_id'] = package.id
-        request.session.pop('pending_custom_itinerary_id', None)
+        _store_pending_payment_session(request, package_id=package.id, provider='stripe')
 
         return redirect(checkout_session.url, code=303)
 
@@ -841,8 +1089,11 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
             customer_email=request.user.email,
         )
 
-        request.session['pending_custom_itinerary_id'] = custom_itinerary.id
-        request.session.pop('pending_booking_package_id', None)
+        _store_pending_payment_session(
+            request,
+            custom_itinerary_id=custom_itinerary.id,
+            provider='stripe',
+        )
 
         return redirect(checkout_session.url, code=303)
     except Exception as e:
@@ -858,54 +1109,21 @@ def payment_success(request):
     Handles successful payments. Creates the booking record and shows a
     confirmation page.
     """
-    custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
-    package_id = request.session.get('pending_booking_package_id')
-
-    if not custom_itinerary_id and not package_id:
+    if not request.session.get('pending_custom_itinerary_id') and not request.session.get('pending_booking_package_id'):
         messages.error(request, "Could not find a pending booking. Please try again.")
         return redirect('package_list')
 
-    if custom_itinerary_id:
-        custom_itinerary = get_object_or_404(
-            CustomItinerary.objects.select_related('package'),
-            pk=custom_itinerary_id,
-            user=request.user,
-        )
+    try:
+        booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
+    except ValueError:
+        messages.error(request, "Could not find a pending booking. Please try again.")
+        return redirect('package_list')
 
-        booking, _ = Booking.objects.get_or_create(
-            custom_itinerary=custom_itinerary,
-            defaults={
-                'user': request.user,
-                'package': custom_itinerary.package,
-                'number_of_travelers': 1,
-                'total_price': custom_itinerary.final_price,
-                'status': 'confirmed',
-            }
-        )
-        if booking.status != 'confirmed' or booking.total_price != custom_itinerary.final_price:
-            booking.status = 'confirmed'
-            booking.total_price = custom_itinerary.final_price
-            booking.package = custom_itinerary.package
-            booking.user = request.user
-            booking.save(update_fields=['status', 'total_price', 'package', 'user'])
-        if custom_itinerary.status != 'confirmed':
-            custom_itinerary.status = 'confirmed'
-            custom_itinerary.save(update_fields=['status', 'updated_at'])
+    _clear_pending_payment_session(request)
 
-        del request.session['pending_custom_itinerary_id']
-        messages.success(request, f"Your custom booking for {custom_itinerary.package.name} is confirmed!")
+    if is_custom:
+        messages.success(request, f"Your custom booking for {package.name} is confirmed!")
     else:
-        package = get_object_or_404(TravelPackage, pk=package_id)
-
-        booking = Booking.objects.create(
-            user=request.user,
-            package=package,
-            number_of_travelers=1,
-            total_price=package.price,
-            status='confirmed'
-        )
-
-        del request.session['pending_booking_package_id']
         messages.success(request, f"Your booking for {package.name} is confirmed!")
 
     return render(request, 'main/payment_success.html', {'booking': booking})

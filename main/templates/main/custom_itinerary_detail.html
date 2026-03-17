@@ -69,7 +69,7 @@
                         {% if custom_itinerary.booking %}
                         <a href="{% url 'booking_confirmation' custom_itinerary.booking.id %}" class="btn btn-primary">View Booking</a>
                         {% else %}
-                        <a href="{% url 'create_custom_itinerary_checkout_session' custom_itinerary.id %}" class="btn btn-primary">Proceed to Payment</a>
+                        <a href="{% url 'choose_custom_itinerary_payment' custom_itinerary.id %}" class="btn btn-primary">Proceed to Payment</a>
                         {% endif %}
                         <a href="{% url 'package_detail' custom_itinerary.package.id %}" class="btn btn-outline-secondary">Back to Package</a>
                         <a href="{% url 'my_bookings' %}" class="btn btn-outline-secondary">My Bookings</a>

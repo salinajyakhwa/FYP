@@ -230,7 +230,7 @@
                     </div>
                     <div class="small text-muted mt-2">Payment still uses the base package flow. Checkout integration for saved custom itineraries is the next step.</div>
                     {% elif user.is_authenticated %}
-                    <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-primary w-100">Book Now</a>
+                    <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
                     {% else %}
                     <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-primary w-100">Log In to Book</a>
                     {% endif %}
