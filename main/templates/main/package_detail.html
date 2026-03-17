@@ -1,241 +1,242 @@
-```html
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}
-Customize: {{ package.name }}
-{% endblock %}
+{% block title %}{{ package.name }}{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container py-5">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            {% if customization_form %}
+            <form method="post" id="customization-form">
+                {% csrf_token %}
+            {% endif %}
 
-    <form action="{% url 'booking_confirmation' package.id %}" method="post">
-        {% csrf_token %}
+            <div class="card border-0 shadow-sm overflow-hidden">
+                {% if package.image %}
+                <img src="{{ package.image.url }}" alt="{{ package.name }}" class="img-fluid" style="max-height: 420px; object-fit: cover;">
+                {% else %}
+                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 320px;">
+                    <span class="text-muted">No image available</span>
+                </div>
+                {% endif %}
 
-        <div class="row g-5">
-
-            <!-- LEFT SIDE -->
-            <div class="col-lg-8">
-
-                <h1 class="fw-bold">{{ package.name }}</h1>
-                <p class="text-muted">Customize your journey to perfection.</p>
-                <hr>
-
-                <!-- CORE OPTIONS -->
-                <h4 class="mb-3">Core Options</h4>
-
-                <div class="row g-3">
-
-                    <!-- Transportation -->
-                    <div class="col-md-6">
-                        <label class="form-label">Transportation</label>
-                        <select name="transportation" class="form-select">
-                            {% for option in transportation_options %}
-                                <option value="{{ option.id }}">{{ option.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Traveler Type -->
-                    <div class="col-md-6">
-                        <label class="form-label">Traveler Type</label>
-                        <select name="traveler_type" class="form-select">
-                            <option value="solo">Solo</option>
-                            <option value="couple">Couple</option>
-                            <option value="family">Family</option>
-                            <option value="group">Group</option>
-                        </select>
-                    </div>
-
-                    <!-- Vehicle -->
-                    <div class="col-md-6">
-                        <label class="form-label">Vehicle</label>
-                        <select name="vehicle" class="form-select">
-                            {% for vehicle in vehicles %}
-                                <option value="{{ vehicle.id }}">{{ vehicle.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Meal Preference -->
-                    <div class="col-md-6">
-                        <label class="form-label">Meal Preference</label>
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                         <div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="food_preference" value="veg" checked>
-                                <label class="form-check-label">Veg</label>
-                            </div>
+                            <h1 class="h2 mb-1">{{ package.name }}</h1>
+                            <p class="text-muted mb-0">Offered by {{ package.vendor.name }}</p>
+                        </div>
+                        <span class="badge bg-primary fs-6">${{ package.price }}</span>
+                    </div>
 
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="food_preference" value="non_veg">
-                                <label class="form-check-label">Non-Veg</label>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Location</div>
+                                <div class="fw-semibold">{{ package.location }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Travel Type</div>
+                                <div class="fw-semibold">{{ package.travel_type }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Dates</div>
+                                <div class="fw-semibold">{{ package.start_date }} to {{ package.end_date }}</div>
                             </div>
                         </div>
                     </div>
 
-                </div>
+                    <h2 class="h5 mb-3">Overview</h2>
+                    <p class="mb-4">{{ package.description }}</p>
 
-                <hr>
-
-                <!-- ACCOMMODATION -->
-                <h4 class="mb-3">Accommodation</h4>
-
-                <div class="row g-3">
-
-                    <!-- Hotel -->
-                    <div class="col-md-6">
-                        <label class="form-label">Hotel</label>
-                        <select id="hotel-select" class="form-select">
-                            <option disabled selected>Select hotel</option>
-                            {% for hotel in hotels %}
-                                <option value="{{ hotel.id }}">{{ hotel.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Room -->
-                    <div class="col-md-6">
-                        <label class="form-label">Room Type</label>
-                        <select name="hotel_room" id="room-select" class="form-select" disabled>
-                            <option>Select hotel first</option>
-                        </select>
-                    </div>
-
-                </div>
-
-                <hr>
-
-                <!-- ITINERARY -->
-                <h4 class="mb-3">Itinerary</h4>
-
-                {% for place in base_places %}
-                    <div class="card mb-3">
-                        <div class="card-body">
-
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">{{ place.name }}</h5>
-
-                                <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           name="places"
-                                           value="{{ place.id }}"
-                                           checked>
-                                    <label class="form-check-label">Include</label>
-                                </div>
+                    <h2 class="h5 mb-3">Itinerary</h2>
+                    {% if itinerary_items %}
+                    <div class="d-grid gap-3">
+                        {% for item in itinerary_items %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Day {{ item.day }}</strong>
+                                <span class="badge text-bg-light">{{ item.activity_label }}</span>
                             </div>
-
-                            <p class="text-muted mt-2">{{ place.description }}</p>
-
-                            <!-- Activities -->
-                            <div>
-                                {% for activity in all_activities %}
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input"
-                                               type="checkbox"
-                                               name="activities_{{ place.id }}"
-                                               value="{{ activity.id }}">
-                                        <label class="form-check-label">
-                                            {{ activity.name }} (+${{ activity.price }})
-                                        </label>
+                            <div class="fw-semibold mb-1">{{ item.title }}</div>
+                            <p class="mb-2">{{ item.description }}</p>
+                            {% if item.options %}
+                            <div class="small text-muted mb-1">
+                                {% if item.selection_field %}
+                                Choose one option
+                                {% else %}
+                                Available options
+                                {% endif %}
+                            </div>
+                            <div class="d-grid gap-2 mb-2">
+                                {% for option in item.options %}
+                                <div class="bg-light rounded p-2">
+                                    {% if item.selection_field %}
+                                    <label class="d-flex justify-content-between align-items-start gap-3 mb-0">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <input
+                                                class="form-check-input mt-1"
+                                                type="radio"
+                                                name="{{ item.selection_field.name }}"
+                                                value="{{ option.id }}"
+                                                {% if item.selection_field.value == option.id|stringformat:"s" %}checked{% endif %}
+                                                {% if item.selection_field.field.required %}required{% endif %}
+                                            >
+                                            <div>
+                                                <strong>{{ option.title }}</strong>
+                                                <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                                {% if option.description %}
+                                                <div class="small mt-1">{{ option.description }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="fw-semibold">${{ option.additional_cost }}</div>
+                                    </label>
+                                    {% else %}
+                                    <div class="d-flex justify-content-between align-items-center gap-3">
+                                        <div>
+                                            <strong>{{ option.title }}</strong>
+                                            <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                        </div>
+                                        <div class="fw-semibold">${{ option.additional_cost }}</div>
                                     </div>
+                                    {% if option.description %}
+                                    <div class="small mt-1">{{ option.description }}</div>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
                                 {% endfor %}
                             </div>
-
+                            {% if item.selection_field and item.selection_field.errors %}
+                            {% for error in item.selection_field.errors %}
+                            <div class="text-danger small mb-2">{{ error }}</div>
+                            {% endfor %}
+                            {% endif %}
+                            {% endif %}
+                            {% if item.inclusions %}
+                            <div class="small text-muted">
+                                Inclusions: {{ item.inclusions|join:", " }}
+                            </div>
+                            {% endif %}
                         </div>
+                        {% endfor %}
                     </div>
-                {% endfor %}
-
-            </div>
-
-
-            <!-- RIGHT SIDE -->
-            <div class="col-lg-4">
-
-                <div class="card shadow-sm p-3" style="position: sticky; top: 100px;">
-
-                    <h4 class="fw-bold">Summary</h4>
-                    <hr>
-
-                    <p>
-                        Base Price
-                        <span class="float-end">${{ package.price }}</span>
-                    </p>
-
-                    <p>
-                        Extras
-                        <span class="float-end" id="extra-cost">$0</span>
-                    </p>
-
-                    <hr>
-
-                    <h5 class="fw-bold">
-                        Total
-                        <span class="float-end text-primary" id="total-price">
-                            ${{ package.price }}
-                        </span>
-                    </h5>
-
-                    <button class="btn btn-primary w-100 mt-3">
-                        Proceed
-                    </button>
-
+                    {% else %}
+                    <div class="alert alert-secondary mb-4">
+                        Detailed itinerary has not been added yet.
+                    </div>
+                    {% endif %}
                 </div>
-
             </div>
 
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Reviews</h2>
+
+                    {% if reviews %}
+                    <div class="d-grid gap-3 mb-4">
+                        {% for review in reviews %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>{{ review.user.username }}</strong>
+                                <span class="small text-muted">Rating: {{ review.rating }}/5</span>
+                            </div>
+                            <p class="mb-1">{{ review.comment }}</p>
+                            <div class="small text-muted">{{ review.created_at }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No reviews yet.</p>
+                    {% endif %}
+
+                    {% if user.is_authenticated and user_can_review %}
+                    <hr>
+                    <h3 class="h6 mb-3">Add Review</h3>
+                    <form method="post" action="{% url 'add_review' package.id %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ review_form.rating.id_for_label }}" class="form-label">Rating</label>
+                            {{ review_form.rating }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ review_form.comment.id_for_label }}" class="form-label">Comment</label>
+                            {{ review_form.comment }}
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary">Submit Review</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if customization_form %}
+            </form>
+            {% endif %}
         </div>
 
-    </form>
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 100px;">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Booking</h2>
+                    {% if customization_form %}
+                    <p class="text-muted mb-3">Choose one option for each required day to preview your custom itinerary total.</p>
+                    {% else %}
+                    <p class="text-muted mb-3">Current booking flow uses the base package price. Day-by-day customization will be added next.</p>
+                    {% endif %}
 
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Base Price</span>
+                        <strong>${{ package.price }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span>Customization</span>
+                        <span class="{% if customization_form %}fw-semibold{% else %}text-muted{% endif %}">
+                            {% if customization_form %}${{ customization_extra_cost }}{% else %}Coming soon{% endif %}
+                        </span>
+                    </div>
+
+                    {% if selected_options_summary %}
+                    <div class="border rounded p-3 mb-4">
+                        <div class="small text-muted mb-2">Selected options</div>
+                        <div class="d-grid gap-2">
+                            {% for selection in selected_options_summary %}
+                            <div>
+                                <div class="small fw-semibold">Day {{ selection.day_number }}: {{ selection.day_title }}</div>
+                                <div class="small text-muted">{{ selection.option_title }} · {{ selection.option_type }} · +${{ selection.additional_cost }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mb-4">
+                        <span>Total</span>
+                        <strong>${{ customization_total }}</strong>
+                    </div>
+
+                    {% if customization_form %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" form="customization-form" formmethod="post" name="preview_customization" value="1" class="btn btn-primary">Preview Custom Total</button>
+                        {% if user.is_authenticated %}
+                        <button type="submit" form="customization-form" formmethod="post" name="save_customization" value="1" class="btn btn-outline-primary">Save Custom Itinerary</button>
+                        {% else %}
+                        <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-outline-primary">Log In to Save</a>
+                        {% endif %}
+                    </div>
+                    <div class="small text-muted mt-2">Payment still uses the base package flow. Checkout integration for saved custom itineraries is the next step.</div>
+                    {% elif user.is_authenticated %}
+                    <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-primary w-100">Book Now</a>
+                    {% else %}
+                    <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-primary w-100">Log In to Book</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
-
-
-{% block scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const hotelSelect = document.getElementById("hotel-select");
-    const roomSelect = document.getElementById("room-select");
-
-    const hotelsData = {
-        {% for hotel in hotels %}
-            "{{ hotel.id }}": [
-                {% for room in hotel.room_options.all %}
-                    {
-                        id: "{{ room.id }}",
-                        name: "{{ room.room_type.name }}",
-                        price: {{ room.price_per_night }}
-                    }{% if not forloop.last %},{% endif %}
-                {% endfor %}
-            ]{% if not forloop.last %},{% endif %}
-        {% endfor %}
-    };
-
-    hotelSelect.addEventListener("change", function () {
-
-        const rooms = hotelsData[this.value] || [];
-
-        roomSelect.innerHTML = '<option>Select room</option>';
-
-        if (rooms.length > 0) {
-            roomSelect.disabled = false;
-
-            rooms.forEach(function (room) {
-                const option = document.createElement("option");
-                option.value = room.id;
-                option.textContent = room.name + " - $" + room.price;
-                roomSelect.appendChild(option);
-            });
-
-        } else {
-            roomSelect.disabled = true;
-        }
-
-    });
-
-});
-</script>
-{% endblock %}
-```

@@ -17,6 +17,7 @@ urlpatterns = [
     
     # 4. PACKAGE DETAILS & BOOKING
     path('package/<int:package_id>/', views.package_detail, name='package_detail'),
+    path('custom-itinerary/<int:custom_itinerary_id>/', views.custom_itinerary_detail, name='custom_itinerary_detail'),
 
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),
@@ -50,6 +51,7 @@ urlpatterns = [
 
     # 8 PAYMENT
     path('create-checkout-session/<int:package_id>/', views.create_checkout_session, name='create_checkout_session'),
+    path('create-checkout-session/custom-itinerary/<int:custom_itinerary_id>/', views.create_custom_itinerary_checkout_session, name='create_custom_itinerary_checkout_session'),
     path('payment-success/', views.payment_success, name= 'payment_success'),
     path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),
 

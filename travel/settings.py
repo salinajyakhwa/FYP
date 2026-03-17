@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
-    
+
     # Third-party apps
     'widget_tweaks',
     'django_filters',
@@ -95,8 +95,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         #'NAME': 'travel',
         'NAME': 'traveldumm',
-        'USER': 'novice',
-        'PASSWORD': 'yourpassword', 
+        #'USER': 'novice',
+        #'PASSWORD': 'yourpassword',
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -162,7 +162,7 @@ LOGOUT_REDIRECT_URL = '/'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
  # STRIPE CONFIGURATION
- # Example: STRIPE_PUBLISHABLE_KEY = 
+ # Example: STRIPE_PUBLISHABLE_KEY =
 os.environ.get('STRIPE_PUBLISHABLE_KEY')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')

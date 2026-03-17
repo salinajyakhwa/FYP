@@ -54,10 +54,95 @@ class TravelPackage(models.Model):
     def __str__(self):
         return self.name
 
+
+class PackageDay(models.Model):
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='package_days')
+    day_number = models.PositiveIntegerField()
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['day_number', 'sort_order', 'id']
+        unique_together = [('package', 'day_number')]
+
+    def __str__(self):
+        return f"{self.package.name} - Day {self.day_number}"
+
+
+class PackageDayOption(models.Model):
+    OPTION_TYPE_CHOICES = (
+        ('flight', 'Flight'),
+        ('road', 'Road'),
+        ('rail', 'Rail'),
+        ('water', 'Water'),
+        ('stay', 'Stay'),
+        ('activity', 'Activity'),
+        ('other', 'Other'),
+    )
+
+    package_day = models.ForeignKey(PackageDay, on_delete=models.CASCADE, related_name='options')
+    option_type = models.CharField(max_length=20, choices=OPTION_TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    additional_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_required = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return f"{self.package_day} - {self.title}"
+
+
+class CustomItinerary(models.Model):
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_itineraries')
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='custom_itineraries')
+    base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    final_price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Custom itinerary for {self.package.name} by {self.user.username}"
+
+
+class CustomItinerarySelection(models.Model):
+    custom_itinerary = models.ForeignKey(CustomItinerary, on_delete=models.CASCADE, related_name='selections')
+    package_day = models.ForeignKey(PackageDay, on_delete=models.CASCADE, related_name='custom_selections')
+    selected_option = models.ForeignKey(PackageDayOption, on_delete=models.CASCADE, related_name='selected_in_itineraries')
+    selected_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['package_day__day_number', 'id']
+        unique_together = [('custom_itinerary', 'package_day')]
+
+    def __str__(self):
+        return f"{self.custom_itinerary} - Day {self.package_day.day_number}"
+
 # Represents a booking made by a user for a travel package.
 class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
     package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='bookings')
+    custom_itinerary = models.OneToOneField(
+        CustomItinerary,
+        on_delete=models.SET_NULL,
+        related_name='booking',
+        blank=True,
+        null=True,
+    )
     booking_date = models.DateTimeField(auto_now_add=True)
     STATUS_CHOICES = (
         ('pending', 'Pending'),

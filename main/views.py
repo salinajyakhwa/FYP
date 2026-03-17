@@ -3,6 +3,7 @@ from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q, Count, Sum
 from django.core.paginator import Paginator # Added for pagination
 from django.contrib.sites.shortcuts import get_current_site
@@ -12,6 +13,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import EmailMessage
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
+from decimal import Decimal
 import json
 from django.contrib.auth import get_user_model # Replaced direct User import
 import stripe
@@ -20,14 +22,29 @@ from django.urls import reverse
 
 
 # Models
-from .models import TravelPackage, Booking, Review, UserProfile, Vendor, Vehicle
+from .models import (
+    TravelPackage,
+    PackageDay,
+    PackageDayOption,
+    CustomItinerary,
+    CustomItinerarySelection,
+    Booking,
+    Review,
+    UserProfile,
+    Vendor,
+    Vehicle,
+)
 
 User = get_user_model() # Get the User model
 
 # Forms
 from .forms import (
     ReviewForm, 
+    ItineraryDayForm,
     ItineraryFormSet, 
+    PackageDayForm,
+    PackageDayOptionForm,
+    CustomItinerarySelectionForm,
     TravelPackageForm, 
     UserUpdateForm, 
     UserProfileUpdateForm,
@@ -69,6 +86,35 @@ def _get_vendor_or_403(request):
     except Exception:
         raise PermissionDenied
 
+
+def _sync_package_itinerary_json(package):
+    package_days = package.package_days.prefetch_related('options').all()
+    package.itinerary = [
+        {
+            'day': package_day.day_number,
+            'title': package_day.title,
+            'activity_type': 'travel',
+            'description': package_day.description,
+            'inclusions': ', '.join(option.title for option in package_day.options.all()),
+        }
+        for package_day in package_days
+    ]
+    package.save(update_fields=['itinerary', 'updated_at'])
+
+
+def _build_selected_options_summary(selected_options):
+    return [
+        {
+            'day_number': package_day.day_number,
+            'day_title': package_day.title,
+            'option_title': selected_option.title,
+            'option_type': selected_option.get_option_type_display(),
+            'additional_cost': selected_option.additional_cost,
+            'description': selected_option.description,
+        }
+        for package_day, selected_option in selected_options
+    ]
+
 def about(request):
     return render(request, 'main/about.html')
 
@@ -104,8 +150,98 @@ def package_list(request):
 def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
     reviews = Review.objects.filter(package=package).order_by('-created_at')
-    vehicles = Vehicle.objects.all() # Assuming you have a Vehicle model related to TravelPackage
     review_form = ReviewForm()
+    itinerary_items = []
+    package_days = package.package_days.prefetch_related('options').all()
+    customization_form = CustomItinerarySelectionForm(package=package) if package_days.exists() else None
+    selected_options_summary = []
+    customization_extra_cost = Decimal('0.00')
+    customization_total = Decimal(package.price)
+
+    if package_days.exists():
+        if request.method == 'POST' and (
+            'preview_customization' in request.POST or 'save_customization' in request.POST
+        ):
+            customization_form = CustomItinerarySelectionForm(request.POST, package=package)
+            if customization_form.is_valid():
+                selected_options = customization_form.get_selected_options()
+                customization_total = customization_form.calculate_total(package.price)
+                customization_extra_cost = customization_total - Decimal(package.price)
+                selected_options_summary = _build_selected_options_summary(selected_options)
+
+                if 'save_customization' in request.POST:
+                    if not request.user.is_authenticated:
+                        messages.info(request, 'Log in to save a custom itinerary.')
+                        return redirect(f"{reverse('login')}?next={request.path}")
+
+                    with transaction.atomic():
+                        custom_itinerary = CustomItinerary.objects.create(
+                            user=request.user,
+                            package=package,
+                            base_price=package.price,
+                            final_price=customization_total,
+                            status='submitted',
+                        )
+                        CustomItinerarySelection.objects.bulk_create([
+                            CustomItinerarySelection(
+                                custom_itinerary=custom_itinerary,
+                                package_day=package_day,
+                                selected_option=selected_option,
+                                selected_price=selected_option.additional_cost,
+                            )
+                            for package_day, selected_option in selected_options
+                        ])
+
+                    messages.success(request, 'Custom itinerary saved successfully.')
+                    return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
+
+        for package_day in package_days:
+            selection_field = None
+            if customization_form is not None:
+                field_name = f'day_{package_day.id}'
+                if field_name in customization_form.fields:
+                    selection_field = customization_form[field_name]
+
+            itinerary_items.append({
+                'id': package_day.id,
+                'day': package_day.day_number,
+                'title': package_day.title,
+                'description': package_day.description,
+                'activity_label': 'Day Plan',
+                'inclusions': [],
+                'options': list(package_day.options.all()),
+                'selection_field': selection_field,
+            })
+    else:
+        activity_labels = dict(ItineraryDayForm.ACTIVITY_CHOICES)
+        raw_itinerary_items = package.itinerary if isinstance(package.itinerary, list) else []
+
+        for item in sorted(raw_itinerary_items, key=lambda entry: entry.get('day') or 0):
+            if not isinstance(item, dict):
+                continue
+
+            day = item.get('day')
+            title = (item.get('title') or '').strip()
+            description = (item.get('description') or '').strip()
+            activity_type = item.get('activity_type') or ''
+            inclusions = [
+                inclusion.strip()
+                for inclusion in (item.get('inclusions') or '').split(',')
+                if inclusion.strip()
+            ]
+
+            if not day or not title or not description:
+                continue
+
+            itinerary_items.append({
+                'day': day,
+                'title': title,
+                'description': description,
+                'activity_label': activity_labels.get(activity_type, activity_type.replace('_', ' ').title()),
+                'inclusions': inclusions,
+                'options': [],
+                'selection_field': None,
+            })
     
     user_can_review = False
     if request.user.is_authenticated:
@@ -127,9 +263,33 @@ def package_detail(request, package_id):
         'reviews': reviews,
         'user_can_review': user_can_review,
         'review_form': review_form,
-        'vehicles' : vehicles, # Pass vehicles to the template
+        'itinerary_items': itinerary_items,
+        'customization_form': customization_form,
+        'selected_options_summary': selected_options_summary,
+        'customization_extra_cost': customization_extra_cost,
+        'customization_total': customization_total,
     }
     return render(request, 'main/package_detail.html', context)
+
+
+@login_required
+def custom_itinerary_detail(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package', 'package__vendor', 'user').prefetch_related(
+            'selections__package_day',
+            'selections__selected_option',
+        ),
+        pk=custom_itinerary_id,
+    )
+
+    if custom_itinerary.user != request.user:
+        raise PermissionDenied
+
+    context = {
+        'custom_itinerary': custom_itinerary,
+        'selections': custom_itinerary.selections.all(),
+    }
+    return render(request, 'main/custom_itinerary_detail.html', context)
 
 def compare_packages(request):
     if request.method == 'POST':
@@ -451,32 +611,74 @@ def manage_itinerary(request, package_id):
     
     if package.vendor != _get_vendor_or_403(request):
         raise PermissionDenied
+    package_days = package.package_days.prefetch_related('options').all()
+    edit_day = None
+    edit_option = None
+
+    edit_day_id = request.GET.get('edit_day')
+    if edit_day_id:
+        edit_day = package_days.filter(pk=edit_day_id).first()
+
+    edit_option_id = request.GET.get('edit_option')
+    if edit_option_id:
+        edit_option = PackageDayOption.objects.filter(package_day__package=package, pk=edit_option_id).select_related('package_day').first()
+
+    day_form = PackageDayForm(instance=edit_day, package=package, prefix='day')
+    option_form = PackageDayOptionForm(instance=edit_option, package=package, prefix='option')
 
     if request.method == 'POST':
-        formset = ItineraryFormSet(request.POST)
-        if formset.is_valid():
-            # JSON Logic
-            new_itinerary = []
-            for form in formset:
-                if form.cleaned_data and not form.cleaned_data.get('DELETE'):
-                    new_itinerary.append({
-                        'day': form.cleaned_data.get('day'),
-                        'title': form.cleaned_data.get('title'),
-                        'activity_type': form.cleaned_data.get('activity_type'),
-                        'description': form.cleaned_data.get('description'),
-                        'inclusions': form.cleaned_data.get('inclusions'),
-                    })
-            package.itinerary = new_itinerary
-            package.save()
-            messages.success(request, "Itinerary updated!")
-            return redirect('vendor_dashboard')
-    else:
-        initial_data = package.itinerary if isinstance(package.itinerary, list) else []
-        formset = ItineraryFormSet(initial=initial_data)
+        action = request.POST.get('action')
+        day_id = request.POST.get('day_id') or None
+        option_id = request.POST.get('option_id') or None
+
+        if action == 'save_day':
+            day_instance = package_days.filter(pk=day_id).first() if day_id else None
+            day_form = PackageDayForm(request.POST, instance=day_instance, package=package, prefix='day')
+            option_form = PackageDayOptionForm(package=package, prefix='option')
+            if day_form.is_valid():
+                day = day_form.save(commit=False)
+                day.package = package
+                day.save()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary day saved successfully.')
+                return redirect('manage_itinerary', package_id=package.id)
+        elif action == 'save_option':
+            option_instance = (
+                PackageDayOption.objects.filter(package_day__package=package, pk=option_id).first()
+                if option_id else None
+            )
+            option_form = PackageDayOptionForm(request.POST, instance=option_instance, package=package, prefix='option')
+            day_form = PackageDayForm(package=package, prefix='day')
+            if option_form.is_valid():
+                option_form.save()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary option saved successfully.')
+                return redirect('manage_itinerary', package_id=package.id)
+        elif action == 'delete_day':
+            day_to_delete = package_days.filter(pk=day_id).first() if day_id else None
+            if day_to_delete:
+                day_to_delete.delete()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary day deleted.')
+                return redirect('manage_itinerary', package_id=package.id)
+        elif action == 'delete_option':
+            option_to_delete = (
+                PackageDayOption.objects.filter(package_day__package=package, pk=option_id).first()
+                if option_id else None
+            )
+            if option_to_delete:
+                option_to_delete.delete()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary option deleted.')
+                return redirect('manage_itinerary', package_id=package.id)
 
     context = {
         'package': package,
-        'formset': formset
+        'package_days': package_days,
+        'day_form': day_form,
+        'option_form': option_form,
+        'editing_day': edit_day,
+        'editing_option': edit_option,
     }
     return render(request, 'main/manage_itinerary.html', context)
 
@@ -590,6 +792,7 @@ def create_checkout_session(request, package_id):
 
         # Store package_id in session to retrieve after success
         request.session['pending_booking_package_id'] = package.id
+        request.session.pop('pending_custom_itinerary_id', None)
 
         return redirect(checkout_session.url, code=303)
 
@@ -601,34 +804,111 @@ def create_checkout_session(request, package_id):
         return redirect('package_detail', package_id=package.id)
 
 
+@login_required
+def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package', 'package__vendor'),
+        pk=custom_itinerary_id,
+        user=request.user,
+    )
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    success_url = request.build_absolute_uri(
+        reverse('payment_success')
+    ) + '?session_id={CHECKOUT_SESSION_ID}'
+
+    cancel_url = request.build_absolute_uri(
+        reverse('payment_cancelled')
+    )
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f"{custom_itinerary.package.name} (Custom Itinerary)",
+                        'description': f"Custom travel package by {custom_itinerary.package.vendor.name}",
+                    },
+                    'unit_amount': int(custom_itinerary.final_price * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            customer_email=request.user.email,
+        )
+
+        request.session['pending_custom_itinerary_id'] = custom_itinerary.id
+        request.session.pop('pending_booking_package_id', None)
+
+        return redirect(checkout_session.url, code=303)
+    except Exception as e:
+        messages.error(
+            request,
+            f"Something went wrong with the payment process. Error: {e}"
+        )
+        return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
+
+
 def payment_success(request):
     """
     Handles successful payments. Creates the booking record and shows a
     confirmation page.
     """
+    custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
     package_id = request.session.get('pending_booking_package_id')
 
-    if not package_id:
+    if not custom_itinerary_id and not package_id:
         messages.error(request, "Could not find a pending booking. Please try again.")
         return redirect('package_list')
 
-    package = get_object_or_404(TravelPackage, pk=package_id)
+    if custom_itinerary_id:
+        custom_itinerary = get_object_or_404(
+            CustomItinerary.objects.select_related('package'),
+            pk=custom_itinerary_id,
+            user=request.user,
+        )
 
-    # Create booking after successful payment
-    Booking.objects.create(
-        user=request.user,
-        package=package,
-        number_of_travelers=1,  # You can replace with form value later
-        total_price=package.price,
-        status='confirmed'
-    )
+        booking, _ = Booking.objects.get_or_create(
+            custom_itinerary=custom_itinerary,
+            defaults={
+                'user': request.user,
+                'package': custom_itinerary.package,
+                'number_of_travelers': 1,
+                'total_price': custom_itinerary.final_price,
+                'status': 'confirmed',
+            }
+        )
+        if booking.status != 'confirmed' or booking.total_price != custom_itinerary.final_price:
+            booking.status = 'confirmed'
+            booking.total_price = custom_itinerary.final_price
+            booking.package = custom_itinerary.package
+            booking.user = request.user
+            booking.save(update_fields=['status', 'total_price', 'package', 'user'])
+        if custom_itinerary.status != 'confirmed':
+            custom_itinerary.status = 'confirmed'
+            custom_itinerary.save(update_fields=['status', 'updated_at'])
 
-    # Clear session variable
-    del request.session['pending_booking_package_id']
+        del request.session['pending_custom_itinerary_id']
+        messages.success(request, f"Your custom booking for {custom_itinerary.package.name} is confirmed!")
+    else:
+        package = get_object_or_404(TravelPackage, pk=package_id)
 
-    messages.success(request, f"Your booking for {package.name} is confirmed!")
+        booking = Booking.objects.create(
+            user=request.user,
+            package=package,
+            number_of_travelers=1,
+            total_price=package.price,
+            status='confirmed'
+        )
 
-    return render(request, 'main/payment_success.html')
+        del request.session['pending_booking_package_id']
+        messages.success(request, f"Your booking for {package.name} is confirmed!")
+
+    return render(request, 'main/payment_success.html', {'booking': booking})
 
 
 def payment_cancelled(request):
@@ -641,8 +921,19 @@ def payment_cancelled(request):
     )
     return render(request, 'main/payment_cancelled.html')
 
+@login_required
 def booking_confirmation(request, booking_id):
-    booking = get_object_or_404(Booking, pk=booking_id)
+    booking = get_object_or_404(
+        Booking.objects.select_related('package', 'package__vendor', 'custom_itinerary').prefetch_related(
+            'custom_itinerary__selections__package_day',
+            'custom_itinerary__selections__selected_option',
+        ),
+        pk=booking_id,
+    )
+
+    if booking.user != request.user:
+        raise PermissionDenied
+
     package = booking.package
     context = {
         'booking': booking,
