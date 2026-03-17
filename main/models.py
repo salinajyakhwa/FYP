@@ -46,7 +46,6 @@ class TravelPackage(models.Model):
     image = models.ImageField(upload_to='packages/', blank=True, null=True)
     itinerary = models.JSONField(default=list)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    available_slots = models.PositiveIntegerField(default=10)
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -91,3 +90,13 @@ class PackageImage(models.Model):
 
     class Meta:
         app_label = 'main' # Explicitly set app_label
+
+class Vehicle(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    capacity = models.PositiveIntegerField()
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='vehicles')
+    price_per_day = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.name

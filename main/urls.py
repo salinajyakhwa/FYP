@@ -53,12 +53,5 @@ urlpatterns = [
     path('payment-success/', views.payment_success, name= 'payment_success'),
     path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),
 
-    # eSewa (sandbox) verification endpoint
-    path('payment/esewa-verify/', views.esewa_verify, name='esewa_verify'),
-
-    # eSewa sandbox checkout (demo)
-    path('payment/esewa-checkout/<int:package_id>/', views.esewa_checkout, name='esewa_checkout'),
-
-    # Payment chooser
-    path('payment/choose/<int:package_id>/', views.choose_payment, name='choose_payment'),
+    path('booking/confirmation/<int:booking_id>/', views.booking_confirmation, name='booking_confirmation'),
 ]

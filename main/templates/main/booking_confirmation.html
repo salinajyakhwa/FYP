@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Your Booking{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h2 class="mb-0">Please Confirm Your Customized Itinerary</h2>
+                </div>
+                <div class="card-body">
+                    <h3 class="fw-bold">{{ custom_itinerary.package.name }}</h3>
+                    <hr>
+                    
+                    <h5 class="mt-4">Your Selections:</h5>
+                    <ul>
+                        <li><strong>Transportation:</strong> {{ custom_itinerary.selected_transportation.name }}</li>
+                        <li><strong>Hotel & Room:</strong> {{ custom_itinerary.selected_hotel_room.hotel.name }} - {{ custom_itinerary.selected_hotel_room.room_type.name }}</li>
+                        <li><strong>Food Preference:</strong> {{ custom_itinerary.get_food_preference_display }}</li>
+                        <li><strong>Traveler Type:</strong> {{ custom_itinerary.get_traveler_type_display }}</li>
+                    </ul>
+
+                    <h5 class="mt-4">Your Itinerary:</h5>
+                    {% for item in custom_itinerary.itinerary_places.all %}
+                        <div class="mb-2">
+                            <strong>{{ item.place.name }}:</strong>
+                            {% if item.selected_activities.all %}
+                                <small class="text-muted">
+                                    Activities: 
+                                    {% for activity in item.selected_activities.all %}
+                                        {{ activity.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </small>
+                            {% else %}
+                                <small class="text-muted">No activities selected.</small>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <hr>
+                    <div class="text-end">
+                        <h4 class="fw-bold">Final Price: <span class="text-primary">${{ custom_itinerary.final_price }}</span></h4>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <!-- This button should eventually lead to the payment view, passing the custom_itinerary.id -->
+                        <a href="#" class="btn btn-success btn-lg">Proceed to Payment</a>
+                        <a href="{% url 'package_detail' package.id %}" class="btn btn-secondary btn-sm mt-2">Go Back & Edit</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
