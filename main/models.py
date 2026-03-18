@@ -132,6 +132,63 @@ class CustomItinerarySelection(models.Model):
     def __str__(self):
         return f"{self.custom_itinerary} - Day {self.package_day.day_number}"
 
+
+class ChatThread(models.Model):
+    traveler = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_threads')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='chat_threads')
+    package = models.ForeignKey(
+        TravelPackage,
+        on_delete=models.CASCADE,
+        related_name='chat_threads',
+        blank=True,
+        null=True,
+    )
+    booking = models.ForeignKey(
+        'Booking',
+        on_delete=models.SET_NULL,
+        related_name='chat_threads',
+        blank=True,
+        null=True,
+    )
+    custom_itinerary = models.ForeignKey(
+        CustomItinerary,
+        on_delete=models.SET_NULL,
+        related_name='chat_threads',
+        blank=True,
+        null=True,
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['traveler', 'vendor', 'package'],
+                name='unique_chat_thread_per_traveler_vendor_package',
+            ),
+        ]
+
+    def __str__(self):
+        if self.package:
+            return f"Chat: {self.traveler.username} and {self.vendor.name} about {self.package.name}"
+        return f"Chat: {self.traveler.username} and {self.vendor.name}"
+
+
+class ChatMessage(models.Model):
+    thread = models.ForeignKey(ChatThread, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_messages')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f"Message in thread {self.thread_id} by {self.sender.username}"
+
 # Represents a booking made by a user for a travel package.
 class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')

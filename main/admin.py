@@ -7,6 +7,8 @@ from .models import (
     PackageDayOption,
     CustomItinerary,
     CustomItinerarySelection,
+    ChatThread,
+    ChatMessage,
     Booking,
     Review,
 )
@@ -18,5 +20,7 @@ admin.site.register(PackageDay)
 admin.site.register(PackageDayOption)
 admin.site.register(CustomItinerary)
 admin.site.register(CustomItinerarySelection)
+admin.site.register(ChatThread)
+admin.site.register(ChatMessage)
 admin.site.register(Booking)
 admin.site.register(Review)

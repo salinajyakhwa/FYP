@@ -34,6 +34,8 @@ from .models import (
     PackageDayOption,
     CustomItinerary,
     CustomItinerarySelection,
+    ChatThread,
+    ChatMessage,
     Booking,
     Review,
     UserProfile,
@@ -51,6 +53,7 @@ from .forms import (
     PackageDayForm,
     PackageDayOptionForm,
     CustomItinerarySelectionForm,
+    ChatMessageForm,
     TravelPackageForm, 
     UserUpdateForm, 
     UserProfileUpdateForm,
@@ -91,6 +94,31 @@ def _get_vendor_or_403(request):
         return request.user.userprofile.vendor
     except Exception:
         raise PermissionDenied
+
+
+def _get_vendor_user(vendor):
+    return vendor.user_profile.user
+
+
+def _get_chat_thread_for_user_or_403(user, thread_id):
+    thread = get_object_or_404(
+        ChatThread.objects.select_related(
+            'traveler',
+            'vendor',
+            'vendor__user_profile',
+            'vendor__user_profile__user',
+            'package',
+        ).prefetch_related('messages__sender'),
+        pk=thread_id,
+        is_active=True,
+    )
+
+    is_traveler = thread.traveler_id == user.id
+    is_vendor = _get_vendor_user(thread.vendor).id == user.id
+    if not (is_traveler or is_vendor):
+        raise PermissionDenied
+
+    return thread
 
 
 def _sync_package_itinerary_json(package):
@@ -405,6 +433,91 @@ def custom_itinerary_detail(request, custom_itinerary_id):
         ),
     }
     return render(request, 'main/custom_itinerary_detail.html', context)
+
+
+@login_required
+def chat_thread_open(request, package_id):
+    package = get_object_or_404(
+        TravelPackage.objects.select_related('vendor', 'vendor__user_profile', 'vendor__user_profile__user'),
+        pk=package_id,
+    )
+
+    profile = getattr(request.user, 'userprofile', None)
+    if not profile or profile.role != 'traveler':
+        raise PermissionDenied
+
+    thread, _ = ChatThread.objects.get_or_create(
+        traveler=request.user,
+        vendor=package.vendor,
+        package=package,
+        defaults={
+            'booking': None,
+            'custom_itinerary': None,
+        }
+    )
+    return redirect('chat_thread_detail', thread_id=thread.id)
+
+
+@login_required
+def chat_thread_list(request):
+    profile = getattr(request.user, 'userprofile', None)
+    if not profile:
+        raise PermissionDenied
+
+    if profile.role == 'traveler':
+        threads = ChatThread.objects.filter(
+            traveler=request.user,
+            is_active=True,
+        ).select_related(
+            'vendor',
+            'vendor__user_profile',
+            'vendor__user_profile__user',
+            'package',
+        ).prefetch_related('messages__sender')
+    elif profile.role == 'vendor':
+        vendor = _get_vendor_or_403(request)
+        threads = ChatThread.objects.filter(
+            vendor=vendor,
+            is_active=True,
+        ).select_related(
+            'traveler',
+            'package',
+        ).prefetch_related('messages__sender')
+    else:
+        raise PermissionDenied
+
+    context = {
+        'threads': threads,
+        'user_role': profile.role,
+    }
+    return render(request, 'main/chat_thread_list.html', context)
+
+
+@login_required
+def chat_thread_detail(request, thread_id):
+    thread = _get_chat_thread_for_user_or_403(request.user, thread_id)
+    messages_qs = thread.messages.select_related('sender').all()
+
+    if request.method == 'POST':
+        form = ChatMessageForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.thread = thread
+            message.sender = request.user
+            message.save()
+            ChatThread.objects.filter(pk=thread.id).update(updated_at=timezone.now())
+            return redirect('chat_thread_detail', thread_id=thread.id)
+    else:
+        form = ChatMessageForm()
+
+    counterpart_name = thread.vendor.name if thread.traveler_id == request.user.id else thread.traveler.username
+    context = {
+        'thread': thread,
+        'messages': messages_qs,
+        'form': form,
+        'counterpart_name': counterpart_name,
+    }
+    return render(request, 'main/chat_thread_detail.html', context)
 
 
 @login_required

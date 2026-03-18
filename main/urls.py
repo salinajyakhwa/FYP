@@ -18,6 +18,9 @@ urlpatterns = [
     # 4. PACKAGE DETAILS & BOOKING
     path('package/<int:package_id>/', views.package_detail, name='package_detail'),
     path('custom-itinerary/<int:custom_itinerary_id>/', views.custom_itinerary_detail, name='custom_itinerary_detail'),
+    path('chat/', views.chat_thread_list, name='chat_thread_list'),
+    path('chat/open/package/<int:package_id>/', views.chat_thread_open, name='chat_thread_open'),
+    path('chat/thread/<int:thread_id>/', views.chat_thread_detail, name='chat_thread_detail'),
 
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),

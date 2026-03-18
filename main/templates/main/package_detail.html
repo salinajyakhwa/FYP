@@ -219,6 +219,12 @@
                         <strong>${{ customization_total }}</strong>
                     </div>
 
+                    {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
+                    <div class="mb-3">
+                        <a href="{% url 'chat_thread_open' package.id %}" class="btn btn-outline-secondary w-100">Chat with Vendor</a>
+                    </div>
+                    {% endif %}
+
                     {% if customization_form %}
                     <div class="d-grid gap-2">
                         <button type="submit" form="customization-form" formmethod="post" name="preview_customization" value="1" class="btn btn-primary">Preview Custom Total</button>
