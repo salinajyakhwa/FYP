@@ -64,4 +64,6 @@ urlpatterns = [
     path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),
 
     path('booking/confirmation/<int:booking_id>/', views.booking_confirmation, name='booking_confirmation'),
+    path('vendor/booking/<int:booking_id>/csv/', views.export_booking_csv, name='export_booking_csv'),
+    path('vendor/flights/', views.flight_bookings, name='flight_bookings'),
 ]

@@ -166,7 +166,7 @@ class PackageDayForm(forms.ModelForm):
 class PackageDayOptionForm(forms.ModelForm):
     class Meta:
         model = PackageDayOption
-        fields = ['package_day', 'option_type', 'title', 'description', 'additional_cost', 'is_required', 'sort_order']
+        fields = ['package_day', 'option_type', 'title', 'description', 'additional_cost', 'is_required', 'sort_order','action_link']
         widgets = {
             'package_day': forms.Select(attrs={'class': 'form-select'}),
             'option_type': forms.Select(attrs={'class': 'form-select'}),
@@ -175,6 +175,7 @@ class PackageDayOptionForm(forms.ModelForm):
             'additional_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'is_required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'sort_order': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'action_link': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'Optional booking link'}),
         }
 
     def __init__(self, *args, package=None, **kwargs):

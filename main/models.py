@@ -88,6 +88,7 @@ class PackageDayOption(models.Model):
     additional_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_required = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
+    action_link = models.URLField(blank=True, null=True)
 
     class Meta:
         ordering = ['sort_order', 'id']

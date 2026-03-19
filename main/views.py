@@ -25,6 +25,9 @@ import stripe
 from django.conf import settings
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
+import csv
+from django.http import HttpResponse
+from.models import Booking, TravelPackage, CustomItinerarySelection
 
 
 # Models
@@ -802,12 +805,46 @@ def vendor_dashboard(request):
 @role_required(allowed_roles=['vendor'])
 def vendor_bookings(request):
     vendor = _get_vendor_or_403(request)
-    # Get all bookings for packages owned by the vendor
-    bookings = Booking.objects.filter(package__vendor=vendor).select_related('package', 'user').order_by('-booking_date')
-    
+
+    #  Optimized query
+    bookings = Booking.objects.filter(package__vendor=vendor)\
+        .select_related('user', 'package', 'custom_itinerary')\
+        .prefetch_related(
+            'custom_itinerary__selections__package_day',
+            'custom_itinerary__selections__selected_option'
+        )\
+        .order_by('-booking_date')
+
+    #  GROUPING LOGIC (Phase 2)
+    grouped_data = {}
+
+    for booking in bookings:
+        groups = {}
+
+        if booking.custom_itinerary:
+            for sel in booking.custom_itinerary.selections.all():
+                option = sel.selected_option
+
+                # Group by action_link OR fallback to type
+                key = option.action_link if option.action_link else f"type_{option.option_type}"
+
+                if key not in groups:
+                    groups[key] = {
+                        'type': option.option_type,
+                        'link': option.action_link,
+                        'items': []
+                    }
+
+                groups[key]['items'].append(sel)
+
+        grouped_data[booking.id] = groups
+
+    #  Final context
     context = {
-        'bookings': bookings
+        'bookings': bookings,
+        'grouped_data': grouped_data
     }
+
     return render(request, 'main/vendor_bookings.html', context)
 
 @login_required
@@ -1271,3 +1308,56 @@ def booking_confirmation(request, booking_id):
         'package': package,
     }
     return render(request, 'main/booking_confirmation.html', context)
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def export_booking_csv(request, booking_id):
+    booking = get_object_or_404(
+        Booking.objects.select_related('user', 'package', 'custom_itinerary'),
+        id=booking_id,
+        package__vendor=_get_vendor_or_403(request)
+    )
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="booking_{booking.id}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['User', 'Package', 'Option Type', 'Option', 'Price'])
+
+    if booking.custom_itinerary:
+        selections = booking.custom_itinerary.selections.select_related(
+            'package_day', 'selected_option'
+        )
+
+        for sel in selections:
+            writer.writerow([
+                booking.user.username,
+                booking.package.name,
+                sel.selected_option.option_type,
+                sel.selected_option.title,
+                sel.selected_price
+            ])
+    else:
+        writer.writerow([
+            booking.user.username,
+            booking.package.name,
+            'Default Package',
+            'No customization',
+            booking.total_price
+        ])
+
+    return response
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def flight_bookings(request):
+    vendor = _get_vendor_or_403(request)
+
+    bookings = Booking.objects.filter(
+        package__vendor=vendor,
+        custom_itinerary__selections__selected_option__option_type='flight'
+    ).select_related('user', 'package').distinct()
+
+    return render(request, 'main/flight_bookings.html', {
+        'bookings': bookings
+    })
