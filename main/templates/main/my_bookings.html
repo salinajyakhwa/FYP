@@ -1,40 +1,171 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h1 class="mb-4">My Bookings</h1>
+{% block title %}My Bookings{% endblock %}
 
-{% for booking in bookings %}
-<div class="card mb-3">
-    <div class="card-header">
-        Booking for: <strong>{{ booking.package.name }}</strong>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-8">
-                <p><strong>Vendor:</strong> {{ booking.package.vendor.name }}</p>
-                <p><strong>Booked on:</strong> {{ booking.booking_date|date:"F j, Y" }}</p>
-                {% if booking.custom_itinerary %}
-                <p class="mb-0"><strong>Type:</strong> Custom itinerary booking</p>
-                {% endif %}
-            </div>
-            <div class="col-md-4 text-md-end">
-                <p><strong>Status:</strong> <span class="badge bg-primary">{{ booking.get_status_display }}</span></p>
-                <p><strong>Total Price:</strong> ${{ booking.total_price|floatformat:2 }}</p>
-                <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-outline-secondary btn-sm mb-2">View Details</a>
-                {% if booking.status == 'pending' or booking.status == 'confirmed' %}
-                    <form action="{% url 'cancel_booking' booking.id %}" method="post" class="d-inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-sm">Cancel Booking</button>
-                    </form>
-                {% endif %}
+{% block extra_css %}
+<style>
+    .bookings-page {
+        max-width: 980px;
+        margin: 0 auto;
+    }
+
+    .bookings-page .page-note {
+        color: #6c757d;
+        max-width: 700px;
+    }
+
+    .booking-card {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        background: #fff;
+    }
+
+    .booking-card + .booking-card {
+        margin-top: 1rem;
+    }
+
+    .booking-image {
+        width: 100%;
+        height: 100%;
+        min-height: 48px;
+        object-fit: cover;
+        background: #f8f9fa;
+    }
+
+    .booking-placeholder {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+
+    .booking-status {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+    }
+
+    .booking-section-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-bottom: 0.2rem;
+    }
+
+    .booking-chip {
+        display: inline-block;
+        background: #f1f3f5;
+        color: #495057;
+        border-radius: 999px;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.8rem;
+        margin-right: 0.4rem;
+        margin-bottom: 0.4rem;
+    }
+
+    @media (max-width: 767.98px) {
+        .booking-actions .btn,
+        .booking-actions form,
+        .booking-actions button {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="bookings-page">
+        <div class="mb-4">
+            <h1 class="mb-2">My Bookings</h1>
+            <p class="page-note mb-2">
+                You can see your booked trips here, along with the status, dates, and total price.
+            </p>
+            <p class="text-muted mb-0">{{ bookings|length }} booking{{ bookings|length|pluralize }}</p>
+        </div>
+
+        {% for booking in bookings %}
+        <div class="card booking-card shadow-sm">
+            <div class="row g-0">
+                <div class="col-md-4">
+                    {% if booking.package.image %}
+                    <img src="{{ booking.package.image.url }}" alt="{{ booking.package.name }}" class="booking-image">
+                    {% else %}
+                    <div class="booking-placeholder">
+                        <span>No image available</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-8">
+                    <div class="card-body p-2">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-2 mb-2">
+                            <div>
+                                <h2 class="h5 mb-1">{{ booking.package.name }}</h2>
+                                <p class="text-muted small mb-0">Vendor: {{ booking.package.vendor.name }}</p>
+                            </div>
+                            <span class="badge booking-status
+                                {% if booking.status == 'confirmed' %}text-bg-success
+                                {% elif booking.status == 'pending' %}text-bg-warning
+                                {% else %}text-bg-danger{% endif %}">
+                                {{ booking.get_status_display }}
+                            </span>
+                        </div>
+
+                        <div class="row g-2 mb-1">
+                            <div class="col-sm-6">
+                                <div class="booking-section-title">Booked On</div>
+                                <div class="small">{{ booking.booking_date|date:"F j, Y" }}</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="booking-section-title">Total Price</div>
+                                <div class="small">${{ booking.total_price|floatformat:2 }}</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="booking-section-title">Travel Dates</div>
+                                <div class="small">{{ booking.package.start_date|date:"M j, Y" }} to {{ booking.package.end_date|date:"M j, Y" }}</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="booking-section-title">Travel Type</div>
+                                <div class="small">{{ booking.package.travel_type }}</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-1">
+                            <span class="booking-chip">{{ booking.package.location }}</span>
+                            <span class="booking-chip">Booking #{{ booking.id }}</span>
+                            {% if booking.custom_itinerary %}
+                            <span class="booking-chip">Custom itinerary</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="booking-actions d-flex flex-wrap gap-2">
+                            <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-outline-primary btn-sm">
+                                View Details
+                            </a>
+                            {% if booking.status == 'pending' or booking.status == 'confirmed' %}
+                            <form action="{% url 'cancel_booking' booking.id %}" method="post" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    Cancel Booking
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+        {% empty %}
+        <div class="alert alert-info">
+            You have not made any bookings yet.
+            <a href="{% url 'package_list' %}" class="alert-link">Browse packages</a>
+        </div>
+        {% endfor %}
     </div>
 </div>
-{% empty %}
-<div class="alert alert-info" role="alert">
-    You have not made any bookings yet. <a href="{% url 'package_list' %}" class="alert-link">Explore packages now!</a>
-</div>
-{% endfor %}
-
 {% endblock %}

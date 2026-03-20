@@ -694,7 +694,11 @@ def profile(request):
 
 @login_required
 def my_bookings(request):
-    bookings = Booking.objects.filter(user=request.user).select_related('package').order_by('-booking_date')
+    bookings = Booking.objects.filter(user=request.user).select_related(
+        'package',
+        'package__vendor',
+        'custom_itinerary',
+    ).order_by('-booking_date')
     return render(request, 'main/my_bookings.html', {'bookings': bookings})
 
 
