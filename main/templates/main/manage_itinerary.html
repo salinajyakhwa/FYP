@@ -1,121 +1,217 @@
 {% extends "base.html" %}
-{% load widget_tweaks %}
 
 {% block title %}Manage Itinerary{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="mb-0">Manage Itinerary</h1>
-            <p class="text-muted">For package: {{ package.name }}</p>
+            <p class="text-muted mb-0">Package: {{ package.name }}</p>
         </div>
-        <a href="{% url 'vendor_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+        <a href="{% url 'vendor_package_list' %}" class="btn btn-outline-secondary">Back to Packages</a>
     </div>
 
-    <form method="post" id="itinerary-form-container">
-        {% csrf_token %}
-        {{ formset.management_form }}
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Current Itinerary Days</h2>
 
-        <div id="itinerary-forms">
-            {% for form in formset %}
-            <div class="card shadow-sm mb-3 itinerary-form">
-                <div class="card-body">
-                    <div class="row g-3 align-items-center">
-                        <div class="col-md-1">
-                            <label class="form-label">Day</label>
-                            {% render_field form.day class="form-control" %}
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Title</label>
-                            {% render_field form.title class="form-control" %}
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Activity Type</label>
-                            {% render_field form.activity_type class="form-select" %}
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Inclusions</label>
-                            {% render_field form.inclusions class="form-control" %}
-                        </div>
-                        <div class="col-md-11">
-                            <label class="form-label">Description</label>
-                            {% render_field form.description class="form-control" %}
-                        </div>
-                        <div class="col-md-1 d-flex align-items-end">
-                            {% if form.instance.id or formset.can_delete %}
-                            <div class="form-check">
-                                {% render_field form.DELETE class="form-check-input" %}
-                                <label class="form-check-label" for="{{ form.DELETE.id_for_label }}">Delete</label>
+                    {% if package_days %}
+                    <div class="d-grid gap-3">
+                        {% for package_day in package_days %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="small text-muted">Day {{ package_day.day_number }}</div>
+                                    <div class="fw-semibold">{{ package_day.title }}</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <a href="{% url 'manage_itinerary' package.id %}?edit_day={{ package_day.id }}" class="btn btn-sm btn-outline-secondary">Edit Day</a>
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_day">
+                                        <input type="hidden" name="day_id" value="{{ package_day.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete Day</button>
+                                    </form>
+                                </div>
                             </div>
+
+                            <p class="mt-2 mb-3">{{ package_day.description }}</p>
+
+                            <div class="small text-muted mb-2">Options</div>
+                            {% if package_day.options.all %}
+                            <div class="d-grid gap-2">
+                                {% for option in package_day.options.all %}
+                                <div class="bg-light rounded p-3">
+                                    <div class="d-flex justify-content-between align-items-start gap-3">
+                                        <div>
+                                            <div class="fw-semibold">{{ option.title }}</div>
+                                            <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fw-semibold">${{ option.additional_cost }}</div>
+                                            <div class="d-flex gap-2 mt-2">
+                                                <a href="{% url 'manage_itinerary' package.id %}?edit_option={{ option.id }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                                <form method="post" class="d-inline">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="action" value="delete_option">
+                                                    <input type="hidden" name="option_id" value="{{ option.id }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% if option.description %}
+                                    <p class="mb-0 mt-2 small">{{ option.description }}</p>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="alert alert-secondary mb-0">No options added for this day yet.</div>
                             {% endif %}
                         </div>
+                        {% endfor %}
                     </div>
+                    {% else %}
+                    <div class="alert alert-secondary mb-0">
+                        No relational itinerary days have been added yet.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-            {% endfor %}
         </div>
 
-        <div class="mt-4">
-            <button type="button" id="add-form" class="btn btn-secondary">
-                <i class="bi bi-plus-circle me-2"></i>Add Another Day
-            </button>
-            <button type="submit" class="btn btn-primary">Save Itinerary</button>
-        </div>
-    </form>
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">{% if editing_day %}Edit Day{% else %}Add Day{% endif %}</h2>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_day">
+                        <input type="hidden" name="day_id" value="{% if editing_day %}{{ editing_day.id }}{% endif %}">
 
-    <!-- Hidden template for new forms -->
-    <div id="empty-form" style="display:none">
-        <div class="card shadow-sm mb-3 itinerary-form">
-            <div class="card-body">
-                <div class="row g-3 align-items-center">
-                    <div class="col-md-1">
-                        <label class="form-label">Day</label>
-                        {% render_field formset.empty_form.day class="form-control" %}
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Title</label>
-                        {% render_field formset.empty_form.title class="form-control" %}
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Activity Type</label>
-                        {% render_field formset.empty_form.activity_type class="form-select" %}
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Inclusions</label>
-                        {% render_field formset.empty_form.inclusions class="form-control" %}
-                    </div>
-                    <div class="col-md-11">
-                        <label class="form-label">Description</label>
-                        {% render_field formset.empty_form.description class="form-control" %}
-                    </div>
-                    <div class="col-md-1 d-flex align-items-end">
-                        <div class="form-check">
-                            {% render_field formset.empty_form.DELETE class="form-check-input" %}
-                            <label class="form-check-label" for="{{ formset.empty_form.DELETE.id_for_label }}">Delete</label>
+                        <div class="mb-3">
+                            <label for="{{ day_form.day_number.id_for_label }}" class="form-label">Day Number</label>
+                            {{ day_form.day_number }}
+                            {% for error in day_form.day_number.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
                         </div>
-                    </div>
+                        <div class="mb-3">
+                            <label for="{{ day_form.title.id_for_label }}" class="form-label">Title</label>
+                            {{ day_form.title }}
+                            {% for error in day_form.title.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ day_form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ day_form.description }}
+                            {% for error in day_form.description.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ day_form.sort_order.id_for_label }}" class="form-label">Sort Order</label>
+                            {{ day_form.sort_order }}
+                            {% for error in day_form.sort_order.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        {% if day_form.non_field_errors %}
+                        <div class="alert alert-danger py-2">
+                            {{ day_form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Day</button>
+                            {% if editing_day %}
+                            <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-outline-secondary">Cancel</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">{% if editing_option %}Edit Option{% else %}Add Option{% endif %}</h2>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_option">
+                        <input type="hidden" name="option_id" value="{% if editing_option %}{{ editing_option.id }}{% endif %}">
+
+                        <div class="mb-3">
+                            <label for="{{ option_form.package_day.id_for_label }}" class="form-label">Day</label>
+                            {{ option_form.package_day }}
+                            {% for error in option_form.package_day.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ option_form.option_type.id_for_label }}" class="form-label">Option Type</label>
+                            {{ option_form.option_type }}
+                            {% for error in option_form.option_type.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ option_form.title.id_for_label }}" class="form-label">Title</label>
+                            {{ option_form.title }}
+                            {% for error in option_form.title.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ option_form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ option_form.description }}
+                            {% for error in option_form.description.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ option_form.additional_cost.id_for_label }}" class="form-label">Additional Cost</label>
+                            {{ option_form.additional_cost }}
+                            {% for error in option_form.additional_cost.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ option_form.sort_order.id_for_label }}" class="form-label">Sort Order</label>
+                            {{ option_form.sort_order }}
+                            {% for error in option_form.sort_order.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-check mb-3">
+                            {{ option_form.is_required }}
+                            <label for="{{ option_form.is_required.id_for_label }}" class="form-check-label">Required selection</label>
+                            {% for error in option_form.is_required.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        {% if option_form.non_field_errors %}
+                        <div class="alert alert-danger py-2">
+                            {{ option_form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Option</button>
+                            {% if editing_option %}
+                            <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-outline-secondary">Cancel</a>
+                            {% endif %}
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.getElementById('add-form').addEventListener('click', function() {
-    const formsetContainer = document.getElementById('itinerary-forms');
-    const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
-    const formIdx = parseInt(totalFormsInput.value);
-    
-    const emptyFormHtml = document.getElementById('empty-form').innerHTML.replace(/__prefix__/g, formIdx);
-    
-    const newFormDiv = document.createElement('div');
-    newFormDiv.innerHTML = emptyFormHtml;
-    formsetContainer.appendChild(newFormDiv.firstElementChild);
-    
-    totalFormsInput.value = formIdx + 1;
-});
-</script>
 {% endblock %}

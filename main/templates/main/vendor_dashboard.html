@@ -144,6 +144,9 @@
                 <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
                     <i class="bi bi-download me-2"></i>Export
                 </button>
+                <a href="{% url 'chat_thread_list' %}" class="btn btn-outline-secondary btn-sm d-flex align-items-center">
+                    <i class="bi bi-chat-dots me-2"></i>Messages
+                </a>
                 <a href="{% url 'create_package' %}" class="btn btn-indigo d-flex align-items-center">
                     <i class="bi bi-plus-lg me-2"></i>New Package
                 </a>

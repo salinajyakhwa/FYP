@@ -6,13 +6,18 @@
 {% block content %}
 <div class="container mt-5">
   <div class="card shadow-sm p-4">
-    <h3 class="mb-3">Checkout — {{ package.name }}</h3>
-    <p>Price: <strong>${{ package.price|floatformat:2 }}</strong> per person</p>
+    <h3 class="mb-3">Checkout — {{ display_name }}</h3>
+    <p>Price: <strong>${{ amount|floatformat:2 }}</strong></p>
 
     <div class="d-flex gap-3 mt-4">
+      {% if custom_itinerary %}
+      <a href="{% url 'create_custom_itinerary_checkout_session' custom_itinerary.id %}" class="btn btn-success btn-lg">Pay with Stripe</a>
+      <a href="{% url 'esewa_custom_itinerary_checkout' custom_itinerary.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</a>
+      {% else %}
       <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-success btn-lg">Pay with Stripe</a>
 
       <a href="{% url 'esewa_checkout' package.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</a>
+      {% endif %}
     </div>
 
     <p class="mt-3 text-muted">eSewa sandbox credentials: <strong>9806800001</strong> / <strong>Nepal@123</strong> (OTP: <strong>123456</strong>)</p>

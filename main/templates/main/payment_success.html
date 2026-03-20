@@ -21,10 +21,17 @@ Payment Successful
             <p>
                 You can view your booking details in your dashboard.
             </p>
-            
-            <a href="{% url 'my_bookings' %}" class="btn btn-primary mt-3">
-                Go to My Bookings
-            </a>
+
+            <div class="d-flex justify-content-center gap-2 mt-3">
+                {% if booking %}
+                <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-primary">
+                    View Booking
+                </a>
+                {% endif %}
+                <a href="{% url 'my_bookings' %}" class="btn btn-outline-primary">
+                    Go to My Bookings
+                </a>
+            </div>
         </div>
     </div>
 </div>

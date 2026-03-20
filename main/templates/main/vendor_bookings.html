@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_tags %}
 
 {% block title %}Manage Bookings | Vendor Portal{% endblock %}
 
@@ -115,6 +116,9 @@
             <button class="btn btn-outline-dark btn-sm rounded-2">
                 <i class="bi bi-download me-2"></i>Export CSV
             </button>
+            <a href="{% url 'flight_bookings' %}" class="btn btn-primary">
+                Flights
+            </a>
         </div>
     </div>
 
@@ -173,6 +177,9 @@
                             ${{ booking.total_price|floatformat:2 }}
                         </td>
                         <td class="text-end">
+                            <a href="{% url 'flight_bookings' %}" class="btn btn-primary">
+                                Flights
+                            </a>
                             {% if booking.status == 'pending' %}
                             <div class="d-flex justify-content-end gap-2">
                                 <form action="{% url 'update_booking_status' booking.id 'confirmed' %}" method="post">
@@ -204,6 +211,53 @@
                             </div>
                         </td>
                     </tr>
+                    <!-- 🔽 CHILD ROW: Selected Options -->
+<tr>
+    <td colspan="7" style="background:#f9fafb;">
+        {% with groups=grouped_data|get_item:booking.id %}
+            {% if groups %}
+                
+                {% for key, group in groups.items %}
+                    <div class="mb-3 p-3 border rounded bg-white">
+    
+                        <!-- Group Title -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong>
+                                {% if group.type == 'flight' %}✈ Flights
+                                {% elif group.type == 'stay' %}🏨 Hotels
+                                {% elif group.type == 'activity' %}🎯 Activities
+                                {% else %}Other{% endif %}
+                                ({{ group.items|length }})
+                            </strong>
+    
+                            <!-- 🔥 GROUP BUTTON -->
+                            {% if group.link %}
+                                <a href="{{ group.link }}" target="_blank"
+                                   class="btn btn-sm btn-primary">
+                                    Book All
+                                </a>
+                            {% endif %}
+                        </div>
+    
+                        <!-- Child Items -->
+                        <ul class="list-group">
+                            {% for sel in group.items %}
+                            <li class="list-group-item">
+                                Day {{ sel.package_day.day_number }}:
+                                {{ sel.selected_option.title }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+    
+                    </div>
+                {% endfor %}
+    
+            {% else %}
+                <span class="text-muted">No selections</span>
+            {% endif %}
+        {% endwith %}
+    </td>
+</tr>
                     {% endfor %}
                 </tbody>
             </table>

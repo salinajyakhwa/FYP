@@ -46,7 +46,6 @@ class TravelPackage(models.Model):
     image = models.ImageField(upload_to='packages/', blank=True, null=True)
     itinerary = models.JSONField(default=list)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    available_slots = models.PositiveIntegerField(default=10)
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -55,10 +54,153 @@ class TravelPackage(models.Model):
     def __str__(self):
         return self.name
 
+
+class PackageDay(models.Model):
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='package_days')
+    day_number = models.PositiveIntegerField()
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['day_number', 'sort_order', 'id']
+        unique_together = [('package', 'day_number')]
+
+    def __str__(self):
+        return f"{self.package.name} - Day {self.day_number}"
+
+
+class PackageDayOption(models.Model):
+    OPTION_TYPE_CHOICES = (
+        ('flight', 'Flight'),
+        ('road', 'Road'),
+        ('rail', 'Rail'),
+        ('water', 'Water'),
+        ('stay', 'Stay'),
+        ('activity', 'Activity'),
+        ('other', 'Other'),
+    )
+
+    package_day = models.ForeignKey(PackageDay, on_delete=models.CASCADE, related_name='options')
+    option_type = models.CharField(max_length=20, choices=OPTION_TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    additional_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_required = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    action_link = models.URLField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return f"{self.package_day} - {self.title}"
+
+
+class CustomItinerary(models.Model):
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_itineraries')
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='custom_itineraries')
+    base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    final_price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Custom itinerary for {self.package.name} by {self.user.username}"
+
+
+class CustomItinerarySelection(models.Model):
+    custom_itinerary = models.ForeignKey(CustomItinerary, on_delete=models.CASCADE, related_name='selections')
+    package_day = models.ForeignKey(PackageDay, on_delete=models.CASCADE, related_name='custom_selections')
+    selected_option = models.ForeignKey(PackageDayOption, on_delete=models.CASCADE, related_name='selected_in_itineraries')
+    selected_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['package_day__day_number', 'id']
+        unique_together = [('custom_itinerary', 'package_day')]
+
+    def __str__(self):
+        return f"{self.custom_itinerary} - Day {self.package_day.day_number}"
+
+
+class ChatThread(models.Model):
+    traveler = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_threads')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='chat_threads')
+    package = models.ForeignKey(
+        TravelPackage,
+        on_delete=models.CASCADE,
+        related_name='chat_threads',
+        blank=True,
+        null=True,
+    )
+    booking = models.ForeignKey(
+        'Booking',
+        on_delete=models.SET_NULL,
+        related_name='chat_threads',
+        blank=True,
+        null=True,
+    )
+    custom_itinerary = models.ForeignKey(
+        CustomItinerary,
+        on_delete=models.SET_NULL,
+        related_name='chat_threads',
+        blank=True,
+        null=True,
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['traveler', 'vendor', 'package'],
+                name='unique_chat_thread_per_traveler_vendor_package',
+            ),
+        ]
+
+    def __str__(self):
+        if self.package:
+            return f"Chat: {self.traveler.username} and {self.vendor.name} about {self.package.name}"
+        return f"Chat: {self.traveler.username} and {self.vendor.name}"
+
+
+class ChatMessage(models.Model):
+    thread = models.ForeignKey(ChatThread, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_messages')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f"Message in thread {self.thread_id} by {self.sender.username}"
+
 # Represents a booking made by a user for a travel package.
 class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
     package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='bookings')
+    custom_itinerary = models.OneToOneField(
+        CustomItinerary,
+        on_delete=models.SET_NULL,
+        related_name='booking',
+        blank=True,
+        null=True,
+    )
     booking_date = models.DateTimeField(auto_now_add=True)
     STATUS_CHOICES = (
         ('pending', 'Pending'),
@@ -91,3 +233,13 @@ class PackageImage(models.Model):
 
     class Meta:
         app_label = 'main' # Explicitly set app_label
+
+class Vehicle(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    capacity = models.PositiveIntegerField()
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='vehicles')
+    price_per_day = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return self.name

@@ -3,201 +3,246 @@
 
 {% block title %}{{ package.name }}{% endblock %}
 
-{% block extra_css %}
-<style>
-    .sticky-booking-card {
-        position: -webkit-sticky;
-        position: sticky;
-        top: 100px; /* Adjust based on your navbar height */
-    }
-    .gallery-main-image {
-        width: 100%;
-        height: 450px;
-        object-fit: cover;
-        border-radius: 1rem;
-    }
-    .gallery-thumbnail {
-        width: 100px;
-        height: 75px;
-        object-fit: cover;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: opacity 0.2s;
-    }
-    .gallery-thumbnail:hover, .gallery-thumbnail.active {
-        opacity: 0.7;
-        border: 2px solid var(--bs-primary);
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="container mt-4">
-    <!-- Package Header -->
-    <div class="mb-4">
-        <h1 class="fw-bold">{{ package.name }}</h1>
-        <div class="d-flex align-items-center text-muted">
-            <span><i class="bi bi-geo-alt-fill me-2"></i>{{ package.location }}</span>
-            <span class="mx-2">|</span>
-            <span>Offered by: {{ package.vendor.name }}</span>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Left Column: Gallery and Info Tabs -->
+<div class="container py-5">
+    <div class="row g-4">
         <div class="col-lg-8">
-            <!-- Image Gallery -->
-            <div class="mb-4">
-                <img src="{% if package.image %}{{ package.image.url }}{% else %}{% static 'img/default_package.jpg' %}{% endif %}" 
-                     alt="{{ package.name }}" 
-                     class="gallery-main-image shadow-sm"
-                     id="main-package-image">
-                <!-- Thumbnail placeholder -->
-                <div class="d-flex gap-2 mt-2">
-                    <!-- In a real implementation, you would loop through a gallery of images -->
-                    {% if package.image %}
-                    <img src="{{ package.image.url }}" class="gallery-thumbnail active" data-full-image-url="{{ package.image.url }}">
-                    {% endif %}
-                    <!-- Add more thumbnails here if you have more images -->
-                </div>
-            </div>
+            {% if customization_form %}
+            <form method="post" id="customization-form">
+                {% csrf_token %}
+            {% endif %}
 
-            <!-- Info Tabs -->
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <ul class="nav nav-tabs card-header-tabs" id="packageTab" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="description-tab" data-bs-toggle="tab" data-bs-target="#description" type="button" role="tab">Description</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="itinerary-tab" data-bs-toggle="tab" data-bs-target="#itinerary" type="button" role="tab">Itinerary</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews" type="button" role="tab">Reviews ({{ reviews.count }})</button>
-                        </li>
-                    </ul>
+            <div class="card border-0 shadow-sm overflow-hidden">
+                {% if package.image %}
+                <img src="{{ package.image.url }}" alt="{{ package.name }}" class="img-fluid" style="max-height: 420px; object-fit: cover;">
+                {% else %}
+                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 320px;">
+                    <span class="text-muted">No image available</span>
                 </div>
-                <div class="card-body">
-                    <div class="tab-content" id="packageTabContent">
-                        <!-- Description Pane -->
-                        <div class="tab-pane fade show active p-3" id="description" role="tabpanel">
-                            <h4 class="fw-bold">About this trip</h4>
-                            <p>{{ package.description|linebreaks }}</p>
+                {% endif %}
+
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <h1 class="h2 mb-1">{{ package.name }}</h1>
+                            <p class="text-muted mb-0">Offered by {{ package.vendor.name }}</p>
                         </div>
+                        <span class="badge bg-primary fs-6">${{ package.price }}</span>
+                    </div>
 
-                        <!-- Itinerary Pane -->
-                        <div class="tab-pane fade p-3" id="itinerary" role="tabpanel">
-                            <div class="accordion" id="itineraryAccordion">
-                                {% for day in package.itinerary %}
-                                <div class="accordion-item">
-                                    <h2 class="accordion-header">
-                                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}">
-                                            <strong>Day {{ day.day }}: {{ day.title }}</strong>
-                                        </button>
-                                    </h2>
-                                    <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#itineraryAccordion">
-                                        <div class="accordion-body">
-                                            <span class="badge bg-primary mb-2">{{ day.activity_type|title }}</span>
-                                            <p>{{ day.description }}</p>
-                                            {% if day.inclusions %}
-                                                <p class="mb-0">
-                                                    <strong>Inclusions:</strong> 
-                                                    <small class="text-muted">{{ day.inclusions }}</small>
-                                                </p>
-                                            {% endif %}
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Location</div>
+                                <div class="fw-semibold">{{ package.location }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Travel Type</div>
+                                <div class="fw-semibold">{{ package.travel_type }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Dates</div>
+                                <div class="fw-semibold">{{ package.start_date }} to {{ package.end_date }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="h5 mb-3">Overview</h2>
+                    <p class="mb-4">{{ package.description }}</p>
+
+                    <h2 class="h5 mb-3">Itinerary</h2>
+                    {% if itinerary_items %}
+                    <div class="d-grid gap-3">
+                        {% for item in itinerary_items %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Day {{ item.day }}</strong>
+                                <span class="badge text-bg-light">{{ item.activity_label }}</span>
+                            </div>
+                            <div class="fw-semibold mb-1">{{ item.title }}</div>
+                            <p class="mb-2">{{ item.description }}</p>
+                            {% if item.options %}
+                            <div class="small text-muted mb-1">
+                                {% if item.selection_field %}
+                                Choose one option
+                                {% else %}
+                                Available options
+                                {% endif %}
+                            </div>
+                            <div class="d-grid gap-2 mb-2">
+                                {% for option in item.options %}
+                                <div class="bg-light rounded p-2">
+                                    {% if item.selection_field %}
+                                    <label class="d-flex justify-content-between align-items-start gap-3 mb-0">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <input
+                                                class="form-check-input mt-1"
+                                                type="radio"
+                                                name="{{ item.selection_field.name }}"
+                                                value="{{ option.id }}"
+                                                {% if item.selection_field.value == option.id|stringformat:"s" %}checked{% endif %}
+                                                {% if item.selection_field.field.required %}required{% endif %}
+                                            >
+                                            <div>
+                                                <strong>{{ option.title }}</strong>
+                                                <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                                {% if option.description %}
+                                                <div class="small mt-1">{{ option.description }}</div>
+                                                {% endif %}
+                                            </div>
                                         </div>
+                                        <div class="fw-semibold">${{ option.additional_cost }}</div>
+                                    </label>
+                                    {% else %}
+                                    <div class="d-flex justify-content-between align-items-center gap-3">
+                                        <div>
+                                            <strong>{{ option.title }}</strong>
+                                            <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                        </div>
+                                        <div class="fw-semibold">${{ option.additional_cost }}</div>
                                     </div>
+                                    {% if option.description %}
+                                    <div class="small mt-1">{{ option.description }}</div>
+                                    {% endif %}
+                                    {% endif %}
                                 </div>
-                                {% empty %}
-                                <p>No itinerary provided for this package.</p>
                                 {% endfor %}
                             </div>
-                        </div>
-
-                        <!-- Reviews Pane -->
-                        <div class="tab-pane fade p-3" id="reviews" role="tabpanel">
-                            {% for review in reviews %}
-                            <div class="d-flex mb-4">
-                                <img src="{{ review.user.userprofile.profile_picture.url }}" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;" alt="{{ review.user.username }}">
-                                <div>
-                                    <h5 class="fw-bold mb-0">{{ review.user.username }}</h5>
-                                    <p class="text-warning d-inline-block mb-1" style="font-size: 1.2rem;">
-                                        {% for i in "12345"|make_list %}<i class="bi bi-star{% if forloop.counter <= review.rating %}-fill{% endif %}"></i>{% endfor %}
-                                    </p>
-                                    <p class="mb-1">{{ review.comment }}</p>
-                                    <small class="text-muted">{{ review.created_at|date:"F j, Y" }}</small>
-                                </div>
-                            </div>
-                            {% empty %}
-                            <p>No reviews for this package yet.</p>
+                            {% if item.selection_field and item.selection_field.errors %}
+                            {% for error in item.selection_field.errors %}
+                            <div class="text-danger small mb-2">{{ error }}</div>
                             {% endfor %}
-
-                            {% if user_can_review %}
-                            <hr class="my-4">
-                            <h4 class="fw-bold">Leave a Review</h4>
-                            <form action="{% url 'add_review' package.id %}" method="post">
-                                {% csrf_token %}
-                                <div class="mb-3">
-                                    <label class="form-label">Rating</label>
-                                    {{ review_form.rating }}
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Comment</label>
-                                    {{ review_form.comment }}
-                                </div>
-                                <button type="submit" class="btn btn-primary">Submit Review</button>
-                            </form>
+                            {% endif %}
+                            {% endif %}
+                            {% if item.inclusions %}
+                            <div class="small text-muted">
+                                Inclusions: {{ item.inclusions|join:", " }}
+                            </div>
                             {% endif %}
                         </div>
+                        {% endfor %}
                     </div>
+                    {% else %}
+                    <div class="alert alert-secondary mb-4">
+                        Detailed itinerary has not been added yet.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
+
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Reviews</h2>
+
+                    {% if reviews %}
+                    <div class="d-grid gap-3 mb-4">
+                        {% for review in reviews %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>{{ review.user.username }}</strong>
+                                <span class="small text-muted">Rating: {{ review.rating }}/5</span>
+                            </div>
+                            <p class="mb-1">{{ review.comment }}</p>
+                            <div class="small text-muted">{{ review.created_at }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No reviews yet.</p>
+                    {% endif %}
+
+                    {% if user.is_authenticated and user_can_review %}
+                    <hr>
+                    <h3 class="h6 mb-3">Add Review</h3>
+                    <form method="post" action="{% url 'add_review' package.id %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ review_form.rating.id_for_label }}" class="form-label">Rating</label>
+                            {{ review_form.rating }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ review_form.comment.id_for_label }}" class="form-label">Comment</label>
+                            {{ review_form.comment }}
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary">Submit Review</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if customization_form %}
+            </form>
+            {% endif %}
         </div>
 
-        <!-- Right Column: Sticky Booking Card -->
         <div class="col-lg-4">
-            <div class="card shadow-sm sticky-booking-card">
-                <div class="card-body">
-                    <h4 class="fw-bold">Booking Information</h4>
-                    <p class="fs-3 fw-bold text-primary mb-2">${{ package.price|floatformat:2 }} <span class="fs-6 fw-normal text-muted">per person</span></p>
-                    <hr>
+            <div class="card border-0 shadow-sm sticky-top" style="top: 100px;">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Booking</h2>
+                    {% if customization_form %}
+                    <p class="text-muted mb-3">Choose one option for each required day to preview your custom itinerary total.</p>
+                    {% else %}
+                    <p class="text-muted mb-3">Current booking flow uses the base package price. Day-by-day customization will be added next.</p>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Base Price</span>
+                        <strong>${{ package.price }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span>Customization</span>
+                        <span class="{% if customization_form %}fw-semibold{% else %}text-muted{% endif %}">
+                            {% if customization_form %}${{ customization_extra_cost }}{% else %}Coming soon{% endif %}
+                        </span>
+                    </div>
+
+                    {% if selected_options_summary %}
+                    <div class="border rounded p-3 mb-4">
+                        <div class="small text-muted mb-2">Selected options</div>
+                        <div class="d-grid gap-2">
+                            {% for selection in selected_options_summary %}
+                            <div>
+                                <div class="small fw-semibold">Day {{ selection.day_number }}: {{ selection.day_title }}</div>
+                                <div class="small text-muted">{{ selection.option_title }} · {{ selection.option_type }} · +${{ selection.additional_cost }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mb-4">
+                        <span>Total</span>
+                        <strong>${{ customization_total }}</strong>
+                    </div>
+
+                    {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
                     <div class="mb-3">
-                        <strong><i class="bi bi-calendar-check me-2"></i>Dates:</strong>
-                        <p class="mb-0">{{ package.start_date|date:"M j, Y" }} to {{ package.end_date|date:"M j, Y" }}</p>
+                        <a href="{% url 'chat_thread_open' package.id %}" class="btn btn-outline-secondary w-100">Chat with Vendor</a>
                     </div>
-                    <div class="d-grid mt-4">
-                        <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary btn-lg">
-                            Proceed to Payment
-                        </a>
+                    {% endif %}
+
+                    {% if customization_form %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" form="customization-form" formmethod="post" name="preview_customization" value="1" class="btn btn-primary">Preview Custom Total</button>
+                        {% if user.is_authenticated %}
+                        <button type="submit" form="customization-form" formmethod="post" name="save_customization" value="1" class="btn btn-outline-primary">Save Custom Itinerary</button>
+                        {% else %}
+                        <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-outline-primary">Log In to Save</a>
+                        {% endif %}
                     </div>
-                    <div class="d-grid mt-2">
-                        <a href="{% url 'compare_packages' %}?package_id={{ package.id }}" class="btn btn-outline-primary">
-                            Compare Similar Packages
-                        </a>
-                    </div>
+                    <div class="small text-muted mt-2">Payment still uses the base package flow. Checkout integration for saved custom itineraries is the next step.</div>
+                    {% elif user.is_authenticated %}
+                    <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
+                    {% else %}
+                    <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-primary w-100">Log In to Book</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const mainImage = document.getElementById('main-package-image');
-    const thumbnails = document.querySelectorAll('.gallery-thumbnail');
-
-    thumbnails.forEach(function(thumbnail) {
-        thumbnail.addEventListener('click', function(event) {
-            // Update main image
-            mainImage.src = this.dataset.fullImageUrl;
-
-            // Update active state
-            thumbnails.forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-        });
-    });
-});
-</script>
 {% endblock %}

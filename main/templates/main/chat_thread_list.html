@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Chats{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Chats</h1>
+            <p class="text-muted mb-0">
+                {% if user_role == 'vendor' %}
+                Customer conversations for your packages
+                {% else %}
+                Your conversations with vendors
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if threads %}
+            <div class="list-group list-group-flush">
+                {% for thread in threads %}
+                <a href="{% url 'chat_thread_detail' thread.id %}" class="list-group-item list-group-item-action p-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="fw-semibold">
+                                {% if user_role == 'vendor' %}
+                                {{ thread.traveler.username }}
+                                {% else %}
+                                {{ thread.vendor.name }}
+                                {% endif %}
+                            </div>
+                            {% if thread.package %}
+                            <div class="small text-muted">Package: {{ thread.package.name }}</div>
+                            {% endif %}
+                            {% with last_message=thread.messages.last %}
+                            {% if last_message %}
+                            <div class="small mt-2 text-muted">
+                                <strong>{{ last_message.sender.username }}:</strong> {{ last_message.message|truncatewords:12 }}
+                            </div>
+                            {% else %}
+                            <div class="small mt-2 text-muted">No messages yet.</div>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        <div class="small text-muted text-nowrap">{{ thread.updated_at|date:"M j, Y g:i a" }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-4 text-muted">No chats yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

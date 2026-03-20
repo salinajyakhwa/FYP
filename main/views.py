@@ -1,10 +1,11 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponseBadRequest
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
-from django.db.models import Q, Count, Sum, Case, When, Value, IntegerField
+from django.db import transaction
+from django.db.models import Q, Count, Sum
 from django.core.paginator import Paginator # Added for pagination
 from django.contrib.sites.shortcuts import get_current_site
 from django.template.loader import render_to_string
@@ -13,28 +14,49 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import EmailMessage
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
-import json
-import hmac
-import hashlib
+from decimal import Decimal
 import base64
-import logging
-from django.views.decorators.csrf import csrf_exempt
+import hashlib
+import hmac
+import json
+import uuid
 from django.contrib.auth import get_user_model # Replaced direct User import
 import stripe
 from django.conf import settings
 from django.urls import reverse
-import uuid
-from decimal import Decimal, ROUND_HALF_UP
+from django.views.decorators.csrf import csrf_exempt
+import csv
+from django.http import HttpResponse
+from.models import Booking, TravelPackage, CustomItinerarySelection
+
 
 # Models
-from .models import TravelPackage, Booking, Review, UserProfile, Vendor
+from .models import (
+    TravelPackage,
+    PackageDay,
+    PackageDayOption,
+    CustomItinerary,
+    CustomItinerarySelection,
+    ChatThread,
+    ChatMessage,
+    Booking,
+    Review,
+    UserProfile,
+    Vendor,
+    Vehicle,
+)
 
 User = get_user_model() # Get the User model
 
 # Forms
 from .forms import (
     ReviewForm, 
+    ItineraryDayForm,
     ItineraryFormSet, 
+    PackageDayForm,
+    PackageDayOptionForm,
+    CustomItinerarySelectionForm,
+    ChatMessageForm,
     TravelPackageForm, 
     UserUpdateForm, 
     UserProfileUpdateForm,
@@ -76,6 +98,165 @@ def _get_vendor_or_403(request):
     except Exception:
         raise PermissionDenied
 
+
+def _get_vendor_user(vendor):
+    return vendor.user_profile.user
+
+
+def _get_chat_thread_for_user_or_403(user, thread_id):
+    thread = get_object_or_404(
+        ChatThread.objects.select_related(
+            'traveler',
+            'vendor',
+            'vendor__user_profile',
+            'vendor__user_profile__user',
+            'package',
+        ).prefetch_related('messages__sender'),
+        pk=thread_id,
+        is_active=True,
+    )
+
+    is_traveler = thread.traveler_id == user.id
+    is_vendor = _get_vendor_user(thread.vendor).id == user.id
+    if not (is_traveler or is_vendor):
+        raise PermissionDenied
+
+    return thread
+
+
+def _sync_package_itinerary_json(package):
+    package_days = package.package_days.prefetch_related('options').all()
+    package.itinerary = [
+        {
+            'day': package_day.day_number,
+            'title': package_day.title,
+            'activity_type': 'travel',
+            'description': package_day.description,
+            'inclusions': ', '.join(option.title for option in package_day.options.all()),
+        }
+        for package_day in package_days
+    ]
+    package.save(update_fields=['itinerary', 'updated_at'])
+
+
+def _build_selected_options_summary(selected_options):
+    return [
+        {
+            'day_number': package_day.day_number,
+            'day_title': package_day.title,
+            'option_title': selected_option.title,
+            'option_type': selected_option.get_option_type_display(),
+            'additional_cost': selected_option.additional_cost,
+            'description': selected_option.description,
+        }
+        for package_day, selected_option in selected_options
+    ]
+
+
+def _build_payment_context(*, package, custom_itinerary=None):
+    amount = custom_itinerary.final_price if custom_itinerary else package.price
+    return {
+        'package': package,
+        'custom_itinerary': custom_itinerary,
+        'amount': amount,
+        'display_name': f"{package.name} (Custom Itinerary)" if custom_itinerary else package.name,
+    }
+
+
+def _store_pending_payment_session(request, *, package_id=None, custom_itinerary_id=None, transaction_uuid=None, provider=None):
+    request.session['pending_booking_package_id'] = package_id
+    request.session['pending_custom_itinerary_id'] = custom_itinerary_id
+    request.session['pending_payment_provider'] = provider
+    request.session['pending_payment_transaction_uuid'] = transaction_uuid
+
+
+def _clear_pending_payment_session(request):
+    for key in [
+        'pending_booking_package_id',
+        'pending_custom_itinerary_id',
+        'pending_payment_provider',
+        'pending_payment_transaction_uuid',
+    ]:
+        request.session.pop(key, None)
+
+
+def _create_or_update_booking_from_pending_payment(request):
+    custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
+    package_id = request.session.get('pending_booking_package_id')
+
+    if not custom_itinerary_id and not package_id:
+        raise ValueError('No pending payment target found.')
+
+    if custom_itinerary_id:
+        custom_itinerary = get_object_or_404(
+            CustomItinerary.objects.select_related('package'),
+            pk=custom_itinerary_id,
+            user=request.user,
+        )
+
+        booking, _ = Booking.objects.get_or_create(
+            custom_itinerary=custom_itinerary,
+            defaults={
+                'user': request.user,
+                'package': custom_itinerary.package,
+                'number_of_travelers': 1,
+                'total_price': custom_itinerary.final_price,
+                'status': 'confirmed',
+            }
+        )
+        if booking.status != 'confirmed' or booking.total_price != custom_itinerary.final_price:
+            booking.status = 'confirmed'
+            booking.total_price = custom_itinerary.final_price
+            booking.package = custom_itinerary.package
+            booking.user = request.user
+            booking.save(update_fields=['status', 'total_price', 'package', 'user'])
+        if custom_itinerary.status != 'confirmed':
+            custom_itinerary.status = 'confirmed'
+            custom_itinerary.save(update_fields=['status', 'updated_at'])
+
+        return booking, custom_itinerary.package, True
+
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    booking = Booking.objects.create(
+        user=request.user,
+        package=package,
+        number_of_travelers=1,
+        total_price=package.price,
+        status='confirmed'
+    )
+    return booking, package, False
+
+
+def _generate_esewa_signature(total_amount, transaction_uuid, product_code):
+    message = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
+    digest = hmac.new(
+        settings.ESEWA_SECRET_KEY.encode('utf-8'),
+        message.encode('utf-8'),
+        hashlib.sha256,
+    ).digest()
+    return base64.b64encode(digest).decode('utf-8')
+
+
+def _verify_esewa_payload(payload):
+    signed_field_names = payload.get('signed_field_names', '')
+    signature = payload.get('signature')
+
+    if not signed_field_names or not signature:
+        return False
+
+    message = ','.join(
+        f"{field}={payload.get(field, '')}"
+        for field in signed_field_names.split(',')
+    )
+    expected_signature = base64.b64encode(
+        hmac.new(
+            settings.ESEWA_SECRET_KEY.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256,
+        ).digest()
+    ).decode('utf-8')
+    return hmac.compare_digest(signature, expected_signature)
+
 def about(request):
     return render(request, 'main/about.html')
 
@@ -112,6 +293,97 @@ def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
     reviews = Review.objects.filter(package=package).order_by('-created_at')
     review_form = ReviewForm()
+    itinerary_items = []
+    package_days = package.package_days.prefetch_related('options').all()
+    customization_form = CustomItinerarySelectionForm(package=package) if package_days.exists() else None
+    selected_options_summary = []
+    customization_extra_cost = Decimal('0.00')
+    customization_total = Decimal(package.price)
+
+    if package_days.exists():
+        if request.method == 'POST' and (
+            'preview_customization' in request.POST or 'save_customization' in request.POST
+        ):
+            customization_form = CustomItinerarySelectionForm(request.POST, package=package)
+            if customization_form.is_valid():
+                selected_options = customization_form.get_selected_options()
+                customization_total = customization_form.calculate_total(package.price)
+                customization_extra_cost = customization_total - Decimal(package.price)
+                selected_options_summary = _build_selected_options_summary(selected_options)
+
+                if 'save_customization' in request.POST:
+                    if not request.user.is_authenticated:
+                        messages.info(request, 'Log in to save a custom itinerary.')
+                        return redirect(f"{reverse('login')}?next={request.path}")
+
+                    with transaction.atomic():
+                        custom_itinerary = CustomItinerary.objects.create(
+                            user=request.user,
+                            package=package,
+                            base_price=package.price,
+                            final_price=customization_total,
+                            status='submitted',
+                        )
+                        CustomItinerarySelection.objects.bulk_create([
+                            CustomItinerarySelection(
+                                custom_itinerary=custom_itinerary,
+                                package_day=package_day,
+                                selected_option=selected_option,
+                                selected_price=selected_option.additional_cost,
+                            )
+                            for package_day, selected_option in selected_options
+                        ])
+
+                    messages.success(request, 'Custom itinerary saved successfully.')
+                    return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
+
+        for package_day in package_days:
+            selection_field = None
+            if customization_form is not None:
+                field_name = f'day_{package_day.id}'
+                if field_name in customization_form.fields:
+                    selection_field = customization_form[field_name]
+
+            itinerary_items.append({
+                'id': package_day.id,
+                'day': package_day.day_number,
+                'title': package_day.title,
+                'description': package_day.description,
+                'activity_label': 'Day Plan',
+                'inclusions': [],
+                'options': list(package_day.options.all()),
+                'selection_field': selection_field,
+            })
+    else:
+        activity_labels = dict(ItineraryDayForm.ACTIVITY_CHOICES)
+        raw_itinerary_items = package.itinerary if isinstance(package.itinerary, list) else []
+
+        for item in sorted(raw_itinerary_items, key=lambda entry: entry.get('day') or 0):
+            if not isinstance(item, dict):
+                continue
+
+            day = item.get('day')
+            title = (item.get('title') or '').strip()
+            description = (item.get('description') or '').strip()
+            activity_type = item.get('activity_type') or ''
+            inclusions = [
+                inclusion.strip()
+                for inclusion in (item.get('inclusions') or '').split(',')
+                if inclusion.strip()
+            ]
+
+            if not day or not title or not description:
+                continue
+
+            itinerary_items.append({
+                'day': day,
+                'title': title,
+                'description': description,
+                'activity_label': activity_labels.get(activity_type, activity_type.replace('_', ' ').title()),
+                'inclusions': inclusions,
+                'options': [],
+                'selection_field': None,
+            })
     
     user_can_review = False
     if request.user.is_authenticated:
@@ -132,9 +404,143 @@ def package_detail(request, package_id):
         'package': package,
         'reviews': reviews,
         'user_can_review': user_can_review,
-        'review_form': review_form
+        'review_form': review_form,
+        'itinerary_items': itinerary_items,
+        'customization_form': customization_form,
+        'selected_options_summary': selected_options_summary,
+        'customization_extra_cost': customization_extra_cost,
+        'customization_total': customization_total,
     }
     return render(request, 'main/package_detail.html', context)
+
+
+@login_required
+def custom_itinerary_detail(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package', 'package__vendor', 'user').prefetch_related(
+            'selections__package_day',
+            'selections__selected_option',
+        ),
+        pk=custom_itinerary_id,
+    )
+
+    if custom_itinerary.user != request.user:
+        raise PermissionDenied
+
+    context = {
+        'custom_itinerary': custom_itinerary,
+        'selections': custom_itinerary.selections.all(),
+        'payment_context': _build_payment_context(
+            package=custom_itinerary.package,
+            custom_itinerary=custom_itinerary,
+        ),
+    }
+    return render(request, 'main/custom_itinerary_detail.html', context)
+
+
+@login_required
+def chat_thread_open(request, package_id):
+    package = get_object_or_404(
+        TravelPackage.objects.select_related('vendor', 'vendor__user_profile', 'vendor__user_profile__user'),
+        pk=package_id,
+    )
+
+    profile = getattr(request.user, 'userprofile', None)
+    if not profile or profile.role != 'traveler':
+        raise PermissionDenied
+
+    thread, _ = ChatThread.objects.get_or_create(
+        traveler=request.user,
+        vendor=package.vendor,
+        package=package,
+        defaults={
+            'booking': None,
+            'custom_itinerary': None,
+        }
+    )
+    return redirect('chat_thread_detail', thread_id=thread.id)
+
+
+@login_required
+def chat_thread_list(request):
+    profile = getattr(request.user, 'userprofile', None)
+    if not profile:
+        raise PermissionDenied
+
+    if profile.role == 'traveler':
+        threads = ChatThread.objects.filter(
+            traveler=request.user,
+            is_active=True,
+        ).select_related(
+            'vendor',
+            'vendor__user_profile',
+            'vendor__user_profile__user',
+            'package',
+        ).prefetch_related('messages__sender')
+    elif profile.role == 'vendor':
+        vendor = _get_vendor_or_403(request)
+        threads = ChatThread.objects.filter(
+            vendor=vendor,
+            is_active=True,
+        ).select_related(
+            'traveler',
+            'package',
+        ).prefetch_related('messages__sender')
+    else:
+        raise PermissionDenied
+
+    context = {
+        'threads': threads,
+        'user_role': profile.role,
+    }
+    return render(request, 'main/chat_thread_list.html', context)
+
+
+@login_required
+def chat_thread_detail(request, thread_id):
+    thread = _get_chat_thread_for_user_or_403(request.user, thread_id)
+    messages_qs = thread.messages.select_related('sender').all()
+
+    if request.method == 'POST':
+        form = ChatMessageForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.thread = thread
+            message.sender = request.user
+            message.save()
+            ChatThread.objects.filter(pk=thread.id).update(updated_at=timezone.now())
+            return redirect('chat_thread_detail', thread_id=thread.id)
+    else:
+        form = ChatMessageForm()
+
+    counterpart_name = thread.vendor.name if thread.traveler_id == request.user.id else thread.traveler.username
+    context = {
+        'thread': thread,
+        'messages': messages_qs,
+        'form': form,
+        'counterpart_name': counterpart_name,
+    }
+    return render(request, 'main/chat_thread_detail.html', context)
+
+
+@login_required
+def choose_payment(request, package_id):
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    return render(request, 'main/choose_payment.html', _build_payment_context(package=package))
+
+
+@login_required
+def choose_custom_itinerary_payment(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package'),
+        pk=custom_itinerary_id,
+        user=request.user,
+    )
+    return render(
+        request,
+        'main/choose_payment.html',
+        _build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
+    )
 
 def compare_packages(request):
     def _find_similar_packages(base_package, limit=3):
@@ -450,12 +856,46 @@ def vendor_dashboard(request):
 @role_required(allowed_roles=['vendor'])
 def vendor_bookings(request):
     vendor = _get_vendor_or_403(request)
-    # Get all bookings for packages owned by the vendor
-    bookings = Booking.objects.filter(package__vendor=vendor).select_related('package', 'user').order_by('-booking_date')
-    
+
+    #  Optimized query
+    bookings = Booking.objects.filter(package__vendor=vendor)\
+        .select_related('user', 'package', 'custom_itinerary')\
+        .prefetch_related(
+            'custom_itinerary__selections__package_day',
+            'custom_itinerary__selections__selected_option'
+        )\
+        .order_by('-booking_date')
+
+    #  GROUPING LOGIC (Phase 2)
+    grouped_data = {}
+
+    for booking in bookings:
+        groups = {}
+
+        if booking.custom_itinerary:
+            for sel in booking.custom_itinerary.selections.all():
+                option = sel.selected_option
+
+                # Group by action_link OR fallback to type
+                key = option.action_link if option.action_link else f"type_{option.option_type}"
+
+                if key not in groups:
+                    groups[key] = {
+                        'type': option.option_type,
+                        'link': option.action_link,
+                        'items': []
+                    }
+
+                groups[key]['items'].append(sel)
+
+        grouped_data[booking.id] = groups
+
+    #  Final context
     context = {
-        'bookings': bookings
+        'bookings': bookings,
+        'grouped_data': grouped_data
     }
+
     return render(request, 'main/vendor_bookings.html', context)
 
 @login_required
@@ -507,32 +947,74 @@ def manage_itinerary(request, package_id):
     
     if package.vendor != _get_vendor_or_403(request):
         raise PermissionDenied
+    package_days = package.package_days.prefetch_related('options').all()
+    edit_day = None
+    edit_option = None
+
+    edit_day_id = request.GET.get('edit_day')
+    if edit_day_id:
+        edit_day = package_days.filter(pk=edit_day_id).first()
+
+    edit_option_id = request.GET.get('edit_option')
+    if edit_option_id:
+        edit_option = PackageDayOption.objects.filter(package_day__package=package, pk=edit_option_id).select_related('package_day').first()
+
+    day_form = PackageDayForm(instance=edit_day, package=package, prefix='day')
+    option_form = PackageDayOptionForm(instance=edit_option, package=package, prefix='option')
 
     if request.method == 'POST':
-        formset = ItineraryFormSet(request.POST)
-        if formset.is_valid():
-            # JSON Logic
-            new_itinerary = []
-            for form in formset:
-                if form.cleaned_data and not form.cleaned_data.get('DELETE'):
-                    new_itinerary.append({
-                        'day': form.cleaned_data.get('day'),
-                        'title': form.cleaned_data.get('title'),
-                        'activity_type': form.cleaned_data.get('activity_type'),
-                        'description': form.cleaned_data.get('description'),
-                        'inclusions': form.cleaned_data.get('inclusions'),
-                    })
-            package.itinerary = new_itinerary
-            package.save()
-            messages.success(request, "Itinerary updated!")
-            return redirect('vendor_dashboard')
-    else:
-        initial_data = package.itinerary if isinstance(package.itinerary, list) else []
-        formset = ItineraryFormSet(initial=initial_data)
+        action = request.POST.get('action')
+        day_id = request.POST.get('day_id') or None
+        option_id = request.POST.get('option_id') or None
+
+        if action == 'save_day':
+            day_instance = package_days.filter(pk=day_id).first() if day_id else None
+            day_form = PackageDayForm(request.POST, instance=day_instance, package=package, prefix='day')
+            option_form = PackageDayOptionForm(package=package, prefix='option')
+            if day_form.is_valid():
+                day = day_form.save(commit=False)
+                day.package = package
+                day.save()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary day saved successfully.')
+                return redirect('manage_itinerary', package_id=package.id)
+        elif action == 'save_option':
+            option_instance = (
+                PackageDayOption.objects.filter(package_day__package=package, pk=option_id).first()
+                if option_id else None
+            )
+            option_form = PackageDayOptionForm(request.POST, instance=option_instance, package=package, prefix='option')
+            day_form = PackageDayForm(package=package, prefix='day')
+            if option_form.is_valid():
+                option_form.save()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary option saved successfully.')
+                return redirect('manage_itinerary', package_id=package.id)
+        elif action == 'delete_day':
+            day_to_delete = package_days.filter(pk=day_id).first() if day_id else None
+            if day_to_delete:
+                day_to_delete.delete()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary day deleted.')
+                return redirect('manage_itinerary', package_id=package.id)
+        elif action == 'delete_option':
+            option_to_delete = (
+                PackageDayOption.objects.filter(package_day__package=package, pk=option_id).first()
+                if option_id else None
+            )
+            if option_to_delete:
+                option_to_delete.delete()
+                _sync_package_itinerary_json(package)
+                messages.success(request, 'Itinerary option deleted.')
+                return redirect('manage_itinerary', package_id=package.id)
 
     context = {
         'package': package,
-        'formset': formset
+        'package_days': package_days,
+        'day_form': day_form,
+        'option_form': option_form,
+        'editing_day': edit_day,
+        'editing_option': edit_option,
     }
     return render(request, 'main/manage_itinerary.html', context)
 
@@ -606,44 +1088,118 @@ def update_vendor_status(request, vendor_id, new_status):
 
 @login_required
 def esewa_checkout(request, package_id):
-    """Render an eSewa sandbox checkout form and post to eSewa gateway.
-
-    Uses sandbox credentials and builds absolute success/failure URLs so
-    eSewa can redirect back (works with ngrok).
-    This normalizes amounts to two decimal places to match eSewa signing.
-    """
     package = get_object_or_404(TravelPackage, pk=package_id)
-
-    # Use Decimal for precise formatting
-    price_dec = Decimal(str(package.price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    tax_dec = Decimal('10.00')
-    total_dec = (price_dec + tax_dec).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-    # String representations must exactly match what's signed
-    amount = format(price_dec, 'f')        # e.g. '100.00'
-    tax_amount = format(tax_dec, 'f')      # '10.00'
-    total_amount = format(total_dec, 'f')  # '110.00'
-
     transaction_uuid = str(uuid.uuid4())
-    product_code = ESEWA_PRODUCT_CODE
+    amount = Decimal(package.price).quantize(Decimal('0.01'))
+    tax_amount = Decimal('0.00')
+    total_amount = amount + tax_amount
 
-    # Generate signature using the formatted total_amount
-    signature = _esewa_calc_signature(total_amount, transaction_uuid, product_code)
-
-    success_url = request.build_absolute_uri(reverse('esewa_verify'))
-    failure_url = request.build_absolute_uri(reverse('payment_cancelled'))
+    _store_pending_payment_session(
+        request,
+        package_id=package.id,
+        transaction_uuid=transaction_uuid,
+        provider='esewa',
+    )
 
     context = {
-        'amount': amount,
-        'tax_amount': tax_amount,
-        'total_amount': total_amount,
+        **_build_payment_context(package=package),
+        'amount': f"{amount:.2f}",
+        'tax_amount': f"{tax_amount:.2f}",
+        'total_amount': f"{total_amount:.2f}",
         'transaction_uuid': transaction_uuid,
-        'product_code': product_code,
-        'signature': signature,
-        'success_url': success_url,
-        'failure_url': failure_url,
+        'product_code': settings.ESEWA_PRODUCT_CODE,
+        'signature': _generate_esewa_signature(
+            f"{total_amount:.2f}",
+            transaction_uuid,
+            settings.ESEWA_PRODUCT_CODE,
+        ),
+        'success_url': request.build_absolute_uri(reverse('esewa_verify')),
+        'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
+        'esewa_form_url': settings.ESEWA_FORM_URL,
     }
     return render(request, 'main/esewa_checkout.html', context)
+
+
+@login_required
+def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package'),
+        pk=custom_itinerary_id,
+        user=request.user,
+    )
+    transaction_uuid = str(uuid.uuid4())
+    amount = Decimal(custom_itinerary.final_price).quantize(Decimal('0.01'))
+    tax_amount = Decimal('0.00')
+    total_amount = amount + tax_amount
+
+    _store_pending_payment_session(
+        request,
+        custom_itinerary_id=custom_itinerary.id,
+        transaction_uuid=transaction_uuid,
+        provider='esewa',
+    )
+
+    context = {
+        **_build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
+        'amount': f"{amount:.2f}",
+        'tax_amount': f"{tax_amount:.2f}",
+        'total_amount': f"{total_amount:.2f}",
+        'transaction_uuid': transaction_uuid,
+        'product_code': settings.ESEWA_PRODUCT_CODE,
+        'signature': _generate_esewa_signature(
+            f"{total_amount:.2f}",
+            transaction_uuid,
+            settings.ESEWA_PRODUCT_CODE,
+        ),
+        'success_url': request.build_absolute_uri(reverse('esewa_verify')),
+        'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
+        'esewa_form_url': settings.ESEWA_FORM_URL,
+    }
+    return render(request, 'main/esewa_checkout.html', context)
+
+
+@csrf_exempt
+@login_required
+def esewa_verify(request):
+    data_b64 = request.GET.get('data') or request.POST.get('data')
+    if not data_b64:
+        messages.error(request, 'Missing eSewa verification payload.')
+        return redirect('package_list')
+
+    try:
+        payload = json.loads(base64.b64decode(data_b64).decode('utf-8'))
+    except Exception:
+        messages.error(request, 'Invalid eSewa verification payload.')
+        return redirect('package_list')
+
+    if not _verify_esewa_payload(payload):
+        return HttpResponseBadRequest('Invalid eSewa signature.')
+
+    transaction_uuid = payload.get('transaction_uuid')
+    status = payload.get('status')
+    pending_transaction_uuid = request.session.get('pending_payment_transaction_uuid')
+
+    if not pending_transaction_uuid or pending_transaction_uuid != transaction_uuid:
+        messages.error(request, 'Could not match the eSewa payment to a pending checkout.')
+        return redirect('package_list')
+
+    if status != 'COMPLETE':
+        messages.error(request, f'eSewa payment did not complete successfully. Status: {status}')
+        return redirect('payment_cancelled')
+
+    try:
+        booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
+    except ValueError:
+        messages.error(request, 'Could not find a pending booking after eSewa verification.')
+        return redirect('package_list')
+
+    _clear_pending_payment_session(request)
+    if is_custom:
+        messages.success(request, f"Your custom booking for {package.name} is confirmed!")
+    else:
+        messages.success(request, f"Your booking for {package.name} is confirmed!")
+
+    return redirect('booking_confirmation', booking_id=booking.id)
 
 @login_required
 def create_checkout_session(request, package_id):
@@ -651,14 +1207,6 @@ def create_checkout_session(request, package_id):
     Creates a Stripe Checkout session and redirects the user to the
     Stripe-hosted payment page.
     """
-
-
-@login_required
-def choose_payment(request, package_id):
-    """Show a choice between Stripe and eSewa payment methods."""
-    package = get_object_or_404(TravelPackage, pk=package_id)
-    return render(request, 'main/choose_payment.html', {'package': package})
-
     package = get_object_or_404(TravelPackage, pk=package_id)
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -693,8 +1241,7 @@ def choose_payment(request, package_id):
             customer_email=request.user.email,  # Pre-fill customer email
         )
 
-        # Store package_id in session to retrieve after success
-        request.session['pending_booking_package_id'] = package.id
+        _store_pending_payment_session(request, package_id=package.id, provider='stripe')
 
         return redirect(checkout_session.url, code=303)
 
@@ -706,34 +1253,81 @@ def choose_payment(request, package_id):
         return redirect('package_detail', package_id=package.id)
 
 
+@login_required
+def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
+    custom_itinerary = get_object_or_404(
+        CustomItinerary.objects.select_related('package', 'package__vendor'),
+        pk=custom_itinerary_id,
+        user=request.user,
+    )
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    success_url = request.build_absolute_uri(
+        reverse('payment_success')
+    ) + '?session_id={CHECKOUT_SESSION_ID}'
+
+    cancel_url = request.build_absolute_uri(
+        reverse('payment_cancelled')
+    )
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f"{custom_itinerary.package.name} (Custom Itinerary)",
+                        'description': f"Custom travel package by {custom_itinerary.package.vendor.name}",
+                    },
+                    'unit_amount': int(custom_itinerary.final_price * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            customer_email=request.user.email,
+        )
+
+        _store_pending_payment_session(
+            request,
+            custom_itinerary_id=custom_itinerary.id,
+            provider='stripe',
+        )
+
+        return redirect(checkout_session.url, code=303)
+    except Exception as e:
+        messages.error(
+            request,
+            f"Something went wrong with the payment process. Error: {e}"
+        )
+        return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
+
+
 def payment_success(request):
     """
     Handles successful payments. Creates the booking record and shows a
     confirmation page.
     """
-    package_id = request.session.get('pending_booking_package_id')
-
-    if not package_id:
+    if not request.session.get('pending_custom_itinerary_id') and not request.session.get('pending_booking_package_id'):
         messages.error(request, "Could not find a pending booking. Please try again.")
         return redirect('package_list')
 
-    package = get_object_or_404(TravelPackage, pk=package_id)
+    try:
+        booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
+    except ValueError:
+        messages.error(request, "Could not find a pending booking. Please try again.")
+        return redirect('package_list')
 
-    # Create booking after successful payment
-    Booking.objects.create(
-        user=request.user,
-        package=package,
-        number_of_travelers=1,  # You can replace with form value later
-        total_price=package.price,
-        status='confirmed'
-    )
+    _clear_pending_payment_session(request)
 
-    # Clear session variable
-    del request.session['pending_booking_package_id']
+    if is_custom:
+        messages.success(request, f"Your custom booking for {package.name} is confirmed!")
+    else:
+        messages.success(request, f"Your booking for {package.name} is confirmed!")
 
-    messages.success(request, f"Your booking for {package.name} is confirmed!")
-
-    return render(request, 'main/payment_success.html')
+    return render(request, 'main/payment_success.html', {'booking': booking})
 
 
 def payment_cancelled(request):
@@ -746,96 +1340,75 @@ def payment_cancelled(request):
     )
     return render(request, 'main/payment_cancelled.html')
 
+@login_required
+def booking_confirmation(request, booking_id):
+    booking = get_object_or_404(
+        Booking.objects.select_related('package', 'package__vendor', 'custom_itinerary').prefetch_related(
+            'custom_itinerary__selections__package_day',
+            'custom_itinerary__selections__selected_option',
+        ),
+        pk=booking_id,
+    )
 
-# === eSewa ePay V2 verification (sandbox) ===
-# Uses sandbox secret and product code provided for demo/testing
-ESEWA_SECRET_KEY = "8gBm/:&EnhH.1/q"
-ESEWA_PRODUCT_CODE = "EPAYTEST"
+    if booking.user != request.user:
+        raise PermissionDenied
 
+    package = booking.package
+    context = {
+        'booking': booking,
+        'package': package,
+    }
+    return render(request, 'main/booking_confirmation.html', context)
 
-def _esewa_calc_signature(total_amount, transaction_uuid, product_code):
-    """Calculate base64-encoded HMAC-SHA256 signature matching eSewa spec."""
-    msg = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
-    mac = hmac.new(ESEWA_SECRET_KEY.encode('utf-8'), msg.encode('utf-8'), hashlib.sha256).digest()
-    return base64.b64encode(mac).decode('utf-8')
+@login_required
+@role_required(allowed_roles=['vendor'])
+def export_booking_csv(request, booking_id):
+    booking = get_object_or_404(
+        Booking.objects.select_related('user', 'package', 'custom_itinerary'),
+        id=booking_id,
+        package__vendor=_get_vendor_or_403(request)
+    )
 
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="booking_{booking.id}.csv"'
 
-@csrf_exempt
-def esewa_verify(request):
-    """Endpoint to receive eSewa redirect (success/failure) with ?data=BASE64_JSON.
+    writer = csv.writer(response)
+    writer.writerow(['User', 'Package', 'Option Type', 'Option', 'Price'])
 
-    Decodes payload, verifies signature and status, and allows the app to
-    record the payment (update Booking/Payment models as appropriate).
-    """
-    data_b64 = request.GET.get('data') or request.POST.get('data')
-    if not data_b64:
-        return HttpResponseBadRequest("missing data param")
-
-    try:
-        decoded = base64.b64decode(data_b64)
-        payload = json.loads(decoded)
-    except Exception:
-        return HttpResponseBadRequest("invalid data encoding")
-
-    logger = logging.getLogger(__name__)
-
-    # Prefer signed_field_names from payload to reconstruct exact message ordering
-    signed_fields_raw = payload.get('signed_field_names')
-    if signed_fields_raw:
-        # signed_field_names may be a comma-separated string
-        if isinstance(signed_fields_raw, str):
-            signed_fields = [f.strip() for f in signed_fields_raw.split(',') if f.strip()]
-        elif isinstance(signed_fields_raw, list):
-            signed_fields = signed_fields_raw
-        else:
-            signed_fields = ['total_amount', 'transaction_uuid', 'product_code']
-    else:
-        signed_fields = ['total_amount', 'transaction_uuid', 'product_code']
-
-    # Reconstruct message using values returned by eSewa (to match their signing)
-    parts = []
-    for field in signed_fields:
-        val = payload.get(field, '')
-        # Ensure value is a string and strip excess whitespace
-        if val is None:
-            val = ''
-        parts.append(f"{field}={val}")
-    message = ",".join(parts)
-
-    remote_sig = payload.get('signature') or payload.get('merchant_signature') or payload.get('merchantSig')
-
-    if not remote_sig:
-        logger.warning("eSewa payload missing signature: %s", payload)
-        return HttpResponseBadRequest("missing signature")
-
-    # Compute local signature using reconstructed message
-    mac = hmac.new(ESEWA_SECRET_KEY.encode('utf-8'), message.encode('utf-8'), hashlib.sha256).digest()
-    local_sig = base64.b64encode(mac).decode('utf-8')
-
-    # Log for debugging (development only)
-    logger.debug("eSewa payload: %s", payload)
-    logger.debug("Signed fields: %s", signed_fields)
-    logger.debug("Reconstructed message: %s", message)
-    logger.debug("Remote signature: %s", remote_sig)
-    logger.debug("Local signature: %s", local_sig)
-
-    if not hmac.compare_digest(local_sig, remote_sig):
-        # Helpful debug response while developing — remove in production
-        return HttpResponseBadRequest(
-            f"signature mismatch\nremote={remote_sig}\nlocal={local_sig}\nmessage={message}",
-            content_type='text/plain'
+    if booking.custom_itinerary:
+        selections = booking.custom_itinerary.selections.select_related(
+            'package_day', 'selected_option'
         )
 
-    status = payload.get('status')
-    transaction_uuid = payload.get('transaction_uuid')
+        for sel in selections:
+            writer.writerow([
+                booking.user.username,
+                booking.package.name,
+                sel.selected_option.option_type,
+                sel.selected_option.title,
+                sel.selected_price
+            ])
+    else:
+        writer.writerow([
+            booking.user.username,
+            booking.package.name,
+            'Default Package',
+            'No customization',
+            booking.total_price
+        ])
 
-    if status == "COMPLETE":
-        # TODO: update your DB here. Example (uncomment & adapt):
-        # from .models import Payment
-        # Payment.objects.update_or_create(
-        #     transaction_uuid=transaction_uuid,
-        #     defaults={'status':'complete', 'amount': payload.get('total_amount'), 'raw_response': payload}
-        # )
-        return HttpResponse("Payment verified and complete", status=200)
+    return response
 
-    return HttpResponse(f"Payment status: {status}", status=400)
+@login_required
+@role_required(allowed_roles=['vendor'])
+def flight_bookings(request):
+    vendor = _get_vendor_or_403(request)
+
+    bookings = Booking.objects.filter(
+        package__vendor=vendor,
+        custom_itinerary__selections__selected_option__option_type='flight'
+    ).select_related('user', 'package').distinct()
+
+    return render(request, 'main/flight_bookings.html', {
+        'bookings': bookings
+    })

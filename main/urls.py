@@ -17,6 +17,10 @@ urlpatterns = [
     
     # 4. PACKAGE DETAILS & BOOKING
     path('package/<int:package_id>/', views.package_detail, name='package_detail'),
+    path('custom-itinerary/<int:custom_itinerary_id>/', views.custom_itinerary_detail, name='custom_itinerary_detail'),
+    path('chat/', views.chat_thread_list, name='chat_thread_list'),
+    path('chat/open/package/<int:package_id>/', views.chat_thread_open, name='chat_thread_open'),
+    path('chat/thread/<int:thread_id>/', views.chat_thread_detail, name='chat_thread_detail'),
 
     path('my-bookings/', views.my_bookings, name='my_bookings'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),
@@ -49,16 +53,17 @@ urlpatterns = [
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='main/password_reset_complete.html'), name='password_reset_complete'),
 
     # 8 PAYMENT
+    path('payment/choose/<int:package_id>/', views.choose_payment, name='choose_payment'),
+    path('payment/choose/custom-itinerary/<int:custom_itinerary_id>/', views.choose_custom_itinerary_payment, name='choose_custom_itinerary_payment'),
     path('create-checkout-session/<int:package_id>/', views.create_checkout_session, name='create_checkout_session'),
+    path('create-checkout-session/custom-itinerary/<int:custom_itinerary_id>/', views.create_custom_itinerary_checkout_session, name='create_custom_itinerary_checkout_session'),
+    path('payment/esewa-checkout/<int:package_id>/', views.esewa_checkout, name='esewa_checkout'),
+    path('payment/esewa-checkout/custom-itinerary/<int:custom_itinerary_id>/', views.esewa_custom_itinerary_checkout, name='esewa_custom_itinerary_checkout'),
+    path('payment/esewa-verify/', views.esewa_verify, name='esewa_verify'),
     path('payment-success/', views.payment_success, name= 'payment_success'),
     path('payment-cancelled/', views.payment_cancelled, name='payment_cancelled'),
 
-    # eSewa (sandbox) verification endpoint
-    path('payment/esewa-verify/', views.esewa_verify, name='esewa_verify'),
-
-    # eSewa sandbox checkout (demo)
-    path('payment/esewa-checkout/<int:package_id>/', views.esewa_checkout, name='esewa_checkout'),
-
-    # Payment chooser
-    path('payment/choose/<int:package_id>/', views.choose_payment, name='choose_payment'),
+    path('booking/confirmation/<int:booking_id>/', views.booking_confirmation, name='booking_confirmation'),
+    path('vendor/booking/<int:booking_id>/csv/', views.export_booking_csv, name='export_booking_csv'),
+    path('vendor/flights/', views.flight_bookings, name='flight_bookings'),
 ]

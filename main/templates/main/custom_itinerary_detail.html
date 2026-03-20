@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Custom Itinerary{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h1 class="h4 mb-0">Custom Itinerary</h1>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                        <div>
+                            <h2 class="h5 mb-1">{{ custom_itinerary.package.name }}</h2>
+                            <p class="text-muted mb-0">Vendor: {{ custom_itinerary.package.vendor.name }}</p>
+                        </div>
+                        <div class="text-end">
+                            <div class="small text-muted">Status</div>
+                            <div class="fw-semibold">{{ custom_itinerary.get_status_display }}</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Base Price</div>
+                                <div class="fw-semibold">${{ custom_itinerary.base_price }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Final Price</div>
+                                <div class="fw-semibold">${{ custom_itinerary.final_price }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Created</div>
+                                <div class="fw-semibold">{{ custom_itinerary.created_at|date:"F j, Y, g:i a" }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="h6 mb-3">Selections</h3>
+                    <div class="d-grid gap-3 mb-4">
+                        {% for selection in selections %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="small text-muted">Day {{ selection.package_day.day_number }}</div>
+                                    <div class="fw-semibold">{{ selection.package_day.title }}</div>
+                                    <div>{{ selection.selected_option.title }}</div>
+                                    <div class="small text-muted">{{ selection.selected_option.get_option_type_display }}</div>
+                                    {% if selection.selected_option.description %}
+                                    <div class="small mt-1">{{ selection.selected_option.description }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="fw-semibold">+${{ selection.selected_price }}</div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="alert alert-secondary mb-0">No selections were saved for this itinerary.</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if custom_itinerary.booking %}
+                        <a href="{% url 'booking_confirmation' custom_itinerary.booking.id %}" class="btn btn-primary">View Booking</a>
+                        {% else %}
+                        <a href="{% url 'choose_custom_itinerary_payment' custom_itinerary.id %}" class="btn btn-primary">Proceed to Payment</a>
+                        {% endif %}
+                        <a href="{% url 'package_detail' custom_itinerary.package.id %}" class="btn btn-outline-secondary">Back to Package</a>
+                        <a href="{% url 'my_bookings' %}" class="btn btn-outline-secondary">My Bookings</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
