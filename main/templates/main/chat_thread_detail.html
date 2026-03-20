@@ -2,52 +2,332 @@
 
 {% block title %}Chat{% endblock %}
 
-{% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-9">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <div>
-                        <h1 class="h5 mb-1">{{ counterpart_name }}</h1>
-                        {% if thread.package %}
-                        <div class="small text-muted">Package: {{ thread.package.name }}</div>
-                        {% endif %}
-                    </div>
-                    <a href="{% url 'chat_thread_list' %}" class="btn btn-outline-secondary btn-sm">Back to Chats</a>
-                </div>
-                <div class="card-body p-4">
-                    <div class="border rounded p-3 mb-4" style="max-height: 420px; overflow-y: auto;">
-                        {% if messages %}
-                        <div class="d-grid gap-3">
-                            {% for message in messages %}
-                            <div class="{% if message.sender_id == user.id %}text-end{% endif %}">
-                                <div class="small text-muted mb-1">{{ message.sender.username }} · {{ message.created_at|date:"M j, Y g:i a" }}</div>
-                                <div class="d-inline-block px-3 py-2 rounded {% if message.sender_id == user.id %}bg-primary text-white{% else %}bg-light{% endif %}">
-                                    {{ message.message|linebreaksbr }}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <div class="text-muted">No messages yet. Start the conversation.</div>
-                        {% endif %}
-                    </div>
+{% block extra_css %}
+<style>
+    .chat-room {
+        --room-bg: linear-gradient(145deg, #fff7ed 0%, #f8fafc 52%, #eef4ff 100%);
+        --room-card: rgba(255, 255, 255, 0.88);
+        --room-border: rgba(15, 23, 42, 0.08);
+        --room-text: #10233d;
+        --room-muted: #66768b;
+        --room-accent: #0d6efd;
+        --room-accent-dark: #0b5ed7;
+        --room-shadow: 0 28px 80px rgba(15, 23, 42, 0.10);
+        background: var(--room-bg);
+        border-radius: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.78);
+        padding: 1.5rem;
+        box-shadow: var(--room-shadow);
+    }
 
-                    <form method="post">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="{{ form.message.id_for_label }}" class="form-label">Message</label>
-                            {{ form.message }}
-                            {% for error in form.message.errors %}
-                            <div class="text-danger small mt-1">{{ error }}</div>
-                            {% endfor %}
+    .chat-room-card {
+        background: var(--room-card);
+        border: 1px solid var(--room-border);
+        border-radius: 26px;
+        overflow: hidden;
+        backdrop-filter: blur(18px);
+    }
+
+    .chat-room-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.35rem 1.4rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        background:
+            radial-gradient(circle at top right, rgba(13, 110, 253, 0.10), transparent 35%),
+            rgba(255, 255, 255, 0.82);
+    }
+
+    .chat-room-header-main {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        min-width: 0;
+    }
+
+    .chat-room-avatar {
+        width: 58px;
+        height: 58px;
+        border-radius: 20px;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        color: var(--room-accent);
+        background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(20, 184, 166, 0.18));
+        box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.08);
+        flex-shrink: 0;
+    }
+
+    .chat-room-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--room-muted);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+    }
+
+    .chat-room-title {
+        color: var(--room-text);
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+
+    .chat-room-meta {
+        color: var(--room-muted);
+        margin-bottom: 0;
+    }
+
+    .chat-back-link {
+        border-radius: 999px;
+        padding-inline: 1rem;
+        white-space: nowrap;
+    }
+
+    .chat-room-body {
+        padding: 1.35rem;
+    }
+
+    .chat-message-feed {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-right: 0.35rem;
+    }
+
+    .chat-message-feed::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .chat-message-feed::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.25);
+        border-radius: 999px;
+    }
+
+    .chat-message-row {
+        display: flex;
+        justify-content: flex-start;
+    }
+
+    .chat-message-row.is-self {
+        justify-content: flex-end;
+    }
+
+    .chat-message-block {
+        max-width: min(80%, 42rem);
+    }
+
+    .chat-message-meta {
+        color: var(--room-muted);
+        font-size: 0.84rem;
+        margin-bottom: 0.35rem;
+        padding-inline: 0.2rem;
+    }
+
+    .chat-message-bubble {
+        border-radius: 20px;
+        padding: 0.95rem 1rem;
+        line-height: 1.55;
+        word-break: break-word;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .chat-message-row:not(.is-self) .chat-message-bubble {
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        color: var(--room-text);
+        border-top-left-radius: 8px;
+    }
+
+    .chat-message-row.is-self .chat-message-bubble {
+        background: linear-gradient(135deg, var(--room-accent), var(--room-accent-dark));
+        color: #fff;
+        border-top-right-radius: 8px;
+    }
+
+    .chat-message-empty {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--room-muted);
+        border: 1px dashed rgba(100, 116, 139, 0.28);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.58);
+    }
+
+    .chat-composer {
+        margin-top: 1.35rem;
+        border-top: 1px solid rgba(15, 23, 42, 0.06);
+        padding-top: 1.35rem;
+    }
+
+    .chat-composer-card {
+        padding: 1rem;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.75);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .chat-composer-label {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--room-text);
+        font-weight: 600;
+        margin-bottom: 0.8rem;
+    }
+
+    .chat-composer-input {
+        min-height: 118px;
+        resize: vertical;
+        border-radius: 18px;
+        border: 1px solid rgba(15, 23, 42, 0.10);
+        padding: 0.95rem 1rem;
+        box-shadow: none;
+    }
+
+    .chat-composer-input:focus {
+        border-color: rgba(13, 110, 253, 0.42);
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.12);
+    }
+
+    .chat-composer-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.9rem;
+    }
+
+    .chat-composer-note {
+        color: var(--room-muted);
+        font-size: 0.9rem;
+        margin-bottom: 0;
+    }
+
+    .chat-send-btn {
+        border-radius: 999px;
+        padding: 0.8rem 1.2rem;
+        font-weight: 600;
+    }
+
+    @media (max-width: 767.98px) {
+        .chat-room {
+            padding: 0.9rem;
+            border-radius: 22px;
+        }
+
+        .chat-room-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .chat-room-header-main {
+            align-items: flex-start;
+        }
+
+        .chat-message-block {
+            max-width: 92%;
+        }
+
+        .chat-composer-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4 py-lg-5">
+    <div class="chat-room">
+        <div class="chat-room-card">
+            <div class="chat-room-header">
+                <div class="chat-room-header-main">
+                    <div class="chat-room-avatar">{{ counterpart_name|slice:":1"|upper }}</div>
+                    <div>
+                        <div class="chat-room-kicker">
+                            <i class="bi bi-shield-check"></i>
+                            Verified conversation
                         </div>
-                        <button type="submit" class="btn btn-primary">Send Message</button>
+                        <h1 class="chat-room-title">{{ counterpart_name }}</h1>
+                        <p class="chat-room-meta">
+                            {% if thread.package %}
+                            Discussing <strong>{{ thread.package.name }}</strong>
+                            {% else %}
+                            Direct conversation
+                            {% endif %}
+                            · {{ messages|length }} message{{ messages|length|pluralize }}
+                        </p>
+                    </div>
+                </div>
+                <a href="{% url 'chat_thread_list' %}" class="btn btn-outline-secondary chat-back-link">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    Back to chats
+                </a>
+            </div>
+
+            <div class="chat-room-body">
+                <div class="chat-message-feed" id="chat-message-feed">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="chat-message-row {% if message.sender_id == user.id %}is-self{% endif %}">
+                        <div class="chat-message-block">
+                            <div class="chat-message-meta">
+                                {{ message.sender.username }} · {{ message.created_at|date:"M j, Y g:i a" }}
+                            </div>
+                            <div class="chat-message-bubble">{{ message.message|linebreaksbr }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="chat-message-empty">
+                        <div class="mb-2"><i class="bi bi-chat-square-text fs-3"></i></div>
+                        No messages yet. Start with a clear question or booking detail so the conversation stays useful.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="chat-composer">
+                    <form method="post" class="chat-composer-card">
+                        {% csrf_token %}
+                        <label for="{{ form.message.id_for_label }}" class="chat-composer-label">
+                            <i class="bi bi-pencil-square"></i>
+                            New message
+                        </label>
+                        {{ form.message }}
+                        {% for error in form.message.errors %}
+                        <div class="text-danger small mt-2">{{ error }}</div>
+                        {% endfor %}
+                        <div class="chat-composer-actions">
+                            <p class="chat-composer-note">Keep replies specific: dates, package details, pricing, or next steps.</p>
+                            <button type="submit" class="btn btn-primary chat-send-btn">
+                                Send message
+                                <i class="bi bi-send ms-1"></i>
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const feed = document.getElementById('chat-message-feed');
+        if (feed) {
+            feed.scrollTop = feed.scrollHeight;
+        }
+    });
+</script>
 {% endblock %}

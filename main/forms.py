@@ -268,9 +268,10 @@ class ChatMessageForm(forms.ModelForm):
         fields = ['message']
         widgets = {
             'message': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Type your message...',
+                'class': 'form-control chat-composer-input',
+                'rows': 2,
+                'placeholder': 'Write a clear message...',
+                'aria-label': 'Message',
             }),
         }
 

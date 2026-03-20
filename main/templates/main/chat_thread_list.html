@@ -2,58 +2,311 @@
 
 {% block title %}Chats{% endblock %}
 
-{% block content %}
-<div class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-1">Chats</h1>
-            <p class="text-muted mb-0">
-                {% if user_role == 'vendor' %}
-                Customer conversations for your packages
-                {% else %}
-                Your conversations with vendors
-                {% endif %}
-            </p>
-        </div>
-    </div>
+{% block extra_css %}
+<style>
+    .chat-shell {
+        --chat-bg: linear-gradient(135deg, #fff8ef 0%, #f7fafc 50%, #eef4ff 100%);
+        --chat-card: rgba(255, 255, 255, 0.88);
+        --chat-border: rgba(15, 23, 42, 0.08);
+        --chat-text: #10233d;
+        --chat-muted: #64748b;
+        --chat-accent: #0d6efd;
+        --chat-accent-soft: rgba(13, 110, 253, 0.12);
+        background: var(--chat-bg);
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: 28px;
+        padding: 2rem;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.08);
+    }
 
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            {% if threads %}
-            <div class="list-group list-group-flush">
-                {% for thread in threads %}
-                <a href="{% url 'chat_thread_detail' thread.id %}" class="list-group-item list-group-item-action p-4">
-                    <div class="d-flex justify-content-between align-items-start gap-3">
-                        <div>
-                            <div class="fw-semibold">
-                                {% if user_role == 'vendor' %}
-                                {{ thread.traveler.username }}
-                                {% else %}
-                                {{ thread.vendor.name }}
-                                {% endif %}
-                            </div>
-                            {% if thread.package %}
-                            <div class="small text-muted">Package: {{ thread.package.name }}</div>
-                            {% endif %}
-                            {% with last_message=thread.messages.last %}
-                            {% if last_message %}
-                            <div class="small mt-2 text-muted">
-                                <strong>{{ last_message.sender.username }}:</strong> {{ last_message.message|truncatewords:12 }}
-                            </div>
-                            {% else %}
-                            <div class="small mt-2 text-muted">No messages yet.</div>
-                            {% endif %}
-                            {% endwith %}
-                        </div>
-                        <div class="small text-muted text-nowrap">{{ thread.updated_at|date:"M j, Y g:i a" }}</div>
-                    </div>
-                </a>
-                {% endfor %}
+    .chat-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 1rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .chat-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.8rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--chat-muted);
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 0.9rem;
+    }
+
+    .chat-title {
+        color: var(--chat-text);
+        font-size: clamp(1.9rem, 4vw, 2.7rem);
+        line-height: 1.05;
+        margin-bottom: 0.6rem;
+    }
+
+    .chat-subtitle {
+        color: var(--chat-muted);
+        max-width: 42rem;
+        margin-bottom: 0;
+    }
+
+    .chat-summary {
+        min-width: 170px;
+        padding: 1rem 1.1rem;
+        border-radius: 20px;
+        background: rgba(16, 35, 61, 0.96);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(16, 35, 61, 0.18);
+    }
+
+    .chat-summary-label {
+        display: block;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.68);
+        margin-bottom: 0.3rem;
+    }
+
+    .chat-summary-value {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .chat-list-card {
+        background: var(--chat-card);
+        border: 1px solid var(--chat-border);
+        border-radius: 24px;
+        overflow: hidden;
+        backdrop-filter: blur(18px);
+    }
+
+    .chat-thread-row {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        padding: 1.35rem 1.5rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .chat-thread-row:last-child {
+        border-bottom: 0;
+    }
+
+    .chat-thread-row:hover {
+        background: rgba(255, 255, 255, 0.95);
+        transform: translateY(-1px);
+        box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.08);
+    }
+
+    .chat-thread-layout {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .chat-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        color: var(--chat-accent);
+        background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(13, 202, 240, 0.18));
+        flex-shrink: 0;
+    }
+
+    .chat-party {
+        color: var(--chat-text);
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+
+    .chat-package {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        background: var(--chat-accent-soft);
+        color: var(--chat-accent);
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+
+    .chat-preview {
+        color: var(--chat-muted);
+        margin-bottom: 0;
+    }
+
+    .chat-preview strong {
+        color: var(--chat-text);
+    }
+
+    .chat-time {
+        text-align: right;
+        color: var(--chat-muted);
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .chat-arrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-top: 0.85rem;
+        color: var(--chat-accent);
+        font-size: 0.88rem;
+        font-weight: 600;
+    }
+
+    .chat-empty {
+        text-align: center;
+        padding: 4rem 1.5rem;
+    }
+
+    .chat-empty-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 24px;
+        display: inline-grid;
+        place-items: center;
+        margin-bottom: 1rem;
+        font-size: 1.75rem;
+        color: var(--chat-accent);
+        background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(20, 184, 166, 0.18));
+    }
+
+    .chat-empty p {
+        color: var(--chat-muted);
+        max-width: 30rem;
+        margin: 0.75rem auto 0;
+    }
+
+    @media (max-width: 767.98px) {
+        .chat-shell {
+            padding: 1.2rem;
+            border-radius: 22px;
+        }
+
+        .chat-hero {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .chat-thread-layout {
+            grid-template-columns: auto 1fr;
+        }
+
+        .chat-time {
+            grid-column: 2;
+            text-align: left;
+            margin-top: 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4 py-lg-5">
+    <div class="chat-shell">
+        <div class="chat-hero">
+            <div>
+                <div class="chat-eyebrow">
+                    <i class="bi bi-chat-dots"></i>
+                    Message Center
+                </div>
+                <h1 class="chat-title">Professional conversations, organized clearly.</h1>
+                <p class="chat-subtitle">
+                    {% if user_role == 'vendor' %}
+                    Review traveler questions, keep package discussions in context, and respond without losing the thread.
+                    {% else %}
+                    Keep each vendor conversation tied to the right package so quotes, questions, and next steps stay easy to follow.
+                    {% endif %}
+                </p>
             </div>
+            <div class="chat-summary">
+                <span class="chat-summary-label">Active Chats</span>
+                <span class="chat-summary-value">{{ threads|length }}</span>
+            </div>
+        </div>
+
+        <div class="chat-list-card">
+            {% if threads %}
+            {% for thread in threads %}
+            <a href="{% url 'chat_thread_detail' thread.id %}" class="chat-thread-row">
+                <div class="chat-thread-layout">
+                    <div class="chat-avatar">
+                        {% if user_role == 'vendor' %}
+                        {{ thread.traveler.username|slice:":1"|upper }}
+                        {% else %}
+                        {{ thread.vendor.name|slice:":1"|upper }}
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <div class="chat-party">
+                            {% if user_role == 'vendor' %}
+                            {{ thread.traveler.username }}
+                            {% else %}
+                            {{ thread.vendor.name }}
+                            {% endif %}
+                        </div>
+
+                        {% if thread.package %}
+                        <div class="chat-package">
+                            <i class="bi bi-briefcase"></i>
+                            {{ thread.package.name }}
+                        </div>
+                        {% endif %}
+
+                        {% with last_message=thread.messages.last %}
+                        {% if last_message %}
+                        <p class="chat-preview">
+                            <strong>{{ last_message.sender.username }}:</strong>
+                            {{ last_message.message|truncatewords:18 }}
+                        </p>
+                        {% else %}
+                        <p class="chat-preview">No messages yet. Open the thread to start the conversation.</p>
+                        {% endif %}
+                        {% endwith %}
+
+                        <div class="chat-arrow">
+                            Open conversation
+                            <i class="bi bi-arrow-right"></i>
+                        </div>
+                    </div>
+
+                    <div class="chat-time">{{ thread.updated_at|date:"M j, Y g:i a" }}</div>
+                </div>
+            </a>
+            {% endfor %}
             {% else %}
-            <div class="p-4 text-muted">No chats yet.</div>
+            <div class="chat-empty">
+                <div class="chat-empty-icon">
+                    <i class="bi bi-chat-square-text"></i>
+                </div>
+                <h2 class="h4 mb-2">No conversations yet</h2>
+                <p>
+                    {% if user_role == 'vendor' %}
+                    New customer discussions will appear here as soon as travelers contact you from a package page.
+                    {% else %}
+                    Start from any package page to open a direct conversation with the vendor.
+                    {% endif %}
+                </p>
+            </div>
             {% endif %}
         </div>
     </div>
-</div>
+</section>
 {% endblock %}
