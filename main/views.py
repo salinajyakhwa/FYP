@@ -39,6 +39,7 @@ from .models import (
     CustomItinerarySelection,
     Trip,
     TripItem,
+    TripItemAttachment,
     ChatThread,
     ChatMessage,
     Booking,
@@ -59,6 +60,7 @@ from .forms import (
     PackageDayOptionForm,
     CustomItinerarySelectionForm,
     TripItemVendorNotesForm,
+    TripItemAttachmentForm,
     ChatMessageForm,
     TravelPackageForm, 
     UserUpdateForm, 
@@ -250,6 +252,7 @@ def _group_booking_selection_items(selection_items):
 def _build_trip_timeline_items(trip):
     trip_items = (
         trip.items.select_related('package_day', 'selected_option')
+        .prefetch_related('attachments', 'attachments__uploaded_by')
         .all()
         .order_by('day_number', 'sort_order', 'id')
     )
@@ -284,6 +287,8 @@ def _build_trip_timeline_items(trip):
             'selected_option_title': item.selected_option.title if item.selected_option else '',
             'option_type': item.selected_option.get_option_type_display() if item.selected_option else '',
             'vendor_notes': item.vendor_notes,
+            'attachments': list(item.attachments.all()),
+            'attachment_form': TripItemAttachmentForm(prefix=f'attachment-{item.id}'),
         }
         for item in trip_items
     ]
@@ -1060,6 +1065,60 @@ def update_trip_item_notes(request, trip_item_id):
         messages.error(request, 'Could not save trip item notes.')
 
     return redirect('vendor_trip_dashboard', trip_id=trip_item.trip_id)
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def upload_trip_item_attachment(request, trip_item_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    trip_item = get_object_or_404(
+        TripItem.objects.select_related('trip', 'trip__vendor'),
+        pk=trip_item_id,
+    )
+
+    if trip_item.trip.vendor_id != vendor.id:
+        raise PermissionDenied
+
+    form = TripItemAttachmentForm(
+        request.POST,
+        request.FILES,
+        prefix=f'attachment-{trip_item.id}',
+    )
+    if form.is_valid():
+        attachment = form.save(commit=False)
+        attachment.trip_item = trip_item
+        attachment.uploaded_by = request.user
+        attachment.save()
+        messages.success(request, 'Attachment uploaded successfully.')
+    else:
+        messages.error(request, 'Could not upload attachment. Please check the form fields.')
+
+    return redirect('vendor_trip_dashboard', trip_id=trip_item.trip_id)
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def delete_trip_item_attachment(request, attachment_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    attachment = get_object_or_404(
+        TripItemAttachment.objects.select_related('trip_item', 'trip_item__trip', 'trip_item__trip__vendor'),
+        pk=attachment_id,
+    )
+
+    if attachment.trip_item.trip.vendor_id != vendor.id:
+        raise PermissionDenied
+
+    trip_id = attachment.trip_item.trip_id
+    attachment.file.delete(save=False)
+    attachment.delete()
+    messages.success(request, 'Attachment deleted.')
+    return redirect('vendor_trip_dashboard', trip_id=trip_id)
 
 
 

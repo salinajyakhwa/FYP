@@ -12,6 +12,7 @@ from .models import (
     Booking,
     Trip,
     TripItem,
+    TripItemAttachment,
     Review,
 )
 
@@ -27,4 +28,5 @@ admin.site.register(ChatMessage)
 admin.site.register(Booking)
 admin.site.register(Trip)
 admin.site.register(TripItem)
+admin.site.register(TripItemAttachment)
 admin.site.register(Review)

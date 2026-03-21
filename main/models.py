@@ -292,6 +292,32 @@ class TripItem(models.Model):
     def __str__(self):
         return f"Trip #{self.trip_id} - Day {self.day_number}: {self.title}"
 
+
+class TripItemAttachment(models.Model):
+    ATTACHMENT_TYPE_CHOICES = (
+        ('ticket', 'Ticket'),
+        ('voucher', 'Voucher'),
+        ('document', 'Document'),
+        ('receipt', 'Receipt'),
+        ('image', 'Image'),
+        ('qr', 'QR Code'),
+        ('other', 'Other'),
+    )
+
+    trip_item = models.ForeignKey(TripItem, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='trip_attachments/')
+    attachment_type = models.CharField(max_length=20, choices=ATTACHMENT_TYPE_CHOICES, default='document')
+    title = models.CharField(max_length=200)
+    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploaded_trip_attachments')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f"{self.trip_item} - {self.title}"
+
 # Represents a review written by a user for a travel package.
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
