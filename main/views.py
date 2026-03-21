@@ -37,6 +37,8 @@ from .models import (
     PackageDayOption,
     CustomItinerary,
     CustomItinerarySelection,
+    Trip,
+    TripItem,
     ChatThread,
     ChatMessage,
     Booking,
@@ -56,6 +58,7 @@ from .forms import (
     PackageDayForm,
     PackageDayOptionForm,
     CustomItinerarySelectionForm,
+    TripItemVendorNotesForm,
     ChatMessageForm,
     TravelPackageForm, 
     UserUpdateForm, 
@@ -244,6 +247,71 @@ def _group_booking_selection_items(selection_items):
     return groups
 
 
+def _build_trip_timeline_items(trip):
+    trip_items = (
+        trip.items.select_related('package_day', 'selected_option')
+        .all()
+        .order_by('day_number', 'sort_order', 'id')
+    )
+
+    return [
+        {
+            'id': item.id,
+            'day_number': item.day_number,
+            'title': item.title,
+            'description': item.description,
+            'status': item.get_status_display(),
+            'status_key': item.status,
+            'status_badge_class': {
+                'pending': 'text-bg-light border',
+                'ready': 'text-bg-info',
+                'in_progress': 'text-bg-primary',
+                'completed': 'text-bg-success',
+                'blocked': 'text-bg-danger',
+                'cancelled': 'text-bg-dark',
+            }.get(item.status, 'text-bg-light border'),
+            'item_card_class': {
+                'pending': 'border',
+                'ready': 'border border-info-subtle bg-info-subtle',
+                'in_progress': 'border border-primary-subtle bg-primary-subtle',
+                'completed': 'border border-success-subtle bg-success-subtle',
+                'blocked': 'border border-danger-subtle bg-danger-subtle',
+                'cancelled': 'border border-dark-subtle bg-light',
+            }.get(item.status, 'border'),
+            'action_link': item.action_link,
+            'action_label': item.action_label or 'Open Link',
+            'package_day_title': item.package_day.title if item.package_day else '',
+            'selected_option_title': item.selected_option.title if item.selected_option else '',
+            'option_type': item.selected_option.get_option_type_display() if item.selected_option else '',
+            'vendor_notes': item.vendor_notes,
+        }
+        for item in trip_items
+    ]
+
+
+def _build_trip_progress_summary(trip):
+    counts = {
+        'total': 0,
+        'pending': 0,
+        'ready': 0,
+        'in_progress': 0,
+        'completed': 0,
+        'blocked': 0,
+        'cancelled': 0,
+        'completion_percentage': 0,
+    }
+
+    for status in trip.items.values_list('status', flat=True):
+        counts['total'] += 1
+        if status in counts:
+            counts[status] += 1
+
+    if counts['total']:
+        counts['completion_percentage'] = int((counts['completed'] / counts['total']) * 100)
+
+    return counts
+
+
 def _build_payment_context(*, package, custom_itinerary=None):
     amount = custom_itinerary.final_price if custom_itinerary else package.price
     return {
@@ -269,6 +337,99 @@ def _clear_pending_payment_session(request):
         'pending_payment_transaction_uuid',
     ]:
         request.session.pop(key, None)
+
+
+def _create_trip_from_booking(booking):
+    trip, _ = Trip.objects.get_or_create(
+        booking=booking,
+        defaults={
+            'traveler': booking.user,
+            'vendor': booking.package.vendor,
+            'package': booking.package,
+            'custom_itinerary': booking.custom_itinerary,
+            'status': 'planned',
+            'start_date': booking.package.start_date,
+            'end_date': booking.package.end_date,
+        },
+    )
+
+    trip_updates = []
+    if trip.traveler_id != booking.user_id:
+        trip.traveler = booking.user
+        trip_updates.append('traveler')
+    if trip.vendor_id != booking.package.vendor_id:
+        trip.vendor = booking.package.vendor
+        trip_updates.append('vendor')
+    if trip.package_id != booking.package_id:
+        trip.package = booking.package
+        trip_updates.append('package')
+    if trip.custom_itinerary_id != booking.custom_itinerary_id:
+        trip.custom_itinerary = booking.custom_itinerary
+        trip_updates.append('custom_itinerary')
+    if trip.start_date != booking.package.start_date:
+        trip.start_date = booking.package.start_date
+        trip_updates.append('start_date')
+    if trip.end_date != booking.package.end_date:
+        trip.end_date = booking.package.end_date
+        trip_updates.append('end_date')
+    if trip_updates:
+        trip.save(update_fields=trip_updates + ['updated_at'])
+
+    existing_keys = set(
+        trip.items.values_list('package_day_id', 'selected_option_id')
+    )
+    items_to_create = []
+
+    if booking.custom_itinerary:
+        selections = (
+            booking.custom_itinerary.selections.select_related('package_day', 'selected_option')
+            .all()
+            .order_by('package_day__day_number', 'package_day__sort_order', 'id')
+        )
+
+        for selection in selections:
+            item_key = (selection.package_day_id, selection.selected_option_id)
+            if item_key in existing_keys:
+                continue
+
+            items_to_create.append(
+                TripItem(
+                    trip=trip,
+                    package_day=selection.package_day,
+                    selected_option=selection.selected_option,
+                    title=selection.selected_option.title,
+                    description=selection.selected_option.description or selection.package_day.description,
+                    day_number=selection.package_day.day_number,
+                    status='pending',
+                    sort_order=selection.selected_option.sort_order,
+                    action_link=selection.selected_option.action_link,
+                    action_label=_build_action_button_label(selection.selected_option) or '',
+                )
+            )
+    else:
+        package_days = booking.package.package_days.all().order_by('day_number', 'sort_order', 'id')
+        for package_day in package_days:
+            item_key = (package_day.id, None)
+            if item_key in existing_keys:
+                continue
+
+            items_to_create.append(
+                TripItem(
+                    trip=trip,
+                    package_day=package_day,
+                    selected_option=None,
+                    title=package_day.title,
+                    description=package_day.description,
+                    day_number=package_day.day_number,
+                    status='pending',
+                    sort_order=package_day.sort_order,
+                )
+            )
+
+    if items_to_create:
+        TripItem.objects.bulk_create(items_to_create)
+
+    return trip
 
 
 def _create_or_update_booking_from_pending_payment(request):
@@ -305,6 +466,8 @@ def _create_or_update_booking_from_pending_payment(request):
             custom_itinerary.status = 'confirmed'
             custom_itinerary.save(update_fields=['status', 'updated_at'])
 
+        _create_trip_from_booking(booking)
+
         return booking, custom_itinerary.package, True
 
     package = get_object_or_404(TravelPackage, pk=package_id)
@@ -315,6 +478,7 @@ def _create_or_update_booking_from_pending_payment(request):
         total_price=package.price,
         status='confirmed'
     )
+    _create_trip_from_booking(booking)
     return booking, package, False
 
 
@@ -787,7 +951,7 @@ def profile(request):
 def my_bookings(request):
     bookings = (
         Booking.objects.filter(user=request.user)
-        .select_related('package', 'package__vendor', 'custom_itinerary')
+        .select_related('package', 'package__vendor', 'custom_itinerary', 'trip')
         .prefetch_related(
             'custom_itinerary__selections__package_day',
             'custom_itinerary__selections__selected_option',
@@ -798,6 +962,104 @@ def my_bookings(request):
         booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
         booking.selection_groups = _group_booking_selection_items(booking.selection_items)
     return render(request, 'main/my_bookings.html', {'bookings': bookings})
+
+
+@login_required
+def trip_dashboard(request, trip_id):
+    trip = get_object_or_404(
+        Trip.objects.select_related('booking', 'package', 'vendor', 'custom_itinerary')
+        .prefetch_related('items__package_day', 'items__selected_option'),
+        pk=trip_id,
+    )
+
+    if trip.traveler_id != request.user.id:
+        raise PermissionDenied
+
+    context = {
+        'trip': trip,
+        'booking': trip.booking,
+        'package': trip.package,
+        'timeline_items': _build_trip_timeline_items(trip),
+        'progress_summary': _build_trip_progress_summary(trip),
+    }
+    return render(request, 'main/trip_dashboard.html', context)
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def vendor_trip_dashboard(request, trip_id):
+    vendor = _get_vendor_or_403(request)
+    trip = get_object_or_404(
+        Trip.objects.select_related('booking', 'package', 'traveler', 'custom_itinerary', 'vendor')
+        .prefetch_related('items__package_day', 'items__selected_option'),
+        pk=trip_id,
+        vendor=vendor,
+    )
+
+    context = {
+        'trip': trip,
+        'booking': trip.booking,
+        'package': trip.package,
+        'traveler': trip.traveler,
+        'timeline_items': _build_trip_timeline_items(trip),
+        'progress_summary': _build_trip_progress_summary(trip),
+    }
+    return render(request, 'main/vendor_trip_dashboard.html', context)
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def update_trip_item_status(request, trip_item_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    trip_item = get_object_or_404(
+        TripItem.objects.select_related('trip', 'trip__vendor'),
+        pk=trip_item_id,
+    )
+
+    if trip_item.trip.vendor_id != vendor.id:
+        raise PermissionDenied
+
+    new_status = request.POST.get('status', '').strip()
+    allowed_statuses = {choice[0] for choice in TripItem.STATUS_CHOICES}
+
+    if new_status not in allowed_statuses:
+        messages.error(request, 'Invalid trip item status.')
+        return redirect('vendor_trip_dashboard', trip_id=trip_item.trip_id)
+
+    if trip_item.status != new_status:
+        trip_item.status = new_status
+        trip_item.save(update_fields=['status', 'updated_at'])
+        messages.success(request, f'Trip item updated to {trip_item.get_status_display()}.')
+
+    return redirect('vendor_trip_dashboard', trip_id=trip_item.trip_id)
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def update_trip_item_notes(request, trip_item_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    trip_item = get_object_or_404(
+        TripItem.objects.select_related('trip', 'trip__vendor'),
+        pk=trip_item_id,
+    )
+
+    if trip_item.trip.vendor_id != vendor.id:
+        raise PermissionDenied
+
+    form = TripItemVendorNotesForm(request.POST, instance=trip_item)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Trip item notes updated.')
+    else:
+        messages.error(request, 'Could not save trip item notes.')
+
+    return redirect('vendor_trip_dashboard', trip_id=trip_item.trip_id)
 
 
 
@@ -960,7 +1222,7 @@ def vendor_bookings(request):
     vendor = _get_vendor_or_403(request)
 
     bookings = Booking.objects.filter(package__vendor=vendor)\
-        .select_related('user', 'package', 'custom_itinerary')\
+        .select_related('user', 'package', 'custom_itinerary', 'trip')\
         .prefetch_related(
             'custom_itinerary__selections__package_day',
             'custom_itinerary__selections__selected_option'

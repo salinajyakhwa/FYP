@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Trip Operations{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <div class="small text-muted">Vendor Trip Operations</div>
+            <h1 class="h3 mb-1">{{ package.name }}</h1>
+            <div class="text-muted">Traveler: {{ traveler.username }}{% if traveler.email %} · {{ traveler.email }}{% endif %}</div>
+        </div>
+        <div class="text-md-end">
+            <div class="small text-muted">Trip Status</div>
+            <div class="fw-semibold">{{ trip.get_status_display }}</div>
+            <div class="small text-muted mt-2">Booking #{{ booking.id }}</div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Travel Window</div>
+                <div class="fw-semibold">{{ trip.start_date }} to {{ trip.end_date }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Booking Status</div>
+                <div class="fw-semibold">{{ booking.get_status_display }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Travelers</div>
+                <div class="fw-semibold">{{ booking.number_of_travelers }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Total Price</div>
+                <div class="fw-semibold">${{ booking.total_price|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-lg-2">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Total Items</div>
+                <div class="fw-semibold">{{ progress_summary.total }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Completed</div>
+                <div class="fw-semibold text-success">{{ progress_summary.completed }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">In Progress</div>
+                <div class="fw-semibold text-primary">{{ progress_summary.in_progress }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Ready</div>
+                <div class="fw-semibold text-info">{{ progress_summary.ready }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Blocked</div>
+                <div class="fw-semibold text-danger">{{ progress_summary.blocked }}</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Done</div>
+                <div class="fw-semibold">{{ progress_summary.completion_percentage }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Operational Timeline</h2>
+        </div>
+        <div class="card-body p-4">
+            {% if timeline_items %}
+            <div class="d-grid gap-3">
+                {% for item in timeline_items %}
+                <div class="{{ item.item_card_class }} rounded p-3">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="small text-muted">Day {{ item.day_number }}</div>
+                            <div class="fw-semibold">{{ item.title }}</div>
+                            {% if item.package_day_title and item.package_day_title != item.title %}
+                            <div class="small text-muted mt-1">{{ item.package_day_title }}</div>
+                            {% endif %}
+                            {% if item.selected_option_title %}
+                            <div class="mt-2">{{ item.selected_option_title }}</div>
+                            {% endif %}
+                            {% if item.option_type %}
+                            <div class="small text-muted">{{ item.option_type }}</div>
+                            {% endif %}
+                            {% if item.description %}
+                            <div class="small mt-2">{{ item.description }}</div>
+                            {% endif %}
+                            <div class="mt-3">
+                                <label class="form-label small text-muted mb-1">Vendor Notes</label>
+                                <form method="post" action="{% url 'update_trip_item_notes' item.id %}">
+                                    {% csrf_token %}
+                                    <textarea name="vendor_notes" class="form-control form-control-sm" rows="3" placeholder="Add operational notes for this trip item">{{ item.vendor_notes }}</textarea>
+                                    <div class="mt-2">
+                                        <button type="submit" class="btn btn-sm btn-outline-dark">Save Notes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge {{ item.status_badge_class }}">{{ item.status }}</span>
+                            {% if item.action_link %}
+                            <div class="mt-2">
+                                <a href="{{ item.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                                    {{ item.action_label }}
+                                </a>
+                            </div>
+                            {% endif %}
+                            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+                                {% if item.status_key != 'ready' %}
+                                <form method="post" action="{% url 'update_trip_item_status' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="ready">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Mark Ready</button>
+                                </form>
+                                {% endif %}
+                                {% if item.status_key != 'in_progress' %}
+                                <form method="post" action="{% url 'update_trip_item_status' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="in_progress">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Start</button>
+                                </form>
+                                {% endif %}
+                                {% if item.status_key != 'completed' %}
+                                <form method="post" action="{% url 'update_trip_item_status' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="completed">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Complete</button>
+                                </form>
+                                {% endif %}
+                                {% if item.status_key != 'blocked' %}
+                                <form method="post" action="{% url 'update_trip_item_status' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="blocked">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Block</button>
+                                </form>
+                                {% endif %}
+                                {% if item.status_key != 'pending' %}
+                                <form method="post" action="{% url 'update_trip_item_status' item.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="status" value="pending">
+                                    <button type="submit" class="btn btn-sm btn-outline-dark">Reset</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-secondary mb-0">
+                No trip items have been created for this booking yet.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <a href="{% url 'vendor_bookings' %}" class="btn btn-primary">Back to Bookings</a>
+        <a href="{% url 'vendor_dashboard' %}" class="btn btn-outline-secondary">Dashboard</a>
+        <a href="{% url 'package_detail' package.id %}" class="btn btn-outline-secondary">Public Package View</a>
+    </div>
+</div>
+{% endblock %}

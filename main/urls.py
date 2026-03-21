@@ -23,12 +23,16 @@ urlpatterns = [
     path('chat/thread/<int:thread_id>/', views.chat_thread_detail, name='chat_thread_detail'),
 
     path('my-bookings/', views.my_bookings, name='my_bookings'),
+    path('trip/<int:trip_id>/', views.trip_dashboard, name='trip_dashboard'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),
     path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
 
     # 5. VENDOR
     path('vendor/dashboard/', views.vendor_dashboard, name='vendor_dashboard'),
     path('vendor/bookings/', views.vendor_bookings, name='vendor_bookings'),
+    path('vendor/trip/<int:trip_id>/', views.vendor_trip_dashboard, name='vendor_trip_dashboard'),
+    path('vendor/trip-item/<int:trip_item_id>/status/', views.update_trip_item_status, name='update_trip_item_status'),
+    path('vendor/trip-item/<int:trip_item_id>/notes/', views.update_trip_item_notes, name='update_trip_item_notes'),
     path('vendor/booking/<int:booking_id>/update/<str:new_status>/', views.update_booking_status, name='update_booking_status'),
     path('vendor/packages/', views.vendor_package_list, name='vendor_package_list'),
     path('vendor/package/create/', views.create_package, name='create_package'),

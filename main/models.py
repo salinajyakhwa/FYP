@@ -214,6 +214,84 @@ class Booking(models.Model):
     def __str__(self):
         return f"Booking for {self.package.name} by {self.user.username}"
 
+
+class Trip(models.Model):
+    STATUS_CHOICES = (
+        ('planned', 'Planned'),
+        ('ready', 'Ready'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='trip')
+    traveler = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trips')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='trips')
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='trips')
+    custom_itinerary = models.ForeignKey(
+        CustomItinerary,
+        on_delete=models.SET_NULL,
+        related_name='trips',
+        blank=True,
+        null=True,
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"Trip for booking #{self.booking_id}"
+
+
+class TripItem(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('ready', 'Ready'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('blocked', 'Blocked'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='items')
+    package_day = models.ForeignKey(
+        PackageDay,
+        on_delete=models.SET_NULL,
+        related_name='trip_items',
+        blank=True,
+        null=True,
+    )
+    selected_option = models.ForeignKey(
+        PackageDayOption,
+        on_delete=models.SET_NULL,
+        related_name='trip_items',
+        blank=True,
+        null=True,
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    day_number = models.PositiveIntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    sort_order = models.PositiveIntegerField(default=0)
+    action_link = models.URLField(blank=True, null=True)
+    action_label = models.CharField(max_length=100, blank=True)
+    vendor_notes = models.TextField(blank=True)
+    traveler_notes = models.TextField(blank=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['day_number', 'sort_order', 'id']
+
+    def __str__(self):
+        return f"Trip #{self.trip_id} - Day {self.day_number}: {self.title}"
+
 # Represents a review written by a user for a travel package.
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')

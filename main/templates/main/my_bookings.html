@@ -58,6 +58,9 @@
                 <p><strong>Status:</strong> <span class="badge bg-primary">{{ booking.get_status_display }}</span></p>
                 <p><strong>Total Price:</strong> ${{ booking.total_price|floatformat:2 }}</p>
                 <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-outline-secondary btn-sm mb-2">View Details</a>
+                {% if booking.trip %}
+                <a href="{% url 'trip_dashboard' booking.trip.id %}" class="btn btn-outline-primary btn-sm mb-2">View Trip</a>
+                {% endif %}
                 {% if booking.status == 'pending' or booking.status == 'confirmed' %}
                     <form action="{% url 'cancel_booking' booking.id %}" method="post" class="d-inline">
                         {% csrf_token %}

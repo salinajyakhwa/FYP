@@ -27,6 +27,11 @@ Payment Successful
                 <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-primary">
                     View Booking
                 </a>
+                {% if booking.trip %}
+                <a href="{% url 'trip_dashboard' booking.trip.id %}" class="btn btn-outline-primary">
+                    View Trip
+                </a>
+                {% endif %}
                 {% endif %}
                 <a href="{% url 'my_bookings' %}" class="btn btn-outline-primary">
                     Go to My Bookings

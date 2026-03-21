@@ -14,6 +14,7 @@ from .models import (
     Vendor,
     PackageDay,
     PackageDayOption,
+    TripItem,
     ChatMessage,
 )
 
@@ -260,6 +261,18 @@ class CustomItinerarySelectionForm(forms.Form):
         for _, selected_option in self.get_selected_options():
             total += selected_option.additional_cost
         return total
+
+
+class TripItemVendorNotesForm(forms.ModelForm):
+    class Meta:
+        model = TripItem
+        fields = ['vendor_notes']
+        widgets = {
+            'vendor_notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Add operational notes for this trip item'}),
+        }
+
+    def clean_vendor_notes(self):
+        return self.cleaned_data.get('vendor_notes', '').strip()
 
 
 class ChatMessageForm(forms.ModelForm):

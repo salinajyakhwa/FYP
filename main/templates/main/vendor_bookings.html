@@ -178,6 +178,11 @@
                             <a href="{% url 'flight_bookings' %}" class="btn btn-primary">
                                 Flights
                             </a>
+                            {% if booking.trip %}
+                            <a href="{% url 'vendor_trip_dashboard' booking.trip.id %}" class="btn btn-outline-primary">
+                                Open Trip
+                            </a>
+                            {% endif %}
                             {% if booking.status == 'pending' %}
                             <div class="d-flex justify-content-end gap-2">
                                 <form action="{% url 'update_booking_status' booking.id 'confirmed' %}" method="post">
