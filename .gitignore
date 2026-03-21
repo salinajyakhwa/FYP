@@ -17,8 +17,9 @@ static/
 .env
 .env.*
 *.mo
+*.md
 
-# Django migrations 
+# Django migrations
 # */migrations/
 # !*/migrations/__init__.py
 

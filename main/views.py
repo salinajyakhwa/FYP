@@ -153,6 +153,97 @@ def _build_selected_options_summary(selected_options):
     ]
 
 
+def _build_action_button_label(option):
+    if not option.action_link:
+        return None
+    if option.option_type == 'flight':
+        return 'Book Flight'
+
+    title = (option.title or '').strip()
+    if title and len(title) <= 30:
+        return f'Open {title}'
+    return 'Open Link'
+
+
+def _build_group_title(items, action_link):
+    if not items:
+        return 'Selections'
+
+    if action_link:
+        option_type_keys = {item['option_type_key'] for item in items}
+        if option_type_keys == {'flight'}:
+            return 'Flights'
+        if option_type_keys == {'stay'}:
+            return 'Stays'
+        if option_type_keys == {'activity'}:
+            return 'Activities'
+        if len(items) > 1:
+            return 'Shared Actions'
+
+    if len(items) == 1:
+        return f"Day {items[0]['day_number']}"
+    return 'Selections'
+
+
+def _build_booking_selection_items(custom_itinerary):
+    if not custom_itinerary:
+        return []
+
+    selections = (
+        custom_itinerary.selections.select_related('package_day', 'selected_option')
+        .all()
+        .order_by('package_day__day_number', 'package_day__sort_order', 'id')
+    )
+
+    return [
+        {
+            'day_number': selection.package_day.day_number,
+            'day_title': selection.package_day.title,
+            'day_description': selection.package_day.description,
+            'option_title': selection.selected_option.title,
+            'option_type_key': selection.selected_option.option_type,
+            'option_type': selection.selected_option.get_option_type_display(),
+            'option_description': selection.selected_option.description,
+            'selected_price': selection.selected_price,
+            'action_link': selection.selected_option.action_link,
+            'action_button_label': _build_action_button_label(selection.selected_option),
+        }
+        for selection in selections
+    ]
+
+
+def _group_booking_selection_items(selection_items):
+    groups = []
+    index_by_link = {}
+
+    for item in selection_items:
+        action_link = item['action_link']
+        if action_link:
+            group_index = index_by_link.get(action_link)
+            if group_index is None:
+                groups.append({
+                    'group_key': action_link,
+                    'group_link': action_link,
+                    'group_button_label': item['action_button_label'] or 'Open Link',
+                    'items': [],
+                })
+                index_by_link[action_link] = len(groups) - 1
+                group_index = index_by_link[action_link]
+            groups[group_index]['items'].append(item)
+        else:
+            groups.append({
+                'group_key': f"ungrouped-{len(groups)}",
+                'group_link': None,
+                'group_button_label': None,
+                'items': [item],
+            })
+
+    for group in groups:
+        group['group_title'] = _build_group_title(group['items'], group['group_link'])
+
+    return groups
+
+
 def _build_payment_context(*, package, custom_itinerary=None):
     amount = custom_itinerary.final_price if custom_itinerary else package.price
     return {
@@ -694,7 +785,18 @@ def profile(request):
 
 @login_required
 def my_bookings(request):
-    bookings = Booking.objects.filter(user=request.user).select_related('package').order_by('-booking_date')
+    bookings = (
+        Booking.objects.filter(user=request.user)
+        .select_related('package', 'package__vendor', 'custom_itinerary')
+        .prefetch_related(
+            'custom_itinerary__selections__package_day',
+            'custom_itinerary__selections__selected_option',
+        )
+        .order_by('-booking_date')
+    )
+    for booking in bookings:
+        booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
+        booking.selection_groups = _group_booking_selection_items(booking.selection_items)
     return render(request, 'main/my_bookings.html', {'bookings': bookings})
 
 
@@ -857,7 +959,6 @@ def vendor_dashboard(request):
 def vendor_bookings(request):
     vendor = _get_vendor_or_403(request)
 
-    #  Optimized query
     bookings = Booking.objects.filter(package__vendor=vendor)\
         .select_related('user', 'package', 'custom_itinerary')\
         .prefetch_related(
@@ -866,34 +967,12 @@ def vendor_bookings(request):
         )\
         .order_by('-booking_date')
 
-    #  GROUPING LOGIC (Phase 2)
-    grouped_data = {}
-
     for booking in bookings:
-        groups = {}
+        booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
+        booking.selection_groups = _group_booking_selection_items(booking.selection_items)
 
-        if booking.custom_itinerary:
-            for sel in booking.custom_itinerary.selections.all():
-                option = sel.selected_option
-
-                # Group by action_link OR fallback to type
-                key = option.action_link if option.action_link else f"type_{option.option_type}"
-
-                if key not in groups:
-                    groups[key] = {
-                        'type': option.option_type,
-                        'link': option.action_link,
-                        'items': []
-                    }
-
-                groups[key]['items'].append(sel)
-
-        grouped_data[booking.id] = groups
-
-    #  Final context
     context = {
         'bookings': bookings,
-        'grouped_data': grouped_data
     }
 
     return render(request, 'main/vendor_bookings.html', context)
@@ -1354,9 +1433,12 @@ def booking_confirmation(request, booking_id):
         raise PermissionDenied
 
     package = booking.package
+    selection_items = _build_booking_selection_items(booking.custom_itinerary)
     context = {
         'booking': booking,
         'package': package,
+        'selection_items': selection_items,
+        'selection_groups': _group_booking_selection_items(selection_items),
     }
     return render(request, 'main/booking_confirmation.html', context)
 

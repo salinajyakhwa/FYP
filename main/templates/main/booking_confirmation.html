@@ -46,16 +46,44 @@
                     {% if booking.custom_itinerary %}
                     <h3 class="h6 mb-3">Custom Itinerary Selections</h3>
                     <div class="d-grid gap-3 mb-4">
-                        {% for selection in booking.custom_itinerary.selections.all %}
+                        {% for group in selection_groups %}
                         <div class="border rounded p-3">
-                            <div class="d-flex justify-content-between align-items-start gap-3">
-                                <div>
-                                    <div class="small text-muted">Day {{ selection.package_day.day_number }}</div>
-                                    <div class="fw-semibold">{{ selection.package_day.title }}</div>
-                                    <div>{{ selection.selected_option.title }}</div>
-                                    <div class="small text-muted">{{ selection.selected_option.get_option_type_display }}</div>
+                            <div class="d-flex justify-content-between align-items-center gap-3 pb-2 border-bottom">
+                                <div class="fw-semibold">{{ group.group_title }}</div>
+                                {% if group.group_link %}
+                                <a href="{{ group.group_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                                    {{ group.group_button_label }}
+                                </a>
+                                {% endif %}
+                            </div>
+                            <div class="d-grid gap-3 pt-3">
+                                {% for item in group.items %}
+                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                    <div>
+                                        <div class="small text-muted">Day {{ item.day_number }}</div>
+                                        <div class="fw-semibold">{{ item.day_title }}</div>
+                                        {% if item.day_description %}
+                                        <div class="small text-muted mt-1">{{ item.day_description }}</div>
+                                        {% endif %}
+                                        <div class="mt-2">{{ item.option_title }}</div>
+                                        <div class="small text-muted">{{ item.option_type }}</div>
+                                        {% if item.option_description %}
+                                        <div class="small mt-1">{{ item.option_description }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-semibold">+${{ item.selected_price }}</div>
+                                        {% if item.action_link and not group.group_link %}
+                                        <a href="{{ item.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary mt-2">
+                                            {{ item.action_button_label }}
+                                        </a>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <div class="fw-semibold">+${{ selection.selected_price }}</div>
+                                {% if not forloop.last %}
+                                <hr class="my-0">
+                                {% endif %}
+                                {% endfor %}
                             </div>
                         </div>
                         {% endfor %}

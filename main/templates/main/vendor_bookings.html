@@ -1,7 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load custom_tags %}
-
 {% block title %}Manage Bookings | Vendor Portal{% endblock %}
 
 {% block extra_css %}
@@ -200,6 +198,43 @@
                             {% endif %}
                         </td>
                     </tr>
+                    {% if booking.selection_groups %}
+                    <tr>
+                        <td colspan="7" style="background:#f9fafb;">
+                            <div class="d-grid gap-2 py-2">
+                                {% for group in booking.selection_groups %}
+                                <div class="p-3 border rounded bg-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+                                        <strong>{{ group.group_title }}</strong>
+                                        {% if group.group_link %}
+                                        <a href="{{ group.group_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">
+                                            {{ group.group_button_label }}
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    <ul class="list-group">
+                                        {% for item in group.items %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-start gap-3">
+                                            <div>
+                                                <div class="small text-muted">Day {{ item.day_number }}</div>
+                                                <div class="fw-semibold">{{ item.day_title }}</div>
+                                                <div>{{ item.option_title }}</div>
+                                                <div class="small text-muted">{{ item.option_type }}</div>
+                                            </div>
+                                            {% if item.action_link and not group.group_link %}
+                                            <a href="{{ item.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                                                {{ item.action_button_label }}
+                                            </a>
+                                            {% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% empty %}
                     <tr>
                         <td colspan="7">
@@ -211,53 +246,6 @@
                             </div>
                         </td>
                     </tr>
-                    <!-- 🔽 CHILD ROW: Selected Options -->
-<tr>
-    <td colspan="7" style="background:#f9fafb;">
-        {% with groups=grouped_data|get_item:booking.id %}
-            {% if groups %}
-                
-                {% for key, group in groups.items %}
-                    <div class="mb-3 p-3 border rounded bg-white">
-    
-                        <!-- Group Title -->
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <strong>
-                                {% if group.type == 'flight' %}✈ Flights
-                                {% elif group.type == 'stay' %}🏨 Hotels
-                                {% elif group.type == 'activity' %}🎯 Activities
-                                {% else %}Other{% endif %}
-                                ({{ group.items|length }})
-                            </strong>
-    
-                            <!-- 🔥 GROUP BUTTON -->
-                            {% if group.link %}
-                                <a href="{{ group.link }}" target="_blank"
-                                   class="btn btn-sm btn-primary">
-                                    Book All
-                                </a>
-                            {% endif %}
-                        </div>
-    
-                        <!-- Child Items -->
-                        <ul class="list-group">
-                            {% for sel in group.items %}
-                            <li class="list-group-item">
-                                Day {{ sel.package_day.day_number }}:
-                                {{ sel.selected_option.title }}
-                            </li>
-                            {% endfor %}
-                        </ul>
-    
-                    </div>
-                {% endfor %}
-    
-            {% else %}
-                <span class="text-muted">No selections</span>
-            {% endif %}
-        {% endwith %}
-    </td>
-</tr>
                     {% endfor %}
                 </tbody>
             </table>
