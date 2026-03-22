@@ -19,6 +19,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 from django.contrib.auth import get_user_model # Replaced direct User import
 import stripe
@@ -71,6 +72,8 @@ from .forms import (
 
 # Decorators
 from .decorators import role_required
+
+logger = logging.getLogger(__name__)
 
 # ==========================================
 # 1. PUBLIC VIEWS (Landing, About, Listings)
@@ -1579,13 +1582,32 @@ def esewa_verify(request):
     status = payload.get('status')
     pending_transaction_uuid = request.session.get('pending_payment_transaction_uuid')
 
+    logger.info(
+        "eSewa verification callback received: status=%s transaction_uuid=%s payload=%s",
+        status,
+        transaction_uuid,
+        payload,
+    )
+
     if not pending_transaction_uuid or pending_transaction_uuid != transaction_uuid:
-        messages.error(request, 'Could not match the eSewa payment to a pending checkout.')
-        return redirect('package_list')
+        logger.warning(
+            "eSewa session mismatch: pending_transaction_uuid=%s callback_transaction_uuid=%s",
+            pending_transaction_uuid,
+            transaction_uuid,
+        )
+        return redirect(
+            f"{reverse('payment_cancelled')}?reason=session_mismatch"
+        )
 
     if status != 'COMPLETE':
-        messages.error(request, f'eSewa payment did not complete successfully. Status: {status}')
-        return redirect('payment_cancelled')
+        logger.warning(
+            "eSewa payment not completed: status=%s transaction_uuid=%s",
+            status,
+            transaction_uuid,
+        )
+        return redirect(
+            f"{reverse('payment_cancelled')}?reason=esewa_status&status={status or 'UNKNOWN'}"
+        )
 
     try:
         booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
@@ -1734,11 +1756,28 @@ def payment_cancelled(request):
     """
     Handles cancelled payments.
     """
-    messages.warning(
+    reason = request.GET.get('reason', '')
+    status = request.GET.get('status', '')
+
+    detail_message = "Your payment was cancelled. You have not been charged."
+
+    if reason == 'esewa_status':
+        detail_message = f"eSewa returned a non-success status: {status or 'UNKNOWN'}."
+    elif reason == 'session_mismatch':
+        detail_message = (
+            "The payment returned from eSewa, but this app could not match it to your current checkout session."
+        )
+
+    messages.warning(request, detail_message)
+    return render(
         request,
-        "Your payment was cancelled. You have not been charged."
+        'main/payment_cancelled.html',
+        {
+            'detail_message': detail_message,
+            'payment_status': status,
+            'cancel_reason': reason,
+        },
     )
-    return render(request, 'main/payment_cancelled.html')
 
 @login_required
 def booking_confirmation(request, booking_id):

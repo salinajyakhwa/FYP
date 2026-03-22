@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from django.contrib.auth import views as auth_views
 
@@ -72,4 +72,5 @@ urlpatterns = [
     path('booking/confirmation/<int:booking_id>/', views.booking_confirmation, name='booking_confirmation'),
     path('vendor/booking/<int:booking_id>/csv/', views.export_booking_csv, name='export_booking_csv'),
     path('vendor/flights/', views.flight_bookings, name='flight_bookings'),
+    path('accounts/', include('allauth.urls')),
 ]
