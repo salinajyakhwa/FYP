@@ -557,6 +557,15 @@ def package_detail(request, package_id):
     reviews = Review.objects.filter(package=package).order_by('-created_at')
     review_form = ReviewForm()
     itinerary_items = []
+    profile = getattr(request.user, 'userprofile', None) if request.user.is_authenticated else None
+    profile_vendor = getattr(profile, 'vendor', None) if profile else None
+    is_vendor_owner = bool(
+        request.user.is_authenticated
+        and profile
+        and profile.role == 'vendor'
+        and profile_vendor
+        and profile_vendor.id == package.vendor_id
+    )
     package_days = package.package_days.prefetch_related('options').all()
     customization_form = CustomItinerarySelectionForm(package=package) if package_days.exists() else None
     selected_options_summary = []
@@ -673,6 +682,7 @@ def package_detail(request, package_id):
         'selected_options_summary': selected_options_summary,
         'customization_extra_cost': customization_extra_cost,
         'customization_total': customization_total,
+        'is_vendor_owner': is_vendor_owner,
     }
     return render(request, 'main/package_detail.html', context)
 

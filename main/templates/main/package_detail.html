@@ -183,8 +183,12 @@
             <div class="card border-0 shadow-sm sticky-top" style="top: 100px;">
                 <div class="card-body p-4">
                     <h2 class="h5 mb-3">Booking</h2>
-                    {% if customization_form %}
+                    {% if is_vendor_owner and customization_form %}
+                    <p class="text-muted mb-3">Vendor test mode: preview the customer-facing customization flow here, or open itinerary management to edit days and options.</p>
+                    {% elif customization_form %}
                     <p class="text-muted mb-3">Choose one option for each required day to preview your custom itinerary total.</p>
+                    {% elif is_vendor_owner %}
+                    <p class="text-muted mb-3">This package does not have day-by-day options yet. Add itinerary days and options first, then you can test customization here.</p>
                     {% else %}
                     <p class="text-muted mb-3">Current booking flow uses the base package price. Day-by-day customization will be added next.</p>
                     {% endif %}
@@ -225,16 +229,32 @@
                     </div>
                     {% endif %}
 
+                    {% if is_vendor_owner %}
+                    <div class="mb-3">
+                        <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-outline-secondary w-100">Manage Itinerary</a>
+                    </div>
+                    {% endif %}
+
                     {% if customization_form %}
                     <div class="d-grid gap-2">
                         <button type="submit" form="customization-form" formmethod="post" name="preview_customization" value="1" class="btn btn-primary">Preview Custom Total</button>
                         {% if user.is_authenticated %}
-                        <button type="submit" form="customization-form" formmethod="post" name="save_customization" value="1" class="btn btn-outline-primary">Save Custom Itinerary</button>
+                        <button type="submit" form="customization-form" formmethod="post" name="save_customization" value="1" class="btn btn-outline-primary">
+                            {% if is_vendor_owner %}Save Test Custom Itinerary{% else %}Save Custom Itinerary{% endif %}
+                        </button>
                         {% else %}
                         <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-outline-primary">Log In to Save</a>
                         {% endif %}
                     </div>
-                    <div class="small text-muted mt-2">Payment still uses the base package flow. Checkout integration for saved custom itineraries is the next step.</div>
+                    <div class="small text-muted mt-2">
+                        {% if is_vendor_owner %}
+                        This lets you test the customization flow on your own package from the public package page.
+                        {% else %}
+                        Payment still uses the base package flow. Checkout integration for saved custom itineraries is the next step.
+                        {% endif %}
+                    </div>
+                    {% elif is_vendor_owner %}
+                    <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-primary w-100">Add Itinerary Options</a>
                     {% elif user.is_authenticated %}
                     <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
                     {% else %}
