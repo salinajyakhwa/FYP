@@ -190,6 +190,42 @@ class ChatMessage(models.Model):
     def __str__(self):
         return f"Message in thread {self.thread_id} by {self.sender.username}"
 
+
+class Notification(models.Model):
+    NOTIFICATION_TYPE_CHOICES = (
+        ('booking_created', 'Booking Created'),
+        ('payment_success', 'Payment Success'),
+        ('payment_cancelled', 'Payment Cancelled'),
+        ('chat_message', 'Chat Message'),
+        ('custom_itinerary_saved', 'Custom Itinerary Saved'),
+        ('trip_update', 'Trip Update'),
+        ('vendor_alert', 'Vendor Alert'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    notification_type = models.CharField(max_length=30, choices=NOTIFICATION_TYPE_CHOICES)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+    target_url = models.CharField(max_length=500, blank=True)
+    related_booking = models.ForeignKey('Booking', on_delete=models.SET_NULL, related_name='notifications', blank=True, null=True)
+    related_custom_itinerary = models.ForeignKey(CustomItinerary, on_delete=models.SET_NULL, related_name='notifications', blank=True, null=True)
+    related_thread = models.ForeignKey(ChatThread, on_delete=models.SET_NULL, related_name='notifications', blank=True, null=True)
+    related_trip = models.ForeignKey('Trip', on_delete=models.SET_NULL, related_name='notifications', blank=True, null=True)
+    dedupe_key = models.CharField(max_length=255, blank=True, null=True, unique=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['user', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.title}"
+
 # Represents a booking made by a user for a travel package.
 class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')

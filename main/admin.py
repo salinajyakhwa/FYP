@@ -9,6 +9,7 @@ from .models import (
     CustomItinerarySelection,
     ChatThread,
     ChatMessage,
+    Notification,
     Booking,
     Trip,
     TripItem,
@@ -25,6 +26,7 @@ admin.site.register(CustomItinerary)
 admin.site.register(CustomItinerarySelection)
 admin.site.register(ChatThread)
 admin.site.register(ChatMessage)
+admin.site.register(Notification)
 admin.site.register(Booking)
 admin.site.register(Trip)
 admin.site.register(TripItem)

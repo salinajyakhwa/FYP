@@ -85,6 +85,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'main.context_processors.user_profile_context',
+                'main.context_processors.notification_context',
             ],
         },
     },
@@ -99,10 +100,10 @@ WSGI_APPLICATION = 'travel.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        #'NAME': 'travel',
-        'NAME': 'traveldumm',
-        'USER': 'novice',
-        'PASSWORD': 'yourpassword',
+        'NAME': 'travel',
+        #'NAME': 'traveldumm',
+        #'USER': 'novice',
+        #'PASSWORD': 'yourpassword',
         'HOST': 'localhost',
         'PORT': '5432',
     }

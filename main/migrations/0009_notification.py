@@ -1,0 +1,111 @@
+# Generated manually to unblock local environment where manage.py cannot load allauth.
+
+import django.db.models.deletion
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("main", "0008_tripitemattachment"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name="Notification",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(max_length=200)),
+                ("message", models.TextField()),
+                (
+                    "notification_type",
+                    models.CharField(
+                        choices=[
+                            ("booking_created", "Booking Created"),
+                            ("payment_success", "Payment Success"),
+                            ("payment_cancelled", "Payment Cancelled"),
+                            ("chat_message", "Chat Message"),
+                            ("custom_itinerary_saved", "Custom Itinerary Saved"),
+                            ("trip_update", "Trip Update"),
+                            ("vendor_alert", "Vendor Alert"),
+                        ],
+                        max_length=30,
+                    ),
+                ),
+                ("is_read", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("read_at", models.DateTimeField(blank=True, null=True)),
+                ("target_url", models.CharField(blank=True, max_length=500)),
+                ("dedupe_key", models.CharField(blank=True, max_length=255, null=True, unique=True)),
+                (
+                    "related_booking",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="notifications",
+                        to="main.booking",
+                    ),
+                ),
+                (
+                    "related_custom_itinerary",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="notifications",
+                        to="main.customitinerary",
+                    ),
+                ),
+                (
+                    "related_thread",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="notifications",
+                        to="main.chatthread",
+                    ),
+                ),
+                (
+                    "related_trip",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="notifications",
+                        to="main.trip",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="notifications",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ["-created_at", "-id"],
+            },
+        ),
+        migrations.AddIndex(
+            model_name="notification",
+            index=models.Index(fields=["user", "is_read"], name="main_notifi_user_id_c24bc3_idx"),
+        ),
+        migrations.AddIndex(
+            model_name="notification",
+            index=models.Index(fields=["user", "created_at"], name="main_notifi_user_id_1c807b_idx"),
+        ),
+    ]

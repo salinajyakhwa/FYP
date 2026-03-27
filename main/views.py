@@ -38,6 +38,7 @@ from .models import (
     PackageDayOption,
     CustomItinerary,
     CustomItinerarySelection,
+    Notification,
     Trip,
     TripItem,
     TripItemAttachment,
@@ -72,6 +73,7 @@ from .forms import (
 
 # Decorators
 from .decorators import role_required
+from .notifications import create_notification, mark_notification_read
 
 logger = logging.getLogger(__name__)
 
@@ -328,6 +330,101 @@ def _build_payment_context(*, package, custom_itinerary=None):
         'amount': amount,
         'display_name': f"{package.name} (Custom Itinerary)" if custom_itinerary else package.name,
     }
+
+
+def _notify_custom_itinerary_saved(custom_itinerary):
+    create_notification(
+        user=custom_itinerary.user,
+        title='Custom itinerary saved',
+        message=f"Your custom itinerary for {custom_itinerary.package.name} was saved.",
+        notification_type='custom_itinerary_saved',
+        target_url=reverse('custom_itinerary_detail', args=[custom_itinerary.id]),
+        related_custom_itinerary=custom_itinerary,
+        dedupe_key=f"custom_itinerary_saved:{custom_itinerary.id}:{custom_itinerary.user_id}",
+    )
+
+
+def _notify_booking_confirmed(booking, *, is_custom):
+    traveler_message = (
+        f"Your custom booking for {booking.package.name} is confirmed."
+        if is_custom else
+        f"Your booking for {booking.package.name} is confirmed."
+    )
+    create_notification(
+        user=booking.user,
+        title='Payment successful',
+        message=traveler_message,
+        notification_type='payment_success',
+        target_url=reverse('booking_confirmation', args=[booking.id]),
+        related_booking=booking,
+        related_trip=getattr(booking, 'trip', None),
+        dedupe_key=f"payment_success:traveler:{booking.id}",
+    )
+
+    create_notification(
+        user=_get_vendor_user(booking.package.vendor),
+        title='New confirmed booking',
+        message=f"{booking.user.username} confirmed a booking for {booking.package.name}.",
+        notification_type='booking_created',
+        target_url=reverse('vendor_bookings'),
+        related_booking=booking,
+        related_trip=getattr(booking, 'trip', None),
+        dedupe_key=f"booking_created:vendor:{booking.id}",
+    )
+
+
+def _notify_payment_cancelled(request, detail_message):
+    if not request.user.is_authenticated:
+        return
+
+    custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
+    package_id = request.session.get('pending_booking_package_id')
+    target_url = reverse('package_list')
+    related_custom_itinerary = None
+    dedupe_key = None
+
+    if custom_itinerary_id:
+        try:
+            related_custom_itinerary = CustomItinerary.objects.select_related('package').get(
+                pk=custom_itinerary_id,
+                user=request.user,
+            )
+            target_url = reverse('custom_itinerary_detail', args=[related_custom_itinerary.id])
+            dedupe_key = f"payment_cancelled:custom:{related_custom_itinerary.id}"
+        except CustomItinerary.DoesNotExist:
+            related_custom_itinerary = None
+    elif package_id:
+        target_url = reverse('package_detail', args=[package_id])
+        dedupe_key = f"payment_cancelled:package:{package_id}:{request.user.id}"
+
+    create_notification(
+        user=request.user,
+        title='Payment cancelled',
+        message=detail_message,
+        notification_type='payment_cancelled',
+        target_url=target_url,
+        related_custom_itinerary=related_custom_itinerary,
+        dedupe_key=dedupe_key,
+    )
+
+
+def _notify_chat_message(message_obj):
+    thread = message_obj.thread
+    recipient = (
+        _get_vendor_user(thread.vendor)
+        if message_obj.sender_id == thread.traveler_id else
+        thread.traveler
+    )
+    counterpart_name = thread.traveler.username if recipient.id == _get_vendor_user(thread.vendor).id else thread.vendor.name
+
+    create_notification(
+        user=recipient,
+        title='New chat message',
+        message=f"{message_obj.sender.username} sent you a new message about {thread.package.name if thread.package else 'your trip'}.",
+        notification_type='chat_message',
+        target_url=reverse('chat_thread_detail', args=[thread.id]),
+        related_thread=thread,
+    )
 
 
 def _store_pending_payment_session(request, *, package_id=None, custom_itinerary_id=None, transaction_uuid=None, provider=None):
@@ -606,6 +703,7 @@ def package_detail(request, package_id):
                             for package_day, selected_option in selected_options
                         ])
 
+                    _notify_custom_itinerary_saved(custom_itinerary)
                     messages.success(request, 'Custom itinerary saved successfully.')
                     return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
 
@@ -782,6 +880,7 @@ def chat_thread_detail(request, thread_id):
             message.sender = request.user
             message.save()
             ChatThread.objects.filter(pk=thread.id).update(updated_at=timezone.now())
+            _notify_chat_message(message)
             return redirect('chat_thread_detail', thread_id=thread.id)
     else:
         form = ChatMessageForm()
@@ -983,6 +1082,39 @@ def my_bookings(request):
 
 
 @login_required
+def notification_list(request):
+    notifications = Notification.objects.filter(user=request.user).select_related(
+        'related_booking',
+        'related_custom_itinerary',
+        'related_thread',
+        'related_trip',
+    )
+    return render(request, 'main/notifications.html', {'notifications': notifications})
+
+
+@login_required
+def mark_notification_read_view(request, notification_id):
+    notification = get_object_or_404(Notification, pk=notification_id, user=request.user)
+    mark_notification_read(notification)
+    target_url = notification.target_url or reverse('notification_list')
+    return redirect(target_url)
+
+
+@login_required
+def mark_all_notifications_read(request):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    now = timezone.now()
+    Notification.objects.filter(user=request.user, is_read=False).update(
+        is_read=True,
+        read_at=now,
+    )
+    messages.success(request, 'All notifications marked as read.')
+    return redirect('notification_list')
+
+
+@login_required
 def trip_dashboard(request, trip_id):
     trip = get_object_or_404(
         Trip.objects.select_related('booking', 'package', 'vendor', 'custom_itinerary')
@@ -1050,6 +1182,14 @@ def update_trip_item_status(request, trip_item_id):
     if trip_item.status != new_status:
         trip_item.status = new_status
         trip_item.save(update_fields=['status', 'updated_at'])
+        create_notification(
+            user=trip_item.trip.traveler,
+            title='Trip item updated',
+            message=f"Day {trip_item.day_number} for {trip_item.trip.package.name} is now {trip_item.get_status_display().lower()}.",
+            notification_type='trip_update',
+            target_url=reverse('trip_dashboard', args=[trip_item.trip_id]),
+            related_trip=trip_item.trip,
+        )
         messages.success(request, f'Trip item updated to {trip_item.get_status_display()}.')
 
     return redirect('vendor_trip_dashboard', trip_id=trip_item.trip_id)
@@ -1625,6 +1765,7 @@ def esewa_verify(request):
         messages.error(request, 'Could not find a pending booking after eSewa verification.')
         return redirect('package_list')
 
+    _notify_booking_confirmed(booking, is_custom=is_custom)
     _clear_pending_payment_session(request)
     if is_custom:
         messages.success(request, f"Your custom booking for {package.name} is confirmed!")
@@ -1752,6 +1893,7 @@ def payment_success(request):
         messages.error(request, "Could not find a pending booking. Please try again.")
         return redirect('package_list')
 
+    _notify_booking_confirmed(booking, is_custom=is_custom)
     _clear_pending_payment_session(request)
 
     if is_custom:
@@ -1778,6 +1920,7 @@ def payment_cancelled(request):
             "The payment returned from eSewa, but this app could not match it to your current checkout session."
         )
 
+    _notify_payment_cancelled(request, detail_message)
     messages.warning(request, detail_message)
     return render(
         request,
