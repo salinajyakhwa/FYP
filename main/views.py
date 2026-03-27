@@ -97,12 +97,24 @@ def root_redirect_view(request):
     return redirect('dashboard')
 
 def home(request):
-    # Fetch top 4 packages
-    packages = TravelPackage.objects.all().order_by('-created_at')[:4]
+    today = timezone.now().date()
+    sponsored_packages = TravelPackage.objects.select_related('vendor').filter(
+        is_sponsored=True,
+        sponsorship_start__isnull=False,
+        sponsorship_end__isnull=False,
+        sponsorship_start__lte=today,
+        sponsorship_end__gte=today,
+    ).order_by('-sponsorship_priority', '-created_at')[:4]
+    packages = (
+        TravelPackage.objects.select_related('vendor')
+        .exclude(id__in=sponsored_packages.values_list('id', flat=True))
+        .order_by('-created_at')[:4]
+    )
     
-    # OLD: return render(request, 'home.html', {'packages': packages})
-    # NEW: Add 'main/' prefix
-    return render(request, 'main/home.html', {'packages': packages})
+    return render(request, 'main/home.html', {
+        'packages': packages,
+        'sponsored_packages': sponsored_packages,
+    })
 
 def _get_vendor_or_403(request):
     try:
@@ -723,16 +735,28 @@ def search_results(request):
 from .filters import TravelPackageFilter
 
 def package_list(request):
-    packages_list = TravelPackage.objects.all().order_by('-created_at')
+    packages_list = TravelPackage.objects.select_related('vendor').all().order_by('-created_at')
     package_filter = TravelPackageFilter(request.GET, queryset=packages_list)
-    
-    paginator = Paginator(package_filter.qs, 9) # Show 9 packages per page
+    today = timezone.now().date()
+    filtered_qs = package_filter.qs.select_related('vendor')
+    sponsored_packages = filtered_qs.filter(
+        is_sponsored=True,
+        sponsorship_start__isnull=False,
+        sponsorship_end__isnull=False,
+        sponsorship_start__lte=today,
+        sponsorship_end__gte=today,
+    ).order_by('-sponsorship_priority', '-created_at')
+
+    organic_packages_qs = filtered_qs.exclude(id__in=sponsored_packages.values_list('id', flat=True)).order_by('-created_at')
+
+    paginator = Paginator(organic_packages_qs, 9) # Show 9 packages per page
     page_number = request.GET.get('page')
     packages = paginator.get_page(page_number)
 
     context = {
         'packages': packages,
-        'filter': package_filter
+        'filter': package_filter,
+        'sponsored_packages': sponsored_packages,
     }
     return render(request, 'main/package_list.html', context)
 

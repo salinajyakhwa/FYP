@@ -24,6 +24,11 @@
         <span class="badge bg-primary position-absolute top-0 end-0 m-2 px-3 py-2">
             ${{ package.price|floatformat:0 }}
         </span>
+        {% if package.is_sponsored %}
+        <span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2 px-3 py-2">
+            Sponsored
+        </span>
+        {% endif %}
     </div>
 
 
@@ -51,6 +56,7 @@
                 </a>
 
                 <!-- COMPARE -->
+                {% if show_compare|default:True %}
                 <div class="form-check">
                     <input class="form-check-input compare-checkbox"
                            type="checkbox"
@@ -63,6 +69,7 @@
                         Compare
                     </label>
                 </div>
+                {% endif %}
 
             </div>
 
@@ -81,4 +88,3 @@
 </div>
 
 {% endfor %}
-

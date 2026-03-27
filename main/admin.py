@@ -19,7 +19,6 @@ from .models import (
 
 admin.site.register(UserProfile)
 admin.site.register(Vendor)
-admin.site.register(TravelPackage)
 admin.site.register(PackageDay)
 admin.site.register(PackageDayOption)
 admin.site.register(CustomItinerary)
@@ -32,3 +31,18 @@ admin.site.register(Trip)
 admin.site.register(TripItem)
 admin.site.register(TripItemAttachment)
 admin.site.register(Review)
+
+
+@admin.register(TravelPackage)
+class TravelPackageAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'vendor',
+        'price',
+        'is_sponsored',
+        'sponsorship_priority',
+        'sponsorship_start',
+        'sponsorship_end',
+    )
+    list_filter = ('is_sponsored', 'travel_type', 'location')
+    search_fields = ('name', 'location', 'vendor__name')

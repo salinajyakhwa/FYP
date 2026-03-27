@@ -179,6 +179,25 @@
         </div>
     </div>
 
+    {% if sponsored_packages %}
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-end mb-3">
+            <div>
+                <h4 class="fw-bold mb-0">Sponsored Packages</h4>
+                <p class="text-muted small mb-0">Featured listings from promoted partners.</p>
+            </div>
+        </div>
+        <div class="row g-4">
+            {% include "main/_package_list_partial.html" with packages=sponsored_packages show_compare=False %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mb-3">
+        <h4 class="fw-bold mb-0">All Packages</h4>
+        <p class="text-muted small mb-0">Organic package results based on your current filters.</p>
+    </div>
+
     <!-- 🌿 Grid -->
     <form id="compare-form" action="{% url 'compare_packages' %}" method="post">
         {% csrf_token %}
