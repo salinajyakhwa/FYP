@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+import datetime
 
 # Represents a user's profile, extending the built-in User model with additional information.
 class UserProfile(models.Model):
@@ -347,3 +349,27 @@ class Vehicle(models.Model):
 
     def __str__(self):
         return self.name
+
+class EmailVerification(models.Model):
+    user_profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE, related_name='email_verification')
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    token = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + datetime.timedelta(days=1)
+    
+class EmailOTP(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_valid(self):
+        return timezone.now() < self.expires_at
+
+    def __str__(self):
+        return f"{self.email} - {self.otp}"

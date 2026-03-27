@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load socialaccount %}
+{% load custom_tags %}
 
 {% block content %}
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
@@ -107,6 +109,21 @@
         margin-top: 10px;
     }
 
+    .social-pill {
+        background: var(--voyger-light-gray);
+        border-radius: 50px;
+        padding: 10px 25px;
+        display: inline-flex;
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+
+    .social-pill i {
+        font-size: 18px;
+        color: #333;
+        cursor: pointer;
+    }
+
     .img-side {
         flex: 1;
         background-image: url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1470');
@@ -123,6 +140,29 @@
         <div class="form-side">
             <h1 class="auth-title text-center">Join Voyger</h1>
             <p class="text-center text-muted mb-4">Select your account type and start</p>
+
+            <div class="text-center">
+                <div class="social-pill">
+                    <i class="bi bi-apple"></i>
+                    {% social_provider_configured 'google' as google_ready %}
+                    {% social_provider_configured 'facebook' as facebook_ready %}
+                    {% if google_ready %}
+                    <a href="{% provider_login_url 'google' %}" class="text-decoration-none">
+                        <i class="bi bi-google"></i>
+                    </a>
+                    {% else %}
+                    <i class="bi bi-google text-muted"></i>
+                    {% endif %}
+                    {% if facebook_ready %}
+                    <a href="{% provider_login_url 'facebook' %}" class="text-decoration-none">
+                        <i class="bi bi-facebook"></i>
+                    </a>
+                    {% else %}
+                    <i class="bi bi-facebook text-muted"></i>
+                    {% endif %}
+                </div>
+                <div class="text-muted small mb-4">or sign up with email</div>
+            </div>
 
             <form method="post">
                 {% csrf_token %}

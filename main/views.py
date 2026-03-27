@@ -29,6 +29,8 @@ from django.views.decorators.csrf import csrf_exempt
 import csv
 from django.http import HttpResponse
 from.models import Booking, TravelPackage, CustomItinerarySelection
+from .utils import send_otp
+from .models import EmailOTP
 
 
 # Models
@@ -890,14 +892,61 @@ def register(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save() # user is now inactive
-            profile = user.userprofile # Get the user profile
-            send_verification_email(request, user, profile) # Send verification email
-            messages.success(request, f"Please confirm your email address to complete the registration. Check your inbox at {user.email}.")
-            return redirect('check_email') # Redirect to a page informing user to check email
+            user = form.save()
+            email = form.cleaned_data['email']
+
+            send_otp(email, user)
+
+            request.session['pending_email'] = email
+            request.session['pending_user_id'] = user.id
+            messages.success(request, f"An OTP has been sent to {email}. Please enter it to complete registration.")
+            return redirect('verify_otp')
     else:
         form = CustomUserCreationForm()
     return render(request, 'main/register.html', {'form': form})
+
+
+
+def verify_otp(request):
+    pending_email = request.session.get('pending_email')
+    pending_user_id = request.session.get('pending_user_id')
+
+    if not pending_email or not pending_user_id:
+        messages.info(request, 'Start registration first to verify your email.')
+        return redirect('register')
+
+    if request.method == 'POST':
+        otp = request.POST.get('otp', '').strip()
+        otp_obj = (
+            EmailOTP.objects
+            .filter(email=pending_email, otp=otp, user_id=pending_user_id)
+            .order_by('-created_at')
+            .first()
+        )
+
+        if otp_obj and otp_obj.is_valid():
+            user = get_object_or_404(User, pk=pending_user_id, email=pending_email)
+            user.is_active = True
+            user.save(update_fields=['is_active'])
+
+            EmailOTP.objects.filter(email=pending_email).delete()
+            request.session.pop('pending_email', None)
+            request.session.pop('pending_user_id', None)
+
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            messages.success(request, 'Your account has been verified successfully.')
+            return redirect('dashboard')
+
+        return render(
+            request,
+            'main/verify_otp.html',
+            {
+                'email': pending_email,
+                'error': 'Invalid or expired OTP. Please try again.',
+            },
+        )
+
+    return render(request, 'main/verify_otp.html', {'email': pending_email})
 
 # ==========================================
 # 3. PRIVATE USER VIEWS (Dashboard, Profile)
