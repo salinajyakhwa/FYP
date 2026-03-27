@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Traveler Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <div class="small text-muted">Traveler Dashboard</div>
+            <h1 class="h3 mb-1">Your Travel Overview</h1>
+            <div class="text-muted">Current trips, next steps, saved plans, and recent updates in one place.</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'my_bookings' %}" class="btn btn-outline-secondary">My Bookings</a>
+            <a href="{% url 'notification_list' %}" class="btn btn-outline-secondary">Notifications</a>
+            <a href="{% url 'package_list' %}" class="btn btn-primary">Explore Packages</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Active Trips</div>
+                <div class="fw-semibold fs-4">{{ dashboard_summary.active_trips }}</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Unread Notifications</div>
+                <div class="fw-semibold fs-4">{{ dashboard_summary.unread_notifications }}</div>
+                <div class="small text-muted mt-2">Recent updates that still need your attention.</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Pending Actions</div>
+                <div class="fw-semibold fs-4">{{ dashboard_summary.pending_actions }}</div>
+                <div class="small text-muted mt-2">Items that are ready, in progress, blocked, or waiting on you.</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Upcoming Items</div>
+                <div class="fw-semibold fs-4">{{ dashboard_summary.upcoming_items }}</div>
+                <div class="small text-muted mt-2">Future trip steps coming later in your timeline.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="h5 mb-0">Current Trips</h2>
+                        <div class="small text-muted mt-1">Your live and upcoming trip workspaces.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if active_trip_cards %}
+                    <div class="d-grid gap-3">
+                        {% for card in active_trip_cards %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge text-bg-light border">{{ card.lifecycle_label }}</span>
+                                        <span class="small text-muted">{{ card.trip.start_date }} to {{ card.trip.end_date }}</span>
+                                    </div>
+                                    <div class="fw-semibold">{{ card.trip.package.name }}</div>
+                                    <div class="small text-muted">Vendor: {{ card.trip.vendor.name }}</div>
+                                    <div class="small mt-2">Trip status: {{ card.trip.get_status_display }}</div>
+                                    <div class="small text-muted">Booking status: {{ card.trip.booking.get_status_display }}</div>
+                                    {% if card.next_action %}
+                                    <div class="mt-3">
+                                        <div class="small text-muted">Next action</div>
+                                        <div class="fw-semibold">Day {{ card.next_action.day_number }} · {{ card.next_action.title }}</div>
+                                        {% if card.next_action.selected_option_title %}
+                                        <div class="small text-muted">{{ card.next_action.selected_option_title }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    <div class="small text-muted">Done</div>
+                                    <div class="fw-semibold mb-3">{{ card.progress_summary.completion_percentage }}%</div>
+                                    <a href="{% url 'trip_dashboard' card.trip.id %}" class="btn btn-sm btn-primary">Open Trip</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">
+                        You do not have any active trips yet. Once you complete a booking, your current trip workspace will appear here.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 mb-0">Next Actions</h2>
+                    <div class="small text-muted mt-1">The most relevant steps across your trips right now.</div>
+                </div>
+                <div class="card-body">
+                    {% if next_actions %}
+                    <div class="d-grid gap-3">
+                        {% for action in next_actions %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge text-bg-light border">{{ action.lifecycle_label }}</span>
+                                        <span class="small text-muted">{{ action.package.name }}</span>
+                                    </div>
+                                    <div class="fw-semibold">Day {{ action.day_number }} · {{ action.title }}</div>
+                                    <div class="small text-muted">Vendor: {{ action.vendor.name }}</div>
+                                    {% if action.selected_option_title %}
+                                    <div class="small mt-2">{{ action.selected_option_title }}</div>
+                                    {% endif %}
+                                    <div class="small mt-2">Status: {{ action.status }}</div>
+                                    {% if action.description %}
+                                    <div class="small text-muted mt-2">{{ action.description }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    {% if action.action_link %}
+                                    <a href="{{ action.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary">
+                                        {{ action.action_label }}
+                                    </a>
+                                    {% else %}
+                                    <a href="{% url 'trip_dashboard' action.trip.id %}" class="btn btn-sm btn-outline-primary">
+                                        Open Trip
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">There are no immediate traveler actions to show right now.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 mb-0">Saved Custom Itineraries</h2>
+                    <div class="small text-muted mt-1">Continue planning before payment or booking confirmation.</div>
+                </div>
+                <div class="card-body">
+                    {% if saved_custom_itineraries %}
+                    <div class="d-grid gap-3">
+                        {% for itinerary in saved_custom_itineraries %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="fw-semibold">{{ itinerary.package.name }}</div>
+                                    <div class="small text-muted">Vendor: {{ itinerary.package.vendor.name }}</div>
+                                    <div class="small text-muted mt-2">Saved on {{ itinerary.created_at|date:"F j, Y, g:i a" }}</div>
+                                    <div class="small mt-2">Status: {{ itinerary.get_status_display }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-semibold mb-3">${{ itinerary.final_price|floatformat:2 }}</div>
+                                    <a href="{% url 'custom_itinerary_detail' itinerary.id %}" class="btn btn-sm btn-outline-primary">View Plan</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">You do not have any unfinished custom itineraries right now.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="h5 mb-0">Recent Bookings</h2>
+                        <div class="small text-muted mt-1">Your latest booking history and trip entry points.</div>
+                    </div>
+                    <a href="{% url 'my_bookings' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if recent_bookings %}
+                    <div class="d-grid gap-3">
+                        {% for booking in recent_bookings %}
+                        <div class="border rounded p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="fw-semibold">{{ booking.package.name }}</div>
+                                    <div class="small text-muted">Vendor: {{ booking.package.vendor.name }}</div>
+                                    <div class="small text-muted mt-2">Booked on {{ booking.booking_date|date:"F j, Y" }}</div>
+                                    <div class="small">Status: {{ booking.get_status_display }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-semibold mb-2">${{ booking.total_price|floatformat:2 }}</div>
+                                    <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-sm btn-outline-secondary">Booking</a>
+                                    {% if booking.trip %}
+                                    <a href="{% url 'trip_dashboard' booking.trip.id %}" class="btn btn-sm btn-outline-primary">Trip</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">You have not made any bookings yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="h5 mb-0">Recent Notifications</h2>
+                        <div class="small text-muted mt-1">Payments, chat, and trip updates.</div>
+                    </div>
+                    <a href="{% url 'notification_list' %}" class="btn btn-sm btn-outline-secondary">Open</a>
+                </div>
+                <div class="card-body">
+                    {% if recent_notifications %}
+                    <div class="d-grid gap-3">
+                        {% for notification in recent_notifications %}
+                        <div class="border rounded p-3 {% if not notification.is_read %}bg-light{% endif %}">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="fw-semibold">{{ notification.title }}</div>
+                                {% if not notification.is_read %}
+                                <span class="badge text-bg-primary">Unread</span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted mt-1">{{ notification.created_at|date:"F j, Y, g:i a" }}</div>
+                            <div class="small mt-2">{{ notification.message }}</div>
+                            <a href="{% url 'mark_notification_read' notification.id %}" class="btn btn-sm btn-link px-0 mt-2">Open</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">No notifications yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 mb-0">Recent Messages</h2>
+                    <div class="small text-muted mt-1">Latest traveler-vendor conversations.</div>
+                </div>
+                <div class="card-body">
+                    {% if recent_threads %}
+                    <div class="d-grid gap-3">
+                        {% for thread in recent_threads %}
+                        <div class="border rounded p-3">
+                            <div class="fw-semibold">{{ thread.vendor.name }}</div>
+                            <div class="small text-muted">{{ thread.package.name|default:"General trip discussion" }}</div>
+                            {% if thread.latest_message %}
+                            <div class="small mt-2">{{ thread.latest_message.message|truncatechars:110 }}</div>
+                            <div class="small text-muted mt-1">{{ thread.latest_message.created_at|date:"F j, Y, g:i a" }}</div>
+                            {% else %}
+                            <div class="small text-muted mt-2">No messages yet in this thread.</div>
+                            {% endif %}
+                            <a href="{% url 'chat_thread_detail' thread.id %}" class="btn btn-sm btn-link px-0 mt-2">Open Chat</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">No active vendor chats yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
