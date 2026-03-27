@@ -321,7 +321,40 @@ def _build_trip_progress_summary(trip):
     if counts['total']:
         counts['completion_percentage'] = int((counts['completed'] / counts['total']) * 100)
 
+    if counts['blocked']:
+        counts['trip_health_label'] = 'Action Needed'
+    elif counts['ready'] or counts['in_progress']:
+        counts['trip_health_label'] = 'On Track'
+    else:
+        counts['trip_health_label'] = 'Waiting on Vendor'
+
     return counts
+
+
+def _build_trip_next_action(timeline_items):
+    priority_order = ['ready', 'in_progress', 'pending']
+    for status_key in priority_order:
+        for item in timeline_items:
+            if item['status_key'] == status_key:
+                return item
+    return None
+
+
+def _build_trip_recent_attachments(timeline_items, limit=4):
+    attachments = []
+    for item in timeline_items:
+        for attachment in item['attachments']:
+            attachments.append({
+                'title': attachment.title,
+                'type': attachment.get_attachment_type_display(),
+                'url': attachment.file.url,
+                'day_number': item['day_number'],
+                'item_title': item['title'],
+                'created_at': attachment.created_at,
+            })
+
+    attachments.sort(key=lambda entry: entry['created_at'], reverse=True)
+    return attachments[:limit]
 
 
 def _build_payment_context(*, package, custom_itinerary=None):
@@ -1174,12 +1207,21 @@ def trip_dashboard(request, trip_id):
     if trip.traveler_id != request.user.id:
         raise PermissionDenied
 
+    timeline_items = _build_trip_timeline_items(trip)
+    progress_summary = _build_trip_progress_summary(trip)
+    recent_attachments = _build_trip_recent_attachments(timeline_items)
+    next_action = _build_trip_next_action(timeline_items)
+
     context = {
         'trip': trip,
         'booking': trip.booking,
         'package': trip.package,
-        'timeline_items': _build_trip_timeline_items(trip),
-        'progress_summary': _build_trip_progress_summary(trip),
+        'timeline_items': timeline_items,
+        'progress_summary': progress_summary,
+        'next_action': next_action,
+        'recent_attachments': recent_attachments,
+        'documents_count': sum(len(item['attachments']) for item in timeline_items),
+        'help_chat_url': reverse('chat_thread_open', args=[trip.package_id]),
     }
     return render(request, 'main/trip_dashboard.html', context)
 

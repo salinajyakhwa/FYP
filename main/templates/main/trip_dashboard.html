@@ -39,6 +39,49 @@
     </div>
 
     <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted mb-2">Next Action</div>
+                {% if next_action %}
+                <div class="small text-muted">Day {{ next_action.day_number }}</div>
+                <div class="fw-semibold">{{ next_action.title }}</div>
+                {% if next_action.selected_option_title %}
+                <div class="mt-1">{{ next_action.selected_option_title }}</div>
+                {% endif %}
+                <div class="small text-muted mt-1">{{ next_action.status }}</div>
+                {% if next_action.description %}
+                <div class="small mt-2">{{ next_action.description }}</div>
+                {% endif %}
+                {% if next_action.action_link %}
+                <a href="{{ next_action.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary mt-3">
+                    {{ next_action.action_label }}
+                </a>
+                {% endif %}
+                {% else %}
+                <div class="text-muted">No next action is available yet.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Trip Health</div>
+                <div class="fw-semibold">{{ progress_summary.trip_health_label }}</div>
+                <div class="small text-muted mt-2">Blocked items: {{ progress_summary.blocked }}</div>
+                <div class="small text-muted">Ready now: {{ progress_summary.ready }}</div>
+                <div class="small text-muted">In progress: {{ progress_summary.in_progress }}</div>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted">Help & Contact</div>
+                <div class="fw-semibold">{{ package.vendor.name }}</div>
+                <div class="small text-muted mt-2">Need help with this trip?</div>
+                <a href="{{ help_chat_url }}" class="btn btn-sm btn-outline-primary mt-3">Chat With Vendor</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
         <div class="col-md-3 col-lg-2">
             <div class="border rounded p-3 h-100 bg-white">
                 <div class="small text-muted">Total Items</div>
@@ -73,6 +116,44 @@
             <div class="border rounded p-3 h-100 bg-white">
                 <div class="small text-muted">Done</div>
                 <div class="fw-semibold">{{ progress_summary.completion_percentage }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                    <div>
+                        <div class="small text-muted">Important Documents</div>
+                        <div class="fw-semibold">{{ documents_count }} files available</div>
+                    </div>
+                </div>
+                {% if recent_attachments %}
+                <div class="d-grid gap-2">
+                    {% for attachment in recent_attachments %}
+                    <div class="border rounded p-2">
+                        <div class="fw-semibold small">{{ attachment.title }}</div>
+                        <div class="small text-muted">Day {{ attachment.day_number }} · {{ attachment.item_title }} · {{ attachment.type }}</div>
+                        <a href="{{ attachment.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-link px-0">Open File</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted">No documents have been uploaded yet.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-white">
+                <div class="small text-muted mb-2">Blocked Items</div>
+                {% if progress_summary.blocked %}
+                <div class="fw-semibold text-danger">{{ progress_summary.blocked }} blocked</div>
+                <div class="small mt-2">Some trip items are currently blocked. This usually means a previous step needs to be completed or the vendor still needs to prepare something.</div>
+                {% else %}
+                <div class="fw-semibold text-success">No blocked items</div>
+                <div class="small mt-2">Your trip currently has no blocked steps.</div>
+                {% endif %}
             </div>
         </div>
     </div>
