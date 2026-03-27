@@ -99,12 +99,22 @@
                 <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-sm btn-outline-secondary" title="Manage Itinerary">
                     <i class="bi bi-journal-text"></i> Itinerary
                 </a>
+                <a href="{% url 'choose_sponsorship_payment' package.id %}" class="btn btn-sm btn-outline-warning" title="Sponsor Package">
+                    <i class="bi bi-megaphone"></i> {% if package.is_sponsored and package.sponsorship_end %}Extend{% else %}Sponsor{% endif %}
+                </a>
                 <a href="#" class="btn btn-sm btn-outline-secondary" title="Edit Package">
                     <i class="bi bi-pencil"></i> Edit
                 </a>
                 <a href="#" class="btn btn-sm btn-outline-danger" title="Delete Package">
                     <i class="bi bi-trash"></i> Delete
                 </a>
+            </div>
+            <div class="small mt-2 text-muted">
+                {% if package.is_sponsored and package.sponsorship_end %}
+                Sponsored through {{ package.sponsorship_end }}{% if package.sponsorship_amount %} for ${{ package.sponsorship_amount }}{% endif %}
+                {% else %}
+                Not currently sponsored
+                {% endif %}
             </div>
         </div>
         {% empty %}

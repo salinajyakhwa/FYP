@@ -26,16 +26,29 @@ Payment Cancelled
             <hr>
             
             <p>
-                {% if cancel_reason == 'session_mismatch' %}
+                {% if sponsorship_package %}
+                You can return to your package list and try the sponsorship checkout again whenever you are ready.
+                {% elif cancel_reason == 'session_mismatch' %}
                 Try starting the payment again from the same browser tab and finish the eSewa flow without opening a different host or restarting the session.
                 {% else %}
                 You can return to the package list to continue browsing.
                 {% endif %}
             </p>
-            
-            <a href="{% url 'package_list' %}" class="btn btn-secondary mt-3">
-                Browse Packages
-            </a>
+
+            <div class="d-flex justify-content-center gap-2 mt-3">
+                {% if sponsorship_package %}
+                <a href="{% url 'choose_sponsorship_payment' sponsorship_package.id %}" class="btn btn-warning">
+                    Retry Sponsorship Payment
+                </a>
+                <a href="{% url 'vendor_package_list' %}" class="btn btn-outline-secondary">
+                    Back to My Packages
+                </a>
+                {% else %}
+                <a href="{% url 'package_list' %}" class="btn btn-secondary">
+                    Browse Packages
+                </a>
+                {% endif %}
+            </div>
 
         </div>
     </div>

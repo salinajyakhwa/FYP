@@ -8,14 +8,19 @@
   <div class="card shadow-sm p-4">
     <h3 class="mb-3">Checkout — {{ display_name }}</h3>
     <p>Price: <strong>${{ amount|floatformat:2 }}</strong></p>
+    {% if sponsorship_package %}
+    <p class="text-muted mb-0">This promotes <strong>{{ sponsorship_package.name }}</strong> in the sponsored listings section for {{ sponsorship_duration_days }} days.</p>
+    {% endif %}
 
     <div class="d-flex gap-3 mt-4">
-      {% if custom_itinerary %}
+      {% if sponsorship_package %}
+      <a href="{% url 'create_sponsorship_checkout_session' sponsorship_package.id %}" class="btn btn-success btn-lg">Pay with Stripe</a>
+      <a href="{% url 'esewa_sponsorship_checkout' sponsorship_package.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</a>
+      {% elif custom_itinerary %}
       <a href="{% url 'create_custom_itinerary_checkout_session' custom_itinerary.id %}" class="btn btn-success btn-lg">Pay with Stripe</a>
       <a href="{% url 'esewa_custom_itinerary_checkout' custom_itinerary.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</a>
       {% else %}
       <a href="{% url 'create_checkout_session' package.id %}" class="btn btn-success btn-lg">Pay with Stripe</a>
-
       <a href="{% url 'esewa_checkout' package.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</a>
       {% endif %}
     </div>

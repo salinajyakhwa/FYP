@@ -431,6 +431,26 @@ def _build_payment_context(*, package, custom_itinerary=None):
     }
 
 
+SPONSORSHIP_DEFAULT_PRICE = Decimal('100.00')
+SPONSORSHIP_DURATION_DAYS = 30
+
+
+def _get_sponsorship_price(package):
+    amount = Decimal(package.sponsorship_amount or 0)
+    return amount if amount > 0 else SPONSORSHIP_DEFAULT_PRICE
+
+
+def _build_sponsorship_payment_context(package):
+    amount = _get_sponsorship_price(package)
+    return {
+        'package': package,
+        'sponsorship_package': package,
+        'amount': amount,
+        'display_name': f"{package.name} Sponsorship",
+        'sponsorship_duration_days': SPONSORSHIP_DURATION_DAYS,
+    }
+
+
 def _notify_custom_itinerary_saved(custom_itinerary):
     create_notification(
         user=custom_itinerary.user,
@@ -478,11 +498,22 @@ def _notify_payment_cancelled(request, detail_message):
 
     custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
     package_id = request.session.get('pending_booking_package_id')
+    sponsorship_package_id = request.session.get('pending_sponsorship_package_id')
     target_url = reverse('package_list')
     related_custom_itinerary = None
     dedupe_key = None
 
-    if custom_itinerary_id:
+    if sponsorship_package_id:
+        try:
+            package = TravelPackage.objects.select_related('vendor').get(
+                pk=sponsorship_package_id,
+                vendor=_get_vendor_or_403(request),
+            )
+            target_url = reverse('vendor_package_list')
+            dedupe_key = f"payment_cancelled:sponsorship:{package.id}:{request.user.id}"
+        except (TravelPackage.DoesNotExist, PermissionDenied):
+            package = None
+    elif custom_itinerary_id:
         try:
             related_custom_itinerary = CustomItinerary.objects.select_related('package').get(
                 pk=custom_itinerary_id,
@@ -526,9 +557,10 @@ def _notify_chat_message(message_obj):
     )
 
 
-def _store_pending_payment_session(request, *, package_id=None, custom_itinerary_id=None, transaction_uuid=None, provider=None):
+def _store_pending_payment_session(request, *, package_id=None, custom_itinerary_id=None, sponsorship_package_id=None, transaction_uuid=None, provider=None):
     request.session['pending_booking_package_id'] = package_id
     request.session['pending_custom_itinerary_id'] = custom_itinerary_id
+    request.session['pending_sponsorship_package_id'] = sponsorship_package_id
     request.session['pending_payment_provider'] = provider
     request.session['pending_payment_transaction_uuid'] = transaction_uuid
 
@@ -537,6 +569,7 @@ def _clear_pending_payment_session(request):
     for key in [
         'pending_booking_package_id',
         'pending_custom_itinerary_id',
+        'pending_sponsorship_package_id',
         'pending_payment_provider',
         'pending_payment_transaction_uuid',
     ]:
@@ -684,6 +717,55 @@ def _create_or_update_booking_from_pending_payment(request):
     )
     _create_trip_from_booking(booking)
     return booking, package, False
+
+
+def _activate_pending_sponsorship(request):
+    sponsorship_package_id = request.session.get('pending_sponsorship_package_id')
+    if not sponsorship_package_id:
+        raise ValueError('No pending sponsorship target found.')
+
+    vendor = _get_vendor_or_403(request)
+    package = get_object_or_404(
+        TravelPackage.objects.select_related('vendor'),
+        pk=sponsorship_package_id,
+        vendor=vendor,
+    )
+
+    today = timezone.now().date()
+    current_price = _get_sponsorship_price(package)
+
+    if package.is_sponsored and package.sponsorship_end and package.sponsorship_end >= today:
+        start_anchor = package.sponsorship_end + timezone.timedelta(days=1)
+        if not package.sponsorship_start:
+            package.sponsorship_start = today
+    else:
+        package.is_sponsored = True
+        package.sponsorship_start = today
+        start_anchor = today
+
+    package.sponsorship_end = start_anchor + timezone.timedelta(days=SPONSORSHIP_DURATION_DAYS - 1)
+    package.sponsorship_amount = current_price
+    if package.sponsorship_priority == 0:
+        package.sponsorship_priority = 1
+    package.save(update_fields=[
+        'is_sponsored',
+        'sponsorship_start',
+        'sponsorship_end',
+        'sponsorship_amount',
+        'sponsorship_priority',
+        'updated_at',
+    ])
+
+    create_notification(
+        user=_get_vendor_user(vendor),
+        title='Sponsorship activated',
+        message=f"{package.name} is sponsored through {package.sponsorship_end}.",
+        notification_type='payment_success',
+        target_url=reverse('vendor_package_list'),
+        dedupe_key=f"sponsorship:{package.id}:{package.sponsorship_end.isoformat()}",
+    )
+
+    return package
 
 
 def _generate_esewa_signature(total_amount, transaction_uuid, product_code):
@@ -1024,6 +1106,17 @@ def choose_custom_itinerary_payment(request, custom_itinerary_id):
         'main/choose_payment.html',
         _build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
     )
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def choose_sponsorship_payment(request, package_id):
+    package = get_object_or_404(
+        TravelPackage.objects.select_related('vendor'),
+        pk=package_id,
+        vendor=_get_vendor_or_403(request),
+    )
+    return render(request, 'main/choose_payment.html', _build_sponsorship_payment_context(package))
 
 def compare_packages(request):
     def _find_similar_packages(base_package, limit=3):
@@ -1844,6 +1937,45 @@ def esewa_checkout(request, package_id):
 
 
 @login_required
+@role_required(allowed_roles=['vendor'])
+def esewa_sponsorship_checkout(request, package_id):
+    package = get_object_or_404(
+        TravelPackage.objects.select_related('vendor'),
+        pk=package_id,
+        vendor=_get_vendor_or_403(request),
+    )
+    transaction_uuid = str(uuid.uuid4())
+    amount = _get_sponsorship_price(package).quantize(Decimal('0.01'))
+    tax_amount = Decimal('0.00')
+    total_amount = amount + tax_amount
+
+    _store_pending_payment_session(
+        request,
+        sponsorship_package_id=package.id,
+        transaction_uuid=transaction_uuid,
+        provider='esewa',
+    )
+
+    context = {
+        **_build_sponsorship_payment_context(package),
+        'amount': f"{amount:.2f}",
+        'tax_amount': f"{tax_amount:.2f}",
+        'total_amount': f"{total_amount:.2f}",
+        'transaction_uuid': transaction_uuid,
+        'product_code': settings.ESEWA_PRODUCT_CODE,
+        'signature': _generate_esewa_signature(
+            f"{total_amount:.2f}",
+            transaction_uuid,
+            settings.ESEWA_PRODUCT_CODE,
+        ),
+        'success_url': request.build_absolute_uri(reverse('esewa_verify')),
+        'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
+        'esewa_form_url': settings.ESEWA_FORM_URL,
+    }
+    return render(request, 'main/esewa_checkout.html', context)
+
+
+@login_required
 def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
     custom_itinerary = get_object_or_404(
         CustomItinerary.objects.select_related('package'),
@@ -1929,6 +2061,17 @@ def esewa_verify(request):
             f"{reverse('payment_cancelled')}?reason=esewa_status&status={status or 'UNKNOWN'}"
         )
 
+    if request.session.get('pending_sponsorship_package_id'):
+        try:
+            package = _activate_pending_sponsorship(request)
+        except ValueError:
+            messages.error(request, 'Could not find a pending sponsorship after eSewa verification.')
+            return redirect('vendor_package_list')
+
+        _clear_pending_payment_session(request)
+        messages.success(request, f"{package.name} is now sponsored through {package.sponsorship_end}.")
+        return redirect('vendor_package_list')
+
     try:
         booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
     except ValueError:
@@ -1997,6 +2140,58 @@ def create_checkout_session(request, package_id):
 
 
 @login_required
+@role_required(allowed_roles=['vendor'])
+def create_sponsorship_checkout_session(request, package_id):
+    package = get_object_or_404(
+        TravelPackage.objects.select_related('vendor'),
+        pk=package_id,
+        vendor=_get_vendor_or_403(request),
+    )
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    success_url = request.build_absolute_uri(
+        reverse('payment_success')
+    ) + '?session_id={CHECKOUT_SESSION_ID}'
+
+    cancel_url = request.build_absolute_uri(
+        reverse('payment_cancelled')
+    )
+
+    amount = _get_sponsorship_price(package)
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f"{package.name} Sponsorship",
+                        'description': f"Sponsored listing for {SPONSORSHIP_DURATION_DAYS} days",
+                    },
+                    'unit_amount': int(amount * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=success_url,
+            cancel_url=cancel_url,
+            customer_email=request.user.email,
+        )
+
+        _store_pending_payment_session(
+            request,
+            sponsorship_package_id=package.id,
+            provider='stripe',
+        )
+
+        return redirect(checkout_session.url, code=303)
+    except Exception as e:
+        messages.error(request, f"Something went wrong with the payment process. Error: {e}")
+        return redirect('choose_sponsorship_payment', package_id=package.id)
+
+
+@login_required
 def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
     custom_itinerary = get_object_or_404(
         CustomItinerary.objects.select_related('package', 'package__vendor'),
@@ -2053,9 +2248,23 @@ def payment_success(request):
     Handles successful payments. Creates the booking record and shows a
     confirmation page.
     """
-    if not request.session.get('pending_custom_itinerary_id') and not request.session.get('pending_booking_package_id'):
+    if not request.session.get('pending_custom_itinerary_id') and not request.session.get('pending_booking_package_id') and not request.session.get('pending_sponsorship_package_id'):
         messages.error(request, "Could not find a pending booking. Please try again.")
         return redirect('package_list')
+
+    if request.session.get('pending_sponsorship_package_id'):
+        try:
+            package = _activate_pending_sponsorship(request)
+        except ValueError:
+            messages.error(request, "Could not find a pending sponsorship. Please try again.")
+            return redirect('vendor_package_list')
+
+        _clear_pending_payment_session(request)
+        messages.success(request, f"{package.name} is now sponsored through {package.sponsorship_end}.")
+        return render(request, 'main/payment_success.html', {
+            'sponsorship_package': package,
+            'sponsorship_end': package.sponsorship_end,
+        })
 
     try:
         booking, package, is_custom = _create_or_update_booking_from_pending_payment(request)
@@ -2080,6 +2289,7 @@ def payment_cancelled(request):
     """
     reason = request.GET.get('reason', '')
     status = request.GET.get('status', '')
+    sponsorship_package = None
 
     detail_message = "Your payment was cancelled. You have not been charged."
 
@@ -2090,6 +2300,13 @@ def payment_cancelled(request):
             "The payment returned from eSewa, but this app could not match it to your current checkout session."
         )
 
+    sponsorship_package_id = request.session.get('pending_sponsorship_package_id')
+    if sponsorship_package_id and request.user.is_authenticated:
+        sponsorship_package = TravelPackage.objects.filter(
+            pk=sponsorship_package_id,
+            vendor__user=request.user,
+        ).first()
+
     _notify_payment_cancelled(request, detail_message)
     messages.warning(request, detail_message)
     return render(
@@ -2099,6 +2316,7 @@ def payment_cancelled(request):
             'detail_message': detail_message,
             'payment_status': status,
             'cancel_reason': reason,
+            'sponsorship_package': sponsorship_package,
         },
     )
 
