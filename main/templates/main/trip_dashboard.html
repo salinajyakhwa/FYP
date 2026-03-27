@@ -160,56 +160,74 @@
 
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3">
-            <h2 class="h5 mb-0">Trip Timeline</h2>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <h2 class="h5 mb-0">Trip Timeline</h2>
+                {% if current_day_number %}
+                <div class="small text-muted">Current trip day: Day {{ current_day_number }}</div>
+                {% endif %}
+            </div>
         </div>
         <div class="card-body p-4">
-            {% if timeline_items %}
-            <div class="d-grid gap-3">
-                {% for item in timeline_items %}
-                <div class="{{ item.item_card_class }} rounded p-3">
-                    <div class="d-flex justify-content-between align-items-start gap-3">
-                        <div>
-                            <div class="small text-muted">Day {{ item.day_number }}</div>
-                            <div class="fw-semibold">{{ item.title }}</div>
-                            {% if item.package_day_title and item.package_day_title != item.title %}
-                            <div class="small text-muted mt-1">{{ item.package_day_title }}</div>
-                            {% endif %}
-                            {% if item.selected_option_title %}
-                            <div class="mt-2">{{ item.selected_option_title }}</div>
-                            {% endif %}
-                            {% if item.option_type %}
-                            <div class="small text-muted">{{ item.option_type }}</div>
-                            {% endif %}
-                            {% if item.description %}
-                            <div class="small mt-2">{{ item.description }}</div>
-                            {% endif %}
-                            <div class="mt-3">
-                                <div class="small text-muted mb-2">Attachments</div>
-                                {% if item.attachments %}
-                                <div class="d-grid gap-2">
-                                    {% for attachment in item.attachments %}
-                                    <div class="border rounded bg-white p-2">
-                                        <div class="fw-semibold small">{{ attachment.title }}</div>
-                                        <div class="small text-muted">{{ attachment.get_attachment_type_display }}</div>
-                                        <a href="{{ attachment.file.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-link px-0">Open File</a>
+            {% if timeline_sections %}
+            <div class="d-grid gap-4">
+                {% for section in timeline_sections %}
+                <div>
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <h3 class="h6 mb-0">{{ section.title }}</h3>
+                            <span class="badge text-bg-light">{{ section.items|length }}</span>
+                        </div>
+                        <div class="small text-muted mt-1">{{ section.subtitle }}</div>
+                    </div>
+                    <div class="d-grid gap-3">
+                        {% for item in section.items %}
+                        <div class="{{ item.item_card_class }} rounded p-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="small text-muted">Day {{ item.day_number }}</div>
+                                    <div class="fw-semibold">{{ item.title }}</div>
+                                    {% if item.package_day_title and item.package_day_title != item.title %}
+                                    <div class="small text-muted mt-1">{{ item.package_day_title }}</div>
+                                    {% endif %}
+                                    {% if item.selected_option_title %}
+                                    <div class="mt-2">{{ item.selected_option_title }}</div>
+                                    {% endif %}
+                                    {% if item.option_type %}
+                                    <div class="small text-muted">{{ item.option_type }}</div>
+                                    {% endif %}
+                                    {% if item.description %}
+                                    <div class="small mt-2">{{ item.description }}</div>
+                                    {% endif %}
+                                    <div class="mt-3">
+                                        <div class="small text-muted mb-2">Attachments</div>
+                                        {% if item.attachments %}
+                                        <div class="d-grid gap-2">
+                                            {% for attachment in item.attachments %}
+                                            <div class="border rounded bg-white p-2">
+                                                <div class="fw-semibold small">{{ attachment.title }}</div>
+                                                <div class="small text-muted">{{ attachment.get_attachment_type_display }}</div>
+                                                <a href="{{ attachment.file.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-link px-0">Open File</a>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="small text-muted">No attachments available yet.</div>
+                                        {% endif %}
                                     </div>
-                                    {% endfor %}
                                 </div>
-                                {% else %}
-                                <div class="small text-muted">No attachments available yet.</div>
-                                {% endif %}
+                                <div class="text-end">
+                                    <span class="badge {{ item.status_badge_class }}">{{ item.status }}</span>
+                                    {% if item.action_link %}
+                                    <div class="mt-2">
+                                        <a href="{{ item.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                                            {{ item.action_label }}
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
-                        <div class="text-end">
-                            <span class="badge {{ item.status_badge_class }}">{{ item.status }}</span>
-                            {% if item.action_link %}
-                            <div class="mt-2">
-                                <a href="{{ item.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
-                                    {{ item.action_label }}
-                                </a>
-                            </div>
-                            {% endif %}
-                        </div>
+                        {% endfor %}
                     </div>
                 </div>
                 {% endfor %}

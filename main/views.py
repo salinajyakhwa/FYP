@@ -357,6 +357,58 @@ def _build_trip_recent_attachments(timeline_items, limit=4):
     return attachments[:limit]
 
 
+def _build_trip_timeline_sections(trip, timeline_items):
+    today = timezone.now().date()
+    current_day_number = None
+    if trip.start_date:
+        current_day_number = max(1, (today - trip.start_date).days + 1)
+
+    today_items = []
+    upcoming_items = []
+    completed_items = []
+
+    for item in timeline_items:
+        if item['status_key'] in {'completed', 'cancelled'}:
+            completed_items.append(item)
+            continue
+
+        if current_day_number is not None:
+            if item['day_number'] <= current_day_number:
+                today_items.append(item)
+            else:
+                upcoming_items.append(item)
+        else:
+            if item['status_key'] in {'ready', 'in_progress'}:
+                today_items.append(item)
+            else:
+                upcoming_items.append(item)
+
+    sections = []
+    if today_items:
+        sections.append({
+            'title': 'Today',
+            'subtitle': 'Most relevant items for the current stage of your trip.',
+            'items': today_items,
+        })
+    if upcoming_items:
+        sections.append({
+            'title': 'Upcoming',
+            'subtitle': 'What is coming next in your trip.',
+            'items': upcoming_items,
+        })
+    if completed_items:
+        sections.append({
+            'title': 'Completed',
+            'subtitle': 'Finished steps and completed history.',
+            'items': completed_items,
+        })
+
+    return {
+        'sections': sections,
+        'current_day_number': current_day_number,
+    }
+
+
 def _build_payment_context(*, package, custom_itinerary=None):
     amount = custom_itinerary.final_price if custom_itinerary else package.price
     return {
@@ -1211,12 +1263,15 @@ def trip_dashboard(request, trip_id):
     progress_summary = _build_trip_progress_summary(trip)
     recent_attachments = _build_trip_recent_attachments(timeline_items)
     next_action = _build_trip_next_action(timeline_items)
+    timeline_section_data = _build_trip_timeline_sections(trip, timeline_items)
 
     context = {
         'trip': trip,
         'booking': trip.booking,
         'package': trip.package,
         'timeline_items': timeline_items,
+        'timeline_sections': timeline_section_data['sections'],
+        'current_day_number': timeline_section_data['current_day_number'],
         'progress_summary': progress_summary,
         'next_action': next_action,
         'recent_attachments': recent_attachments,
