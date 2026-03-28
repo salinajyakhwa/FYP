@@ -7,7 +7,7 @@
 <div class="container mt-5">
   <div class="card shadow-sm p-4">
     <h3 class="mb-3">Checkout — {{ display_name }}</h3>
-    <p>Price: <strong>${{ amount|floatformat:2 }}</strong></p>
+    <p>Price: <strong>Rs. {{ amount|floatformat:2 }}</strong></p>
     {% if sponsorship_package %}
     <p class="text-muted mb-0">This promotes <strong>{{ sponsorship_package.name }}</strong> in the sponsored listings section for {{ sponsorship_duration_days }} days.</p>
     {% endif %}

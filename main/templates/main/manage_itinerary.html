@@ -58,7 +58,7 @@
                                             </div>
                                         </div>
                                         <div class="text-end">
-                                            <div class="fw-semibold">${{ option.additional_cost }}</div>
+                                            <div class="fw-semibold">Rs. {{ option.additional_cost }}</div>
                                             <div class="d-flex gap-2 mt-2">
                                                 <a href="{% url 'manage_itinerary' package.id %}?edit_option={{ option.id }}" class="btn btn-sm btn-outline-secondary">Edit</a>
                                                 <form method="post" class="d-inline">

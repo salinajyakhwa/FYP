@@ -163,7 +163,7 @@
                 <div class="d-flex align-items-start justify-content-between">
                     <div>
                         <span class="stat-label">Total Net Revenue</span>
-                        <div class="stat-value">${{ total_revenue|floatformat:2 }}</div>
+                        <div class="stat-value">Rs. {{ total_revenue|floatformat:2 }}</div>
                         <span class="text-success small fw-medium">
                             <i class="bi bi-arrow-up-short"></i>12% vs last month
                         </span>
@@ -250,7 +250,7 @@
                                 {{ booking.get_status_display }}
                             </span>
                         </td>
-                        <td class="text-end fw-bold text-dark">${{ booking.total_price|floatformat:2 }}</td>
+                        <td class="text-end fw-bold text-dark">Rs. {{ booking.total_price|floatformat:2 }}</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 y: { 
                     border: { display: false },
                     grid: { color: '#f3f4f6' },
-                    ticks: { callback: v => '$' + v.toLocaleString() } 
+                    ticks: { callback: v => 'Rs. ' + v.toLocaleString() } 
                 },
                 x: { grid: { display: false } }
             }

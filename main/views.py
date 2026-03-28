@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponseBadRequest
 from django.contrib.auth import login, update_session_auth_hash
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
@@ -16,7 +17,7 @@ from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal
 import base64
-import hashlib
+import hashlib 
 import hmac
 import json
 import logging
@@ -70,6 +71,7 @@ from .forms import (
     UserUpdateForm, 
     UserProfileUpdateForm,
     PasswordChangeForm,
+    CustomAuthenticationForm,
     CustomUserCreationForm # Ensure this is in your forms.py
 )
 
@@ -1310,12 +1312,16 @@ def compare_packages(request):
 # 2. AUTHENTICATION
 # ==========================================
 
+class CustomLoginView(auth_views.LoginView):
+    template_name = 'main/login.html'
+    authentication_form = CustomAuthenticationForm
+
 def register(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
 
     if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST, request.FILES)
         if form.is_valid():
             user = form.save()
             email = form.cleaned_data['email']
@@ -1351,12 +1357,25 @@ def verify_otp(request):
 
         if otp_obj and otp_obj.is_valid():
             user = get_object_or_404(User, pk=pending_user_id, email=pending_email)
+            profile = get_object_or_404(UserProfile, user=user)
             user.is_active = True
             user.save(update_fields=['is_active'])
+            profile.is_verified = True
+            profile.save(update_fields=['is_verified'])
 
-            EmailOTP.objects.filter(email=pending_email).delete()
+            EmailOTP.objects.filter(email=pending_email, user_id=pending_user_id).delete()
             request.session.pop('pending_email', None)
             request.session.pop('pending_user_id', None)
+
+            vendor = getattr(profile, 'vendor', None)
+            if profile.role == 'vendor' and vendor:
+                vendor.status = 'pending'
+                vendor.save(update_fields=['status'])
+                messages.success(
+                    request,
+                    'Your email is verified. Your vendor application has been submitted for admin review.'
+                )
+                return redirect('login')
 
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             messages.success(request, 'Your account has been verified successfully.')
@@ -2035,6 +2054,11 @@ def update_vendor_status(request, vendor_id, new_status):
         if new_status in ['approved', 'rejected', 'pending']:
             vendor.status = new_status
             vendor.save()
+            if new_status == 'approved':
+                user = vendor.user_profile.user
+                if not user.is_active:
+                    user.is_active = True
+                    user.save(update_fields=['is_active'])
             messages.success(request, f"Vendor {vendor.name} has been {new_status}.")
         else:
             messages.error(request, "Invalid status.")
@@ -2538,3 +2562,24 @@ def flight_bookings(request):
     return render(request, 'main/flight_bookings.html', {
         'bookings': bookings
     })
+
+
+def vendor_register(request):
+    if request.method == 'POST':
+        form = VendorRegistrationForm(request.POST, request.FILES)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_active = False
+            user.save()
+            Vendor.objects.create(
+                user=user,
+                pan_card_photo=form.cleaned_data['pan_card_photo'],
+                id_document_type=form.cleaned_data['id_document_type'],
+                id_document_photo=form.cleaned_data['id_document_photo'],
+                status='pending'
+            )
+            messages.info(request, "Registration submitted. Await admin approval.")
+            return redirect('login')
+    else:
+        form = VendorRegistrationForm()
+    return render(request, 'vendor/register.html', {'form': form})

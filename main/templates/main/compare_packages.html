@@ -29,7 +29,7 @@
             <tr>
                 <td><strong>Price</strong></td>
                 {% for package in packages %}
-                    <td>${{ package.price|floatformat:2 }}</td>
+                    <td>Rs. {{ package.price|floatformat:2 }}</td>
                 {% endfor %}
             </tr>
             <tr>

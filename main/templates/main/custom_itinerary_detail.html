@@ -26,13 +26,13 @@
                         <div class="col-md-4">
                             <div class="border rounded p-3 h-100">
                                 <div class="small text-muted">Base Price</div>
-                                <div class="fw-semibold">${{ custom_itinerary.base_price }}</div>
+                                <div class="fw-semibold">Rs. {{ custom_itinerary.base_price }}</div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="border rounded p-3 h-100">
                                 <div class="small text-muted">Final Price</div>
-                                <div class="fw-semibold">${{ custom_itinerary.final_price }}</div>
+                                <div class="fw-semibold">Rs. {{ custom_itinerary.final_price }}</div>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -57,7 +57,7 @@
                                     <div class="small mt-1">{{ selection.selected_option.description }}</div>
                                     {% endif %}
                                 </div>
-                                <div class="fw-semibold">+${{ selection.selected_price }}</div>
+                                <div class="fw-semibold">+Rs. {{ selection.selected_price }}</div>
                             </div>
                         </div>
                         {% empty %}

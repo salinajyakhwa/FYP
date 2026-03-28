@@ -24,9 +24,18 @@ class UserProfile(models.Model):
 
 # Represents a travel vendor or service provider.
 class Vendor(models.Model):
+    ID_DOCUMENT_TYPE_CHOICES = (
+        ('national_id', 'National ID Card'),
+        ('passport', 'Passport'),
+        ('citizenship', 'Citizenship'),
+    )
+
     user_profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     description = models.TextField()
+    pan_card_photo = models.ImageField(upload_to='pan_cards/', blank=True, null=True)
+    id_document_type = models.CharField(max_length=50, choices=ID_DOCUMENT_TYPE_CHOICES, blank=True, null=True)
+    id_document_photo = models.ImageField(upload_to='id_documents/', blank=True, null=True)
     website = models.URLField(blank=True, null=True)
     STATUS_CHOICES = (
         ('pending', 'Pending'),
@@ -36,7 +45,7 @@ class Vendor(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
 
     def __str__(self):
-        return self.name
+        return f"{self.user_profile.user.username} - {self.status}"
 
 # Represents a travel package offered by a vendor.
 class TravelPackage(models.Model):

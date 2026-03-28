@@ -69,7 +69,7 @@
             <div class="tour-card shadow-sm">
                 <a href="{% url 'package_detail' package.id %}" class="text-decoration-none">
                     <!-- Price Badge -->
-                    <div class="price-badge">From ${{ package.price }}</div>
+                    <div class="price-badge">From Rs. {{ package.price }}</div>
                     
                     <!-- Background Image -->
                     <div class="tour-bg" style="background-image: url('{% if package.image %}{{ package.image.url }}{% else %}{% static 'img/dash-background.jpg' %}{% endif %}');"></div>
@@ -111,7 +111,7 @@
             </div>
             <div class="small mt-2 text-muted">
                 {% if package.is_sponsored and package.sponsorship_end %}
-                Sponsored through {{ package.sponsorship_end }}{% if package.sponsorship_amount %} for ${{ package.sponsorship_amount }}{% endif %}
+                Sponsored through {{ package.sponsorship_end }}{% if package.sponsorship_amount %} for Rs. {{ package.sponsorship_amount }}{% endif %}
                 {% else %}
                 Not currently sponsored
                 {% endif %}

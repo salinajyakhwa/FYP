@@ -16,6 +16,7 @@
                         <tr>
                             <th scope="col">Vendor Name</th>
                             <th scope="col">User</th>
+                            <th scope="col">Documents</th>
                             <th scope="col">Status</th>
                             <th scope="col">Actions</th>
                         </tr>
@@ -25,6 +26,26 @@
                         <tr>
                             <td>{{ vendor.name }}</td>
                             <td>{{ vendor.user_profile.user.username }}</td>
+                            <td>
+                                <div class="small">
+                                    <div class="mb-1">
+                                        <strong>PAN:</strong>
+                                        {% if vendor.pan_card_photo %}
+                                        <a href="{{ vendor.pan_card_photo.url }}" target="_blank" rel="noopener noreferrer">View upload</a>
+                                        {% else %}
+                                        <span class="text-muted">Missing</span>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <strong>{{ vendor.get_id_document_type_display|default:"ID" }}:</strong>
+                                        {% if vendor.id_document_photo %}
+                                        <a href="{{ vendor.id_document_photo.url }}" target="_blank" rel="noopener noreferrer">View upload</a>
+                                        {% else %}
+                                        <span class="text-muted">Missing</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
                             <td>
                                 <span class="badge 
                                     {% if vendor.status == 'approved' %}bg-success
@@ -57,7 +78,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center">No vendors found.</td>
+                            <td colspan="5" class="text-center">No vendors found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

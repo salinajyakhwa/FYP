@@ -172,7 +172,7 @@
                             {{ booking.number_of_travelers }}
                         </td>
                         <td class="text-end fw-bold text-dark tabular-nums">
-                            ${{ booking.total_price|floatformat:2 }}
+                            Rs. {{ booking.total_price|floatformat:2 }}
                         </td>
                         <td class="text-end">
                             <a href="{% url 'flight_bookings' %}" class="btn btn-primary">

@@ -16,6 +16,10 @@ def role_required(allowed_roles=[]):
 
             try:
                 if request.user.userprofile.role in allowed_roles:
+                    if request.user.userprofile.role == 'vendor':
+                        vendor = getattr(request.user.userprofile, 'vendor', None)
+                        if not vendor or vendor.status != 'approved':
+                            raise PermissionDenied
                     return view_func(request, *args, **kwargs)
                 else:
                     raise PermissionDenied

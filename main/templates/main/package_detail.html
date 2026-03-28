@@ -27,7 +27,7 @@
                             <h1 class="h2 mb-1">{{ package.name }}</h1>
                             <p class="text-muted mb-0">Offered by {{ package.vendor.name }}</p>
                         </div>
-                        <span class="badge bg-primary fs-6">${{ package.price }}</span>
+                        <span class="badge bg-primary fs-6">Rs. {{ package.price }}</span>
                     </div>
 
                     <div class="row g-3 mb-4">
@@ -95,7 +95,7 @@
                                                 {% endif %}
                                             </div>
                                         </div>
-                                        <div class="fw-semibold">${{ option.additional_cost }}</div>
+                                        <div class="fw-semibold">Rs. {{ option.additional_cost }}</div>
                                     </label>
                                     {% else %}
                                     <div class="d-flex justify-content-between align-items-center gap-3">
@@ -103,7 +103,7 @@
                                             <strong>{{ option.title }}</strong>
                                             <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
                                         </div>
-                                        <div class="fw-semibold">${{ option.additional_cost }}</div>
+                                        <div class="fw-semibold">Rs. {{ option.additional_cost }}</div>
                                     </div>
                                     {% if option.description %}
                                     <div class="small mt-1">{{ option.description }}</div>
@@ -195,12 +195,12 @@
 
                     <div class="d-flex justify-content-between mb-2">
                         <span>Base Price</span>
-                        <strong>${{ package.price }}</strong>
+                        <strong>Rs. {{ package.price }}</strong>
                     </div>
                     <div class="d-flex justify-content-between mb-4">
                         <span>Customization</span>
                         <span class="{% if customization_form %}fw-semibold{% else %}text-muted{% endif %}">
-                            {% if customization_form %}${{ customization_extra_cost }}{% else %}Coming soon{% endif %}
+                            {% if customization_form %}Rs. {{ customization_extra_cost }}{% else %}Coming soon{% endif %}
                         </span>
                     </div>
 
@@ -211,7 +211,7 @@
                             {% for selection in selected_options_summary %}
                             <div>
                                 <div class="small fw-semibold">Day {{ selection.day_number }}: {{ selection.day_title }}</div>
-                                <div class="small text-muted">{{ selection.option_title }} · {{ selection.option_type }} · +${{ selection.additional_cost }}</div>
+                                <div class="small text-muted">{{ selection.option_title }} · {{ selection.option_type }} · +Rs. {{ selection.additional_cost }}</div>
                             </div>
                             {% endfor %}
                         </div>
@@ -220,7 +220,7 @@
 
                     <div class="d-flex justify-content-between mb-4">
                         <span>Total</span>
-                        <strong>${{ customization_total }}</strong>
+                        <strong>Rs. {{ customization_total }}</strong>
                     </div>
 
                     {% if user.is_authenticated and user.userprofile.role == 'traveler' %}

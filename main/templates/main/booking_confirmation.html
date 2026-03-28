@@ -38,7 +38,7 @@
                         <div class="col-md-6">
                             <div class="border rounded p-3 h-100">
                                 <div class="small text-muted">Total Price</div>
-                                <div class="fw-semibold">${{ booking.total_price|floatformat:2 }}</div>
+                                <div class="fw-semibold">Rs. {{ booking.total_price|floatformat:2 }}</div>
                             </div>
                         </div>
                     </div>
@@ -72,7 +72,7 @@
                                         {% endif %}
                                     </div>
                                     <div class="text-end">
-                                        <div class="fw-semibold">+${{ item.selected_price }}</div>
+                                        <div class="fw-semibold">+Rs. {{ item.selected_price }}</div>
                                         {% if item.action_link and not group.group_link %}
                                         <a href="{{ item.action_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary mt-2">
                                             {{ item.action_button_label }}
