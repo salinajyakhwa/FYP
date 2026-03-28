@@ -58,14 +58,21 @@
             <div class="col-md-4 text-md-end">
                 <p><strong>Status:</strong> <span class="badge bg-primary">{{ booking.get_status_display }}</span></p>
                 <p><strong>Total Price:</strong> Rs. {{ booking.total_price|floatformat:2 }}</p>
+                {% if booking.status == 'cancellation_requested' %}
+                <div class="small text-muted mb-2">Cancellation request sent.</div>
+                {% elif booking.status == 'cancellation_reviewed' %}
+                <div class="small text-muted mb-2">Waiting for admin decision.</div>
+                <div class="small text-muted mb-2">Estimated refund: Rs. {{ booking.refund_amount|floatformat:2 }}</div>
+                {% endif %}
                 <a href="{% url 'booking_confirmation' booking.id %}" class="btn btn-outline-secondary btn-sm mb-2">View Details</a>
                 {% if booking.trip %}
                 <a href="{% url 'trip_dashboard' booking.trip.id %}" class="btn btn-outline-primary btn-sm mb-2">View Trip</a>
                 {% endif %}
                 {% if booking.status == 'pending' or booking.status == 'confirmed' %}
-                    <form action="{% url 'cancel_booking' booking.id %}" method="post" class="d-inline">
+                    <form action="{% url 'cancel_booking' booking.id %}" method="post" class="d-grid gap-2">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-danger btn-sm">Cancel Booking</button>
+                        <textarea name="cancellation_reason" class="form-control form-control-sm" rows="2" placeholder="Why are you cancelling?"></textarea>
+                        <button type="submit" class="btn btn-danger btn-sm">Request Cancellation</button>
                     </form>
                 {% endif %}
             </div>

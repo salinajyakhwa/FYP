@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from .models import (
     Review,
+    Booking,
     TravelPackage,
     UserProfile,
     Vendor,
@@ -170,6 +171,55 @@ class BookingTravelerForm(forms.Form):
         adult_total = Decimal(self.cleaned_data['adult_count']) * Decimal(adult_unit_price)
         child_total = Decimal(self.cleaned_data['child_count']) * Decimal(child_unit_price)
         return adult_total + child_total
+
+
+class BookingCancellationRequestForm(forms.ModelForm):
+    class Meta:
+        model = Booking
+        fields = ['cancellation_reason']
+        widgets = {
+            'cancellation_reason': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 2,
+                'placeholder': 'Reason for cancellation',
+            }),
+        }
+
+    def clean_cancellation_reason(self):
+        return self.cleaned_data['cancellation_reason'].strip()
+
+
+class VendorCancellationReviewForm(forms.ModelForm):
+    class Meta:
+        model = Booking
+        fields = ['vendor_committed_cost', 'vendor_cancellation_notes']
+        widgets = {
+            'vendor_committed_cost': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'vendor_cancellation_notes': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 2,
+                'placeholder': 'Explain what has already been booked or paid',
+            }),
+        }
+
+    def __init__(self, *args, booking=None, **kwargs):
+        self.booking = booking or kwargs.get('instance')
+        super().__init__(*args, **kwargs)
+
+    def clean_vendor_committed_cost(self):
+        committed_cost = self.cleaned_data['vendor_committed_cost']
+        if committed_cost < 0:
+            raise forms.ValidationError('Committed cost cannot be negative.')
+        if self.booking and committed_cost > self.booking.total_price:
+            raise forms.ValidationError('Committed cost cannot exceed the booking total.')
+        return committed_cost
+
+    def clean_vendor_cancellation_notes(self):
+        return self.cleaned_data.get('vendor_cancellation_notes', '').strip()
 
 class ItineraryDayForm(forms.Form):
     ACTIVITY_CHOICES = [

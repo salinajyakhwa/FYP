@@ -74,6 +74,8 @@ from .forms import (
     CustomAuthenticationForm,
     CustomUserCreationForm,
     BookingTravelerForm,
+    BookingCancellationRequestForm,
+    VendorCancellationReviewForm,
 )
 
 # Decorators
@@ -313,6 +315,11 @@ def _calculate_booking_pricing(package, adult_count, child_count, custom_itinera
         'total_travelers': total_travelers,
         'total_price': _quantize_currency(total_price),
     }
+
+
+def _calculate_refund_amount(total_price, committed_cost):
+    refund_amount = Decimal(total_price) - Decimal(committed_cost)
+    return _quantize_currency(max(refund_amount, Decimal('0.00')))
 
 
 def _build_trip_timeline_items(trip):
@@ -1561,7 +1568,7 @@ def dashboard(request):
 
     recent_notifications = list(
         Notification.objects.filter(user=request.user)
-        .order_by('-created_at')[:5]
+        .order_by('-created_at')[:3]
     )
 
     recent_threads = list(
@@ -1860,9 +1867,15 @@ def cancel_booking(request, booking_id):
 
     if request.method == 'POST':
         if booking.status in ['pending', 'confirmed']:
-            booking.status = 'cancelled'
-            booking.save()
-            messages.success(request, 'Booking cancelled successfully.')
+            form = BookingCancellationRequestForm(request.POST, instance=booking)
+            if form.is_valid():
+                booking = form.save(commit=False)
+                booking.status = 'cancellation_requested'
+                booking.cancellation_requested_at = timezone.now()
+                booking.save(update_fields=['cancellation_reason', 'status', 'cancellation_requested_at'])
+                messages.success(request, 'Cancellation request sent to the vendor for review.')
+            else:
+                messages.error(request, 'Please add a short cancellation reason.')
         else:
             messages.error(request, 'This booking cannot be cancelled.')
     
@@ -2048,6 +2061,12 @@ def vendor_bookings(request):
     for booking in bookings:
         booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
         booking.selection_groups = _group_booking_selection_items(booking.selection_items)
+        if booking.status == 'cancellation_requested':
+            booking.cancellation_review_form = VendorCancellationReviewForm(
+                instance=booking,
+                booking=booking,
+                prefix=f'cancel-{booking.id}',
+            )
 
     context = {
         'bookings': bookings,
@@ -2069,6 +2088,45 @@ def update_booking_status(request, booking_id, new_status):
         else:
             messages.error(request, "Invalid status.")
     
+    return redirect('vendor_bookings')
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def review_cancellation_request(request, booking_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    booking = get_object_or_404(Booking, id=booking_id, package__vendor=vendor)
+
+    if booking.status != 'cancellation_requested':
+        messages.error(request, 'This booking is not waiting for cancellation review.')
+        return redirect('vendor_bookings')
+
+    form = VendorCancellationReviewForm(
+        request.POST,
+        instance=booking,
+        booking=booking,
+        prefix=f'cancel-{booking.id}',
+    )
+    if not form.is_valid():
+        messages.error(request, 'Please correct the cancellation review form.')
+        return redirect('vendor_bookings')
+
+    booking = form.save(commit=False)
+    booking.refund_amount = _calculate_refund_amount(booking.total_price, booking.vendor_committed_cost)
+    booking.status = 'cancellation_reviewed'
+    booking.cancellation_reviewed_at = timezone.now()
+    booking.save(update_fields=[
+        'vendor_committed_cost',
+        'vendor_cancellation_notes',
+        'refund_amount',
+        'status',
+        'cancellation_reviewed_at',
+    ])
+
+    messages.success(request, 'Cancellation review sent for admin approval.')
     return redirect('vendor_bookings')
 
 @login_required
@@ -2248,6 +2306,51 @@ def update_vendor_status(request, vendor_id, new_status):
         else:
             messages.error(request, "Invalid status.")
     return redirect('manage_vendors')
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def manage_cancellation_requests(request):
+    bookings = (
+        Booking.objects.filter(status__in=['cancellation_requested', 'cancellation_reviewed'])
+        .select_related('user', 'package', 'package__vendor')
+        .order_by('-cancellation_requested_at', '-booking_date')
+    )
+    return render(request, 'main/manage_cancellation_requests.html', {'bookings': bookings})
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def finalize_cancellation_request(request, booking_id, decision):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    booking = get_object_or_404(Booking, pk=booking_id)
+    admin_notes = request.POST.get('admin_cancellation_notes', '').strip()
+
+    if booking.status != 'cancellation_reviewed':
+        messages.error(request, 'This booking is not ready for final cancellation approval.')
+        return redirect('manage_cancellation_requests')
+
+    if decision == 'approve':
+        booking.status = 'cancelled'
+        booking.admin_cancellation_notes = admin_notes
+        booking.cancellation_admin_reviewed_at = timezone.now()
+        booking.save(update_fields=['status', 'admin_cancellation_notes', 'cancellation_admin_reviewed_at'])
+        if getattr(booking, 'trip', None) and booking.trip.status != 'cancelled':
+            booking.trip.status = 'cancelled'
+            booking.trip.save(update_fields=['status', 'updated_at'])
+        messages.success(request, 'Cancellation approved and booking marked as cancelled.')
+    elif decision == 'reject':
+        booking.status = 'confirmed'
+        booking.admin_cancellation_notes = admin_notes
+        booking.cancellation_admin_reviewed_at = timezone.now()
+        booking.save(update_fields=['status', 'admin_cancellation_notes', 'cancellation_admin_reviewed_at'])
+        messages.success(request, 'Cancellation rejected and booking restored to confirmed.')
+    else:
+        messages.error(request, 'Invalid cancellation decision.')
+
+    return redirect('manage_cancellation_requests')
 
 
 # ==========================================

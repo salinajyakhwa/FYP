@@ -3,7 +3,7 @@ from . import views
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    path('', views.root_redirect_view, name='root_redirect'),
+    path('', views.home, name='home'),
     path('tours/', views.package_list, name='package_list'),
     path('search/', views.search_results, name='search_results'),
     
@@ -40,6 +40,7 @@ urlpatterns = [
     path('vendor/trip-item/<int:trip_item_id>/attachments/upload/', views.upload_trip_item_attachment, name='upload_trip_item_attachment'),
     path('vendor/trip-item-attachment/<int:attachment_id>/delete/', views.delete_trip_item_attachment, name='delete_trip_item_attachment'),
     path('vendor/booking/<int:booking_id>/update/<str:new_status>/', views.update_booking_status, name='update_booking_status'),
+    path('vendor/booking/<int:booking_id>/cancellation-review/', views.review_cancellation_request, name='review_cancellation_request'),
     path('vendor/packages/', views.vendor_package_list, name='vendor_package_list'),
     path('vendor/package/create/', views.create_package, name='create_package'),
     path('vendor/package/<int:package_id>/manage-itinerary/', views.manage_itinerary, name='manage_itinerary'),
@@ -51,6 +52,8 @@ urlpatterns = [
     path('management/users/delete/<int:user_id>/', views.delete_user, name='delete_user'),
     path('management/vendors/', views.manage_vendors, name='manage_vendors'),
     path('management/vendor/<int:vendor_id>/update/<str:new_status>/', views.update_vendor_status, name='update_vendor_status'),
+    path('management/cancellations/', views.manage_cancellation_requests, name='manage_cancellation_requests'),
+    path('management/cancellations/<int:booking_id>/<str:decision>/', views.finalize_cancellation_request, name='finalize_cancellation_request'),
 
     # 6. EXTRAS
     path('about/', views.about, name='about'),

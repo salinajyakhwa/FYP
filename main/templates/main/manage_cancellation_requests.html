@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Cancellation Reviews{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <div class="small text-muted">Admin</div>
+            <h1 class="h3 mb-1">Cancellation Reviews</h1>
+            <div class="text-muted">Approve or reject vendor-reviewed cancellation requests.</div>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Booking</th>
+                            <th>Traveler</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                            <th>Costs</th>
+                            <th>Decision</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for booking in bookings %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ booking.package.name }}</div>
+                                <div class="small text-muted">#BOK-{{ booking.id|stringformat:"05d" }}</div>
+                            </td>
+                            <td>
+                                <div>{{ booking.user.username }}</div>
+                                <div class="small text-muted">{{ booking.user.email }}</div>
+                            </td>
+                            <td>
+                                <span class="badge text-bg-light border">{{ booking.get_status_display }}</span>
+                            </td>
+                            <td style="min-width: 220px;">
+                                <div>{{ booking.cancellation_reason|default:"No reason provided." }}</div>
+                                {% if booking.vendor_cancellation_notes %}
+                                <div class="small text-muted mt-2">Vendor: {{ booking.vendor_cancellation_notes }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small text-muted">Committed</div>
+                                <div class="fw-semibold">Rs. {{ booking.vendor_committed_cost|floatformat:2 }}</div>
+                                <div class="small text-muted mt-2">Refund</div>
+                                <div class="fw-semibold">Rs. {{ booking.refund_amount|floatformat:2 }}</div>
+                            </td>
+                            <td style="min-width: 260px;">
+                                {% if booking.status == 'cancellation_reviewed' %}
+                                <div class="d-grid gap-2">
+                                    <form action="{% url 'finalize_cancellation_request' booking.id 'approve' %}" method="post">
+                                        {% csrf_token %}
+                                        <textarea name="admin_cancellation_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Optional admin note"></textarea>
+                                        <button type="submit" class="btn btn-danger btn-sm w-100">Approve Cancellation</button>
+                                    </form>
+                                    <form action="{% url 'finalize_cancellation_request' booking.id 'reject' %}" method="post">
+                                        {% csrf_token %}
+                                        <textarea name="admin_cancellation_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Why is this being rejected?"></textarea>
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Reject Request</button>
+                                    </form>
+                                </div>
+                                {% else %}
+                                <div class="small text-muted">Waiting for vendor cost review.</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">No cancellation requests are waiting right now.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -258,13 +258,23 @@ class Booking(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
+        ('cancellation_requested', 'Cancellation Requested'),
+        ('cancellation_reviewed', 'Waiting Admin Decision'),
         ('cancelled', 'Cancelled'),
     )
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
     adult_count = models.PositiveIntegerField(default=1)
     child_count = models.PositiveIntegerField(default=0)
     number_of_travelers = models.PositiveIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    cancellation_reason = models.TextField(blank=True)
+    vendor_committed_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    vendor_cancellation_notes = models.TextField(blank=True)
+    admin_cancellation_notes = models.TextField(blank=True)
+    cancellation_requested_at = models.DateTimeField(blank=True, null=True)
+    cancellation_reviewed_at = models.DateTimeField(blank=True, null=True)
+    cancellation_admin_reviewed_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"Booking for {self.package.name} by {self.user.username}"

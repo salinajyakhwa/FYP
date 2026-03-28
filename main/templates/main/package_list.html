@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load widget_tweaks %}
 
 {% block title %}Explore Journeys | TravelBooker{% endblock %}
@@ -27,7 +28,7 @@
 
     /* 🌿 Seamless Hero & Search */
     .hero-wrap {
-        background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('/static/images/hero.jpg') center/cover no-repeat;
+        background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url("{% static 'img/annapurna.jpg' %}") center/cover no-repeat;
         height: 320px;
         display: flex;
         align-items: center;

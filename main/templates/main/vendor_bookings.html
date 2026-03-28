@@ -68,6 +68,8 @@
     }
     .status-confirmed { background: #ecfdf5; color: #065f46; }
     .status-pending { background: #fffbeb; color: #92400e; }
+    .status-cancellation-requested { background: #eff6ff; color: #1d4ed8; }
+    .status-cancellation-reviewed { background: #f5f3ff; color: #6d28d9; }
     .status-cancelled { background: #fef2f2; color: #991b1b; }
 
     /* Package and User Meta */
@@ -162,6 +164,8 @@
                             <span class="status-pill 
                                 {% if booking.status == 'confirmed' %}status-confirmed
                                 {% elif booking.status == 'pending' %}status-pending
+                                {% elif booking.status == 'cancellation_requested' %}status-cancellation-requested
+                                {% elif booking.status == 'cancellation_reviewed' %}status-cancellation-reviewed
                                 {% elif booking.status == 'cancelled' %}status-cancelled
                                 {% endif %}">
                                 <i class="bi bi-circle-fill me-2" style="font-size: 6px;"></i>
@@ -199,11 +203,65 @@
                                     </button>
                                 </form>
                             </div>
+                            {% elif booking.status == 'cancellation_requested' %}
+                            <span class="text-muted small">Review needed</span>
+                            {% elif booking.status == 'cancellation_reviewed' %}
+                            <span class="text-muted small">Waiting for admin</span>
                             {% else %}
                             <span class="text-muted small">Processed</span>
                             {% endif %}
                         </td>
                     </tr>
+                    {% if booking.status == 'cancellation_requested' or booking.status == 'cancellation_reviewed' %}
+                    <tr>
+                        <td colspan="7" style="background:#f9fafb;">
+                            <div class="p-3">
+                                <div class="row g-3 align-items-start">
+                                    <div class="col-lg-5">
+                                        <div class="small text-muted mb-1">Traveler reason</div>
+                                        <div>{{ booking.cancellation_reason|default:"No reason provided." }}</div>
+                                        {% if booking.cancellation_requested_at %}
+                                        <div class="small text-muted mt-2">Requested on {{ booking.cancellation_requested_at|date:"M d, Y, g:i a" }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-lg-7">
+                                        {% if booking.status == 'cancellation_requested' %}
+                                        <form action="{% url 'review_cancellation_request' booking.id %}" method="post" class="row g-2">
+                                            {% csrf_token %}
+                                            <div class="col-md-4">
+                                                <label class="form-label small text-muted">Committed cost</label>
+                                                {{ booking.cancellation_review_form.vendor_committed_cost }}
+                                            </div>
+                                            <div class="col-md-8">
+                                                <label class="form-label small text-muted">What has been paid?</label>
+                                                {{ booking.cancellation_review_form.vendor_cancellation_notes }}
+                                            </div>
+                                            <div class="col-12 text-end">
+                                                <button type="submit" class="btn btn-primary btn-sm">Send for Admin Review</button>
+                                            </div>
+                                        </form>
+                                        {% else %}
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <div class="small text-muted">Committed cost</div>
+                                                <div class="fw-semibold">Rs. {{ booking.vendor_committed_cost|floatformat:2 }}</div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="small text-muted">Calculated refund</div>
+                                                <div class="fw-semibold">Rs. {{ booking.refund_amount|floatformat:2 }}</div>
+                                            </div>
+                                            <div class="col-md-12">
+                                                <div class="small text-muted">Vendor notes</div>
+                                                <div>{{ booking.vendor_cancellation_notes|default:"No notes added." }}</div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% if booking.selection_groups %}
                     <tr>
                         <td colspan="7" style="background:#f9fafb;">
