@@ -88,6 +88,8 @@ logger = logging.getLogger(__name__)
 # New view for the root URL to handle redirection
 def root_redirect_view(request):
     if request.user.is_authenticated:
+        if request.user.is_superuser:
+            return redirect('admin_dashboard')
         if hasattr(request.user, 'userprofile'):
             if request.user.userprofile.role == 'admin':
                 return redirect('admin_dashboard')
@@ -1398,6 +1400,12 @@ def verify_otp(request):
 
 @login_required
 def dashboard(request):
+    if request.user.is_superuser:
+        return redirect('admin_dashboard')
+
+    if hasattr(request.user, 'userprofile') and request.user.userprofile.role == 'admin':
+        return redirect('admin_dashboard')
+
     # Redirect vendors to vendor dashboard
     if hasattr(request.user, 'userprofile') and request.user.userprofile.role == 'vendor':
         return redirect('vendor_dashboard')
