@@ -1790,10 +1790,12 @@ def send_vendor_status_email(request, vendor):
             "Regards,\nTravel Team"
         )
     elif vendor.status == 'rejected':
+        rejection_reason = (vendor.rejection_reason or '').strip()
         subject = 'Your vendor application was rejected'
         body = (
             f"Hi {user.username},\n\n"
             "Your vendor application was reviewed and rejected. "
+            f"{'Reason: ' + rejection_reason + '.\n\n' if rejection_reason else ''}"
             "If you believe this was a mistake, please contact the administrator.\n\n"
             "Regards,\nTravel Team"
         )
@@ -2087,6 +2089,10 @@ def update_vendor_status(request, vendor_id, new_status):
         vendor = get_object_or_404(Vendor, id=vendor_id)
         if new_status in ['approved', 'rejected', 'pending']:
             vendor.status = new_status
+            if new_status == 'rejected':
+                vendor.rejection_reason = request.POST.get('rejection_reason', '').strip()
+            elif new_status in ['approved', 'pending']:
+                vendor.rejection_reason = ''
             vendor.save()
             if new_status == 'approved':
                 user = vendor.user_profile.user

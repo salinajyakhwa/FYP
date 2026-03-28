@@ -37,6 +37,7 @@ class Vendor(models.Model):
     id_document_type = models.CharField(max_length=50, choices=ID_DOCUMENT_TYPE_CHOICES, blank=True, null=True)
     id_document_photo = models.ImageField(upload_to='id_documents/', blank=True, null=True)
     website = models.URLField(blank=True, null=True)
+    rejection_reason = models.TextField(blank=True, null=True)
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('approved', 'Approved'),

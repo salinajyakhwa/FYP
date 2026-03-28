@@ -84,6 +84,13 @@
         gap: 0.5rem;
     }
 
+    .reject-form textarea {
+        min-width: 240px;
+        min-height: 90px;
+        resize: vertical;
+        font-size: 0.9rem;
+    }
+
     @media (max-width: 991.98px) {
         .doc-preview-grid {
             grid-template-columns: 1fr;
@@ -166,6 +173,11 @@
                                         {% else %}bg-danger{% endif %}">
                                         {{ vendor.get_status_display }}
                                     </span>
+                                    {% if vendor.rejection_reason %}
+                                    <div class="small text-muted mt-2">
+                                        <strong>Reason:</strong> {{ vendor.rejection_reason }}
+                                    </div>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <div class="action-stack">
@@ -176,8 +188,11 @@
                                         </form>
                                         {% endif %}
                                         {% if vendor.status != 'rejected' %}
-                                        <form action="{% url 'update_vendor_status' vendor.id 'rejected' %}" method="post" class="d-inline">
+                                        <form action="{% url 'update_vendor_status' vendor.id 'rejected' %}" method="post" class="reject-form d-inline-block">
                                             {% csrf_token %}
+                                            <div class="mb-2">
+                                                <textarea name="rejection_reason" class="form-control form-control-sm" placeholder="Reason for rejection (optional but recommended)">{{ vendor.rejection_reason|default:'' }}</textarea>
+                                            </div>
                                             <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
                                         </form>
                                         {% endif %}
