@@ -168,8 +168,9 @@
                                 {{ booking.get_status_display }}
                             </span>
                         </td>
-                        <td class="text-center tabular-nums text-muted">
-                            {{ booking.number_of_travelers }}
+                        <td class="text-center text-muted">
+                            <div class="tabular-nums">{{ booking.number_of_travelers }}</div>
+                            <div class="small">{{ booking.adult_count }}A / {{ booking.child_count }}C</div>
                         </td>
                         <td class="text-end fw-bold text-dark tabular-nums">
                             Rs. {{ booking.total_price|floatformat:2 }}

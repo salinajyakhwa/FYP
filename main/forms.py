@@ -146,6 +146,31 @@ class CustomAuthenticationForm(AuthenticationForm):
                 code='inactive',
             )
 
+
+class BookingTravelerForm(forms.Form):
+    adult_count = forms.IntegerField(
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+        label='Adults',
+    )
+    child_count = forms.IntegerField(
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        label='Children',
+    )
+
+    def total_travelers(self):
+        if not hasattr(self, 'cleaned_data'):
+            return 1
+        return self.cleaned_data['adult_count'] + self.cleaned_data['child_count']
+
+    def calculate_total(self, adult_unit_price, child_unit_price):
+        adult_total = Decimal(self.cleaned_data['adult_count']) * Decimal(adult_unit_price)
+        child_total = Decimal(self.cleaned_data['child_count']) * Decimal(child_unit_price)
+        return adult_total + child_total
+
 class ItineraryDayForm(forms.Form):
     ACTIVITY_CHOICES = [
         ('tour', 'Tour'),

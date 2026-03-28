@@ -3,6 +3,21 @@
 
 {% block title %}{{ package.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .traveler-mini-stepper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .traveler-mini-stepper input {
+        max-width: 76px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-5">
     <div class="row g-4">
@@ -224,6 +239,39 @@
                     </div>
 
                     {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
+                    <div class="border rounded p-3 mb-4">
+                        <div class="fw-semibold mb-1">Travelers</div>
+                        <div class="small text-muted mb-3">Choose your group size before payment.</div>
+                        <form action="{% url 'choose_payment' package.id %}" method="get" id="package-traveler-form">
+                            <div class="mb-3">
+                                <label for="package-adult-count" class="form-label small text-muted">Adults</label>
+                                <div class="traveler-mini-stepper">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-adult-count" data-change="-1">-</button>
+                                    <input type="number" id="package-adult-count" name="adult_count" class="form-control" min="1" value="1">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-adult-count" data-change="1">+</button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="package-child-count" class="form-label small text-muted">Children</label>
+                                <div class="traveler-mini-stepper">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="-1">-</button>
+                                    <input type="number" id="package-child-count" name="child_count" class="form-control" min="0" value="0">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="1">+</button>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Current price per traveler</span>
+                                <strong>Rs. <span id="packagePerTravelerPrice">{{ customization_total|floatformat:2 }}</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Estimated package total</span>
+                                <strong id="packageTravelerEstimate">Rs. {{ customization_total|floatformat:2 }}</strong>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                    {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
                     <div class="mb-3">
                         <a href="{% url 'chat_thread_open' package.id %}" class="btn btn-outline-secondary w-100">Chat with Vendor</a>
                     </div>
@@ -256,7 +304,11 @@
                     {% elif is_vendor_owner %}
                     <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-primary w-100">Add Itinerary Options</a>
                     {% elif user.is_authenticated %}
+                    {% if user.userprofile.role == 'traveler' %}
+                    <button type="submit" form="package-traveler-form" class="btn btn-primary w-100">Continue to Payment</button>
+                    {% else %}
                     <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
+                    {% endif %}
                     {% else %}
                     <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-primary w-100">Log In to Book</a>
                     {% endif %}
@@ -265,4 +317,46 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const adultInput = document.getElementById('package-adult-count');
+        const childInput = document.getElementById('package-child-count');
+        const estimateEl = document.getElementById('packageTravelerEstimate');
+        const unitPrice = Number('{{ customization_total }}');
+
+        if (!adultInput || !childInput || !estimateEl) {
+            return;
+        }
+
+        function clampValue(input, minValue) {
+            const parsed = Number(input.value || minValue);
+            input.value = Number.isNaN(parsed) ? minValue : Math.max(parsed, minValue);
+        }
+
+        function updateEstimate() {
+            clampValue(adultInput, 1);
+            clampValue(childInput, 0);
+            const totalTravelers = Number(adultInput.value) + Number(childInput.value);
+            estimateEl.textContent = `Rs. ${(totalTravelers * unitPrice).toFixed(2)}`;
+        }
+
+        document.querySelectorAll('.traveler-adjust').forEach((button) => {
+            button.addEventListener('click', function () {
+                const input = document.getElementById(this.dataset.target);
+                const change = Number(this.dataset.change);
+                const minValue = Number(input.getAttribute('min') || 0);
+                const nextValue = Math.max(minValue, Number(input.value || minValue) + change);
+                input.value = nextValue;
+                updateEstimate();
+            });
+        });
+
+        adultInput.addEventListener('input', updateEstimate);
+        childInput.addEventListener('input', updateEstimate);
+        updateEstimate();
+    }());
+</script>
 {% endblock %}

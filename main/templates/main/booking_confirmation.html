@@ -41,6 +41,13 @@
                                 <div class="fw-semibold">Rs. {{ booking.total_price|floatformat:2 }}</div>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Travelers</div>
+                                <div class="fw-semibold">{{ booking.number_of_travelers }} total</div>
+                                <div class="small text-muted mt-1">{{ booking.adult_count }} adult{{ booking.adult_count|pluralize }}, {{ booking.child_count }} child{{ booking.child_count|pluralize }}</div>
+                            </div>
+                        </div>
                     </div>
 
                     {% if booking.custom_itinerary %}

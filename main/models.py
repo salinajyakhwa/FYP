@@ -261,6 +261,8 @@ class Booking(models.Model):
         ('cancelled', 'Cancelled'),
     )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    adult_count = models.PositiveIntegerField(default=1)
+    child_count = models.PositiveIntegerField(default=0)
     number_of_travelers = models.PositiveIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
 

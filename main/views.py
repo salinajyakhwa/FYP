@@ -72,7 +72,8 @@ from .forms import (
     UserProfileUpdateForm,
     PasswordChangeForm,
     CustomAuthenticationForm,
-    CustomUserCreationForm # Ensure this is in your forms.py
+    CustomUserCreationForm,
+    BookingTravelerForm,
 )
 
 # Decorators
@@ -99,6 +100,13 @@ def root_redirect_view(request):
         return redirect('dashboard')
     # Default for non-logged-in users
     return redirect('dashboard')
+
+
+def _safe_int(value, default, minimum=0):
+    try:
+        return max(minimum, int(value))
+    except (TypeError, ValueError):
+        return default
 
 def home(request):
     today = timezone.now().date()
@@ -270,6 +278,41 @@ def _group_booking_selection_items(selection_items):
         group['group_title'] = _build_group_title(group['items'], group['group_link'])
 
     return groups
+
+
+def _quantize_currency(value):
+    return Decimal(value).quantize(Decimal('0.01'))
+
+
+def _get_package_unit_prices(package, custom_itinerary=None):
+    adult_unit_price = Decimal(package.price)
+    child_unit_price = Decimal(package.price)
+
+    if custom_itinerary:
+        adult_unit_price = Decimal(custom_itinerary.final_price)
+        child_unit_price = adult_unit_price
+
+    return {
+        'adult_unit_price': _quantize_currency(adult_unit_price),
+        'child_unit_price': _quantize_currency(child_unit_price),
+    }
+
+
+def _calculate_booking_pricing(package, adult_count, child_count, custom_itinerary=None):
+    unit_prices = _get_package_unit_prices(package, custom_itinerary=custom_itinerary)
+    total_travelers = adult_count + child_count
+    total_price = (
+        Decimal(adult_count) * unit_prices['adult_unit_price'] +
+        Decimal(child_count) * unit_prices['child_unit_price']
+    )
+
+    return {
+        **unit_prices,
+        'adult_count': adult_count,
+        'child_count': child_count,
+        'total_travelers': total_travelers,
+        'total_price': _quantize_currency(total_price),
+    }
 
 
 def _build_trip_timeline_items(trip):
@@ -549,12 +592,41 @@ def _build_dashboard_next_actions(user, limit=6):
     return action_cards[:limit]
 
 
-def _build_payment_context(*, package, custom_itinerary=None):
-    amount = custom_itinerary.final_price if custom_itinerary else package.price
+def _build_payment_context(*, package, custom_itinerary=None, traveler_form=None):
+    traveler_form = traveler_form or BookingTravelerForm(initial={'adult_count': 1, 'child_count': 0})
+    adult_count = 1
+    child_count = 0
+
+    if traveler_form.is_bound and traveler_form.is_valid():
+        adult_count = traveler_form.cleaned_data['adult_count']
+        child_count = traveler_form.cleaned_data['child_count']
+    else:
+        try:
+            adult_count = max(1, int(traveler_form['adult_count'].value() or 1))
+        except (TypeError, ValueError):
+            adult_count = 1
+        try:
+            child_count = max(0, int(traveler_form['child_count'].value() or 0))
+        except (TypeError, ValueError):
+            child_count = 0
+
+    pricing = _calculate_booking_pricing(
+        package,
+        adult_count,
+        child_count,
+        custom_itinerary=custom_itinerary,
+    )
+
     return {
         'package': package,
         'custom_itinerary': custom_itinerary,
-        'amount': amount,
+        'amount': pricing['total_price'],
+        'adult_unit_price': pricing['adult_unit_price'],
+        'child_unit_price': pricing['child_unit_price'],
+        'adult_count': pricing['adult_count'],
+        'child_count': pricing['child_count'],
+        'total_travelers': pricing['total_travelers'],
+        'traveler_form': traveler_form,
         'display_name': f"{package.name} (Custom Itinerary)" if custom_itinerary else package.name,
     }
 
@@ -685,12 +757,26 @@ def _notify_chat_message(message_obj):
     )
 
 
-def _store_pending_payment_session(request, *, package_id=None, custom_itinerary_id=None, sponsorship_package_id=None, transaction_uuid=None, provider=None):
+def _store_pending_payment_session(
+    request,
+    *,
+    package_id=None,
+    custom_itinerary_id=None,
+    sponsorship_package_id=None,
+    transaction_uuid=None,
+    provider=None,
+    adult_count=None,
+    child_count=None,
+    total_price=None,
+):
     request.session['pending_booking_package_id'] = package_id
     request.session['pending_custom_itinerary_id'] = custom_itinerary_id
     request.session['pending_sponsorship_package_id'] = sponsorship_package_id
     request.session['pending_payment_provider'] = provider
     request.session['pending_payment_transaction_uuid'] = transaction_uuid
+    request.session['pending_booking_adult_count'] = adult_count
+    request.session['pending_booking_child_count'] = child_count
+    request.session['pending_booking_total_price'] = str(total_price) if total_price is not None else None
 
 
 def _clear_pending_payment_session(request):
@@ -700,6 +786,9 @@ def _clear_pending_payment_session(request):
         'pending_sponsorship_package_id',
         'pending_payment_provider',
         'pending_payment_transaction_uuid',
+        'pending_booking_adult_count',
+        'pending_booking_child_count',
+        'pending_booking_total_price',
     ]:
         request.session.pop(key, None)
 
@@ -800,6 +889,8 @@ def _create_trip_from_booking(booking):
 def _create_or_update_booking_from_pending_payment(request):
     custom_itinerary_id = request.session.get('pending_custom_itinerary_id')
     package_id = request.session.get('pending_booking_package_id')
+    adult_count = int(request.session.get('pending_booking_adult_count') or 1)
+    child_count = int(request.session.get('pending_booking_child_count') or 0)
 
     if not custom_itinerary_id and not package_id:
         raise ValueError('No pending payment target found.')
@@ -810,23 +901,51 @@ def _create_or_update_booking_from_pending_payment(request):
             pk=custom_itinerary_id,
             user=request.user,
         )
+        pricing = _calculate_booking_pricing(
+            custom_itinerary.package,
+            adult_count,
+            child_count,
+            custom_itinerary=custom_itinerary,
+        )
+        total_price = _quantize_currency(
+            request.session.get('pending_booking_total_price') or pricing['total_price']
+        )
 
         booking, _ = Booking.objects.get_or_create(
             custom_itinerary=custom_itinerary,
             defaults={
                 'user': request.user,
                 'package': custom_itinerary.package,
-                'number_of_travelers': 1,
-                'total_price': custom_itinerary.final_price,
+                'adult_count': adult_count,
+                'child_count': child_count,
+                'number_of_travelers': pricing['total_travelers'],
+                'total_price': total_price,
                 'status': 'confirmed',
             }
         )
-        if booking.status != 'confirmed' or booking.total_price != custom_itinerary.final_price:
+        if (
+            booking.status != 'confirmed' or
+            booking.total_price != total_price or
+            booking.number_of_travelers != pricing['total_travelers'] or
+            booking.adult_count != adult_count or
+            booking.child_count != child_count
+        ):
             booking.status = 'confirmed'
-            booking.total_price = custom_itinerary.final_price
+            booking.total_price = total_price
             booking.package = custom_itinerary.package
             booking.user = request.user
-            booking.save(update_fields=['status', 'total_price', 'package', 'user'])
+            booking.number_of_travelers = pricing['total_travelers']
+            booking.adult_count = adult_count
+            booking.child_count = child_count
+            booking.save(update_fields=[
+                'status',
+                'total_price',
+                'package',
+                'user',
+                'number_of_travelers',
+                'adult_count',
+                'child_count',
+            ])
         if custom_itinerary.status != 'confirmed':
             custom_itinerary.status = 'confirmed'
             custom_itinerary.save(update_fields=['status', 'updated_at'])
@@ -836,11 +955,17 @@ def _create_or_update_booking_from_pending_payment(request):
         return booking, custom_itinerary.package, True
 
     package = get_object_or_404(TravelPackage, pk=package_id)
+    pricing = _calculate_booking_pricing(package, adult_count, child_count)
+    total_price = _quantize_currency(
+        request.session.get('pending_booking_total_price') or pricing['total_price']
+    )
     booking = Booking.objects.create(
         user=request.user,
         package=package,
-        number_of_travelers=1,
-        total_price=package.price,
+        adult_count=adult_count,
+        child_count=child_count,
+        number_of_travelers=pricing['total_travelers'],
+        total_price=total_price,
         status='confirmed'
     )
     _create_trip_from_booking(booking)
@@ -1219,7 +1344,16 @@ def chat_thread_detail(request, thread_id):
 @login_required
 def choose_payment(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
-    return render(request, 'main/choose_payment.html', _build_payment_context(package=package))
+    initial = {
+        'adult_count': _safe_int(request.GET.get('adult_count', 1) or 1, 1, minimum=1),
+        'child_count': _safe_int(request.GET.get('child_count', 0) or 0, 0, minimum=0),
+    }
+    traveler_form = BookingTravelerForm(initial=initial)
+    return render(
+        request,
+        'main/choose_payment.html',
+        _build_payment_context(package=package, traveler_form=traveler_form),
+    )
 
 
 @login_required
@@ -1229,10 +1363,19 @@ def choose_custom_itinerary_payment(request, custom_itinerary_id):
         pk=custom_itinerary_id,
         user=request.user,
     )
+    initial = {
+        'adult_count': _safe_int(request.GET.get('adult_count', 1) or 1, 1, minimum=1),
+        'child_count': _safe_int(request.GET.get('child_count', 0) or 0, 0, minimum=0),
+    }
+    traveler_form = BookingTravelerForm(initial=initial)
     return render(
         request,
         'main/choose_payment.html',
-        _build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
+        _build_payment_context(
+            package=custom_itinerary.package,
+            custom_itinerary=custom_itinerary,
+            traveler_form=traveler_form,
+        ),
     )
 
 
@@ -2114,8 +2257,22 @@ def update_vendor_status(request, vendor_id, new_status):
 @login_required
 def esewa_checkout(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
+    if request.method != 'POST':
+        return redirect('choose_payment', package_id=package.id)
+
+    traveler_form = BookingTravelerForm(request.POST)
+    if not traveler_form.is_valid():
+        return render(
+            request,
+            'main/choose_payment.html',
+            _build_payment_context(package=package, traveler_form=traveler_form),
+        )
+
+    adult_count = traveler_form.cleaned_data['adult_count']
+    child_count = traveler_form.cleaned_data['child_count']
+    pricing = _calculate_booking_pricing(package, adult_count, child_count)
     transaction_uuid = str(uuid.uuid4())
-    amount = Decimal(package.price).quantize(Decimal('0.01'))
+    amount = pricing['total_price']
     tax_amount = Decimal('0.00')
     total_amount = amount + tax_amount
 
@@ -2124,10 +2281,13 @@ def esewa_checkout(request, package_id):
         package_id=package.id,
         transaction_uuid=transaction_uuid,
         provider='esewa',
+        adult_count=adult_count,
+        child_count=child_count,
+        total_price=pricing['total_price'],
     )
 
     context = {
-        **_build_payment_context(package=package),
+        **_build_payment_context(package=package, traveler_form=traveler_form),
         'amount': f"{amount:.2f}",
         'tax_amount': f"{tax_amount:.2f}",
         'total_amount': f"{total_amount:.2f}",
@@ -2191,8 +2351,31 @@ def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
         pk=custom_itinerary_id,
         user=request.user,
     )
+    if request.method != 'POST':
+        return redirect('choose_custom_itinerary_payment', custom_itinerary_id=custom_itinerary.id)
+
+    traveler_form = BookingTravelerForm(request.POST)
+    if not traveler_form.is_valid():
+        return render(
+            request,
+            'main/choose_payment.html',
+            _build_payment_context(
+                package=custom_itinerary.package,
+                custom_itinerary=custom_itinerary,
+                traveler_form=traveler_form,
+            ),
+        )
+
+    adult_count = traveler_form.cleaned_data['adult_count']
+    child_count = traveler_form.cleaned_data['child_count']
+    pricing = _calculate_booking_pricing(
+        custom_itinerary.package,
+        adult_count,
+        child_count,
+        custom_itinerary=custom_itinerary,
+    )
     transaction_uuid = str(uuid.uuid4())
-    amount = Decimal(custom_itinerary.final_price).quantize(Decimal('0.01'))
+    amount = pricing['total_price']
     tax_amount = Decimal('0.00')
     total_amount = amount + tax_amount
 
@@ -2201,10 +2384,17 @@ def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
         custom_itinerary_id=custom_itinerary.id,
         transaction_uuid=transaction_uuid,
         provider='esewa',
+        adult_count=adult_count,
+        child_count=child_count,
+        total_price=pricing['total_price'],
     )
 
     context = {
-        **_build_payment_context(package=custom_itinerary.package, custom_itinerary=custom_itinerary),
+        **_build_payment_context(
+            package=custom_itinerary.package,
+            custom_itinerary=custom_itinerary,
+            traveler_form=traveler_form,
+        ),
         'amount': f"{amount:.2f}",
         'tax_amount': f"{tax_amount:.2f}",
         'total_amount': f"{total_amount:.2f}",
@@ -2303,6 +2493,20 @@ def create_checkout_session(request, package_id):
     Stripe-hosted payment page.
     """
     package = get_object_or_404(TravelPackage, pk=package_id)
+    if request.method != 'POST':
+        return redirect('choose_payment', package_id=package.id)
+
+    traveler_form = BookingTravelerForm(request.POST)
+    if not traveler_form.is_valid():
+        return render(
+            request,
+            'main/choose_payment.html',
+            _build_payment_context(package=package, traveler_form=traveler_form),
+        )
+
+    adult_count = traveler_form.cleaned_data['adult_count']
+    child_count = traveler_form.cleaned_data['child_count']
+    pricing = _calculate_booking_pricing(package, adult_count, child_count)
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     # Define the URLs for success and cancellation
@@ -2316,27 +2520,48 @@ def create_checkout_session(request, package_id):
 
     try:
         # Create a new Checkout Session for the order
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
+        line_items = []
+        if adult_count:
+            line_items.append({
                 'price_data': {
                     'currency': 'usd',
                     'product_data': {
-                        'name': package.name,
+                        'name': f"{package.name} - Adult Traveler",
                         'description': f"Travel Package by {package.vendor.name}",
                     },
-                    # Stripe expects amount in cents
-                    'unit_amount': int(package.price * 100),
+                    'unit_amount': int(pricing['adult_unit_price'] * 100),
                 },
-                'quantity': 1,
-            }],
+                'quantity': adult_count,
+            })
+        if child_count:
+            line_items.append({
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f"{package.name} - Child Traveler",
+                        'description': f"Travel Package by {package.vendor.name}",
+                    },
+                    'unit_amount': int(pricing['child_unit_price'] * 100),
+                },
+                'quantity': child_count,
+            })
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=line_items,
             mode='payment',
             success_url=success_url,
             cancel_url=cancel_url,
             customer_email=request.user.email,  # Pre-fill customer email
         )
 
-        _store_pending_payment_session(request, package_id=package.id, provider='stripe')
+        _store_pending_payment_session(
+            request,
+            package_id=package.id,
+            provider='stripe',
+            adult_count=adult_count,
+            child_count=child_count,
+            total_price=pricing['total_price'],
+        )
 
         return redirect(checkout_session.url, code=303)
 
@@ -2407,6 +2632,29 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
         pk=custom_itinerary_id,
         user=request.user,
     )
+    if request.method != 'POST':
+        return redirect('choose_custom_itinerary_payment', custom_itinerary_id=custom_itinerary.id)
+
+    traveler_form = BookingTravelerForm(request.POST)
+    if not traveler_form.is_valid():
+        return render(
+            request,
+            'main/choose_payment.html',
+            _build_payment_context(
+                package=custom_itinerary.package,
+                custom_itinerary=custom_itinerary,
+                traveler_form=traveler_form,
+            ),
+        )
+
+    adult_count = traveler_form.cleaned_data['adult_count']
+    child_count = traveler_form.cleaned_data['child_count']
+    pricing = _calculate_booking_pricing(
+        custom_itinerary.package,
+        adult_count,
+        child_count,
+        custom_itinerary=custom_itinerary,
+    )
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     success_url = request.build_absolute_uri(
@@ -2418,19 +2666,34 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
     )
 
     try:
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
+        line_items = []
+        if adult_count:
+            line_items.append({
                 'price_data': {
                     'currency': 'usd',
                     'product_data': {
-                        'name': f"{custom_itinerary.package.name} (Custom Itinerary)",
+                        'name': f"{custom_itinerary.package.name} (Custom) - Adult Traveler",
                         'description': f"Custom travel package by {custom_itinerary.package.vendor.name}",
                     },
-                    'unit_amount': int(custom_itinerary.final_price * 100),
+                    'unit_amount': int(pricing['adult_unit_price'] * 100),
                 },
-                'quantity': 1,
-            }],
+                'quantity': adult_count,
+            })
+        if child_count:
+            line_items.append({
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f"{custom_itinerary.package.name} (Custom) - Child Traveler",
+                        'description': f"Custom travel package by {custom_itinerary.package.vendor.name}",
+                    },
+                    'unit_amount': int(pricing['child_unit_price'] * 100),
+                },
+                'quantity': child_count,
+            })
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=line_items,
             mode='payment',
             success_url=success_url,
             cancel_url=cancel_url,
@@ -2441,6 +2704,9 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
             request,
             custom_itinerary_id=custom_itinerary.id,
             provider='stripe',
+            adult_count=adult_count,
+            child_count=child_count,
+            total_price=pricing['total_price'],
         )
 
         return redirect(checkout_session.url, code=303)
