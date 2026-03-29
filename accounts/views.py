@@ -1,3 +1,2 @@
-from main.views_auth import *  # noqa: F401,F403
-from main.views_dashboard import dashboard  # noqa: F401
-
+from main.views.auth import *  # noqa: F401,F403
+from main.views.traveler import dashboard  # noqa: F401

@@ -1,2 +1,1 @@
-from main.forms_auth import *  # noqa: F401,F403
-
+from main.forms.auth import *  # noqa: F401,F403

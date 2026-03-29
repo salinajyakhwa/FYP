@@ -1,1 +1,1 @@
-from ..forms_bookings import BookingDisputeForm  # noqa: F401
+from .traveler import BookingDisputeForm  # noqa: F401
