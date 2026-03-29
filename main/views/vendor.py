@@ -235,7 +235,40 @@ def create_package(request):
             return redirect('vendor_dashboard')
     else:
         form = TravelPackageForm()
-    return render(request, 'main/vendor/create_package.html', {'form': form})
+    return render(request, 'main/vendor/create_package.html', {
+        'form': form,
+        'page_title': 'Create New Travel Package',
+        'submit_label': 'Create Package',
+        'cancel_url': 'vendor_dashboard',
+    })
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def edit_package(request, package_id):
+    vendor = _get_vendor_or_403(request)
+    package = get_object_or_404(TravelPackage, pk=package_id, vendor=vendor)
+
+    if request.method == 'POST':
+        form = TravelPackageForm(request.POST, request.FILES, instance=package)
+        if form.is_valid():
+            package = form.save(commit=False)
+            package.moderation_status = 'pending'
+            package.moderation_notes = ''
+            package.moderated_at = None
+            package.save()
+            messages.success(request, 'Package updated and sent for admin review.')
+            return redirect('vendor_package_list')
+    else:
+        form = TravelPackageForm(instance=package)
+
+    return render(request, 'main/vendor/create_package.html', {
+        'form': form,
+        'package': package,
+        'page_title': 'Edit Travel Package',
+        'submit_label': 'Save Changes',
+        'cancel_url': 'vendor_package_list',
+    })
 
 
 @login_required

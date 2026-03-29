@@ -102,7 +102,7 @@
                 <a href="{% url 'choose_sponsorship_payment' package.id %}" class="btn btn-sm btn-outline-warning" title="Sponsor Package">
                     <i class="bi bi-megaphone"></i> {% if package.is_sponsored and package.sponsorship_end %}Extend{% else %}Sponsor{% endif %}
                 </a>
-                <a href="#" class="btn btn-sm btn-outline-secondary" title="Edit Package">
+                <a href="{% url 'edit_package' package.id %}" class="btn btn-sm btn-outline-secondary" title="Edit Package">
                     <i class="bi bi-pencil"></i> Edit
                 </a>
                 <a href="#" class="btn btn-sm btn-outline-danger" title="Delete Package">
