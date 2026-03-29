@@ -7,16 +7,15 @@ from django.utils import timezone
 
 from .models import Booking, ChatThread, Notification
 from .notifications import mark_notification_read
+from .services.dashboard import (
+    _build_dashboard_next_actions,
+    _build_dashboard_trip_cards,
+    _build_traveler_dashboard_summary,
+)
 
 
 @login_required
 def dashboard(request):
-    from .views import (
-        _build_dashboard_next_actions,
-        _build_dashboard_trip_cards,
-        _build_traveler_dashboard_summary,
-    )
-
     if request.user.is_superuser:
         return redirect('admin_dashboard')
 
@@ -29,7 +28,7 @@ def dashboard(request):
     recent_bookings = list(
         Booking.objects.filter(user=request.user)
         .select_related('package', 'package__vendor', 'trip', 'operations')
-        .order_by('-booking_date')[:5]
+        .order_by('-booking_date')[:1]
     )
 
     recent_notifications = list(
@@ -47,9 +46,9 @@ def dashboard(request):
         messages_list = list(thread.messages.all())
         thread.latest_message = messages_list[-1] if messages_list else None
 
-    return render(request, 'main/traveler_dashboard.html', {
+    return render(request, 'main/traveler/traveler_dashboard.html', {
         'dashboard_summary': _build_traveler_dashboard_summary(request.user),
-        'active_trip_cards': _build_dashboard_trip_cards(request.user),
+        'active_trip_cards': _build_dashboard_trip_cards(request.user, limit=1),
         'next_actions': _build_dashboard_next_actions(request.user),
         'recent_notifications': recent_notifications,
         'recent_threads': recent_threads,
@@ -65,7 +64,7 @@ def notification_list(request):
         'related_thread',
         'related_trip',
     )
-    return render(request, 'main/notifications.html', {'notifications': notifications})
+    return render(request, 'main/traveler/notifications.html', {'notifications': notifications})
 
 
 @login_required

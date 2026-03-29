@@ -39,14 +39,14 @@ def home(request):
         .exclude(id__in=sponsored_packages.values_list('id', flat=True))
         .order_by('-created_at')[:4]
     )
-    return render(request, 'main/home.html', {
+    return render(request, 'main/public/home.html', {
         'packages': packages,
         'sponsored_packages': sponsored_packages,
     })
 
 
 def about(request):
-    return render(request, 'main/about.html')
+    return render(request, 'main/public/about.html')
 
 
 def search_results(request):
@@ -61,7 +61,7 @@ def search_results(request):
     else:
         packages = base_qs
 
-    return render(request, 'main/_package_list_partial.html', {'packages': packages})
+    return render(request, 'main/public/_package_list_partial.html', {'packages': packages})
 
 
 def package_list(request):
@@ -89,7 +89,7 @@ def package_list(request):
     page_number = request.GET.get('page')
     packages = paginator.get_page(page_number)
 
-    return render(request, 'main/package_list.html', {
+    return render(request, 'main/public/package_list.html', {
         'packages': packages,
         'filter': package_filter,
         'sponsored_packages': sponsored_packages,
@@ -137,7 +137,7 @@ def compare_packages(request):
         base_package = get_object_or_404(TravelPackage, id=request.GET.get('package_id'))
         similar_packages = _find_similar_packages(base_package)
         packages = [base_package] + similar_packages
-        return render(request, 'main/compare_packages.html', {
+        return render(request, 'main/public/compare_packages.html', {
             'packages': packages,
             'base_package': base_package,
             'auto_generated': True,
@@ -158,13 +158,13 @@ def compare_packages(request):
                 request,
                 "Showing similar packages automatically based on your selected package.",
             )
-            return render(request, 'main/compare_packages.html', {
+            return render(request, 'main/public/compare_packages.html', {
                 'packages': packages,
                 'base_package': base_package,
                 'auto_generated': True,
             })
 
-        return render(request, 'main/compare_packages.html', {
+        return render(request, 'main/public/compare_packages.html', {
             'packages': selected_packages,
             'auto_generated': False,
         })

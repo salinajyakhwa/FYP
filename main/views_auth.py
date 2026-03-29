@@ -26,7 +26,7 @@ User = get_user_model()
 
 
 class CustomLoginView(auth_views.LoginView):
-    template_name = 'main/login.html'
+    template_name = 'main/auth/login.html'
     authentication_form = CustomAuthenticationForm
 
 
@@ -51,7 +51,7 @@ def register(request):
             return redirect('verify_otp')
     else:
         form = CustomUserCreationForm()
-    return render(request, 'main/register.html', {'form': form})
+    return render(request, 'main/auth/register.html', {'form': form})
 
 
 def verify_otp(request):
@@ -97,12 +97,12 @@ def verify_otp(request):
             messages.success(request, 'Your account has been verified successfully.')
             return redirect('dashboard')
 
-        return render(request, 'main/verify_otp.html', {
+        return render(request, 'main/auth/verify_otp.html', {
             'email': pending_email,
             'error': 'Invalid or expired OTP. Please try again.',
         })
 
-    return render(request, 'main/verify_otp.html', {'email': pending_email})
+    return render(request, 'main/auth/verify_otp.html', {'email': pending_email})
 
 
 @login_required
@@ -133,7 +133,7 @@ def profile(request):
         profile_form = UserProfileUpdateForm(instance=profile)
         pass_form = PasswordChangeForm(request.user)
 
-    return render(request, 'main/profile.html', {
+    return render(request, 'main/auth/profile.html', {
         'user_form': user_form,
         'profile_form': profile_form,
         'pass_form': pass_form,
@@ -143,7 +143,7 @@ def profile(request):
 def send_verification_email(request, user, profile):
     current_site = get_current_site(request)
     mail_subject = "Activate your account."
-    message = render_to_string('main/acc_active_email.html', {
+    message = render_to_string('main/auth/acc_active_email.html', {
         'user': user,
         'domain': current_site.domain,
         'uid': urlsafe_base64_encode(force_bytes(user.pk)),
@@ -154,7 +154,7 @@ def send_verification_email(request, user, profile):
 
 
 def check_email(request):
-    return render(request, 'main/check_email.html')
+    return render(request, 'main/auth/check_email.html')
 
 
 def verify_email(request, uidb64, token):
@@ -184,7 +184,7 @@ def verify_email(request, uidb64, token):
     else:
         messages.error(request, 'Activation link is invalid!')
 
-    return render(request, 'main/verification_status.html')
+    return render(request, 'main/auth/verification_status.html')
 
 
 def vendor_register(request):
@@ -209,7 +209,7 @@ def vendor_register(request):
     else:
         form = CustomUserCreationForm(initial={'role': 'vendor'})
 
-    return render(request, 'main/register.html', {
+    return render(request, 'main/auth/register.html', {
         'form': form,
         'registration_mode': 'vendor',
     })

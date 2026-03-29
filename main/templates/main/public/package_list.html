@@ -189,7 +189,7 @@
             </div>
         </div>
         <div class="row g-4">
-            {% include "main/_package_list_partial.html" with packages=sponsored_packages show_compare=False %}
+            {% include "main/public/_package_list_partial.html" with packages=sponsored_packages show_compare=False %}
         </div>
     </div>
     {% endif %}
@@ -203,7 +203,7 @@
     <form id="compare-form" action="{% url 'compare_packages' %}" method="post">
         {% csrf_token %}
         <div class="row g-4">
-            {% include "main/_package_list_partial.html" %}
+            {% include "main/public/_package_list_partial.html" %}
         </div>
 
         <!-- 🌿 Sticky Compare Notification Bar -->

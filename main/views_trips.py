@@ -9,18 +9,18 @@ from .decorators import role_required
 from .forms import TripItemAttachmentForm, TripItemVendorNotesForm
 from .models import Trip, TripItem, TripItemAttachment
 from .notifications import create_notification
+from .services.access import _get_vendor_or_403
+from .services.trips import (
+    _build_trip_next_action,
+    _build_trip_progress_summary,
+    _build_trip_recent_attachments,
+    _build_trip_timeline_items,
+    _build_trip_timeline_sections,
+)
 
 
 @login_required
 def trip_dashboard(request, trip_id):
-    from .views import (
-        _build_trip_next_action,
-        _build_trip_progress_summary,
-        _build_trip_recent_attachments,
-        _build_trip_timeline_items,
-        _build_trip_timeline_sections,
-    )
-
     trip = get_object_or_404(
         Trip.objects.select_related('booking', 'package', 'vendor', 'custom_itinerary')
         .prefetch_related('items__package_day', 'items__selected_option'),
@@ -36,7 +36,7 @@ def trip_dashboard(request, trip_id):
     next_action = _build_trip_next_action(timeline_items)
     timeline_section_data = _build_trip_timeline_sections(trip, timeline_items)
 
-    return render(request, 'main/trip_dashboard.html', {
+    return render(request, 'main/traveler/trip_dashboard.html', {
         'trip': trip,
         'booking': trip.booking,
         'package': trip.package,
@@ -54,8 +54,6 @@ def trip_dashboard(request, trip_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_trip_dashboard(request, trip_id):
-    from .views import _build_trip_progress_summary, _build_trip_timeline_items, _get_vendor_or_403
-
     vendor = _get_vendor_or_403(request)
     trip = get_object_or_404(
         Trip.objects.select_related('booking', 'package', 'traveler', 'custom_itinerary', 'vendor')
@@ -64,7 +62,7 @@ def vendor_trip_dashboard(request, trip_id):
         vendor=vendor,
     )
 
-    return render(request, 'main/vendor_trip_dashboard.html', {
+    return render(request, 'main/vendor/vendor_trip_dashboard.html', {
         'trip': trip,
         'booking': trip.booking,
         'package': trip.package,
@@ -77,8 +75,6 @@ def vendor_trip_dashboard(request, trip_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def update_trip_item_status(request, trip_item_id):
-    from .views import _get_vendor_or_403
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 
@@ -117,8 +113,6 @@ def update_trip_item_status(request, trip_item_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def update_trip_item_notes(request, trip_item_id):
-    from .views import _get_vendor_or_403
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 
@@ -144,8 +138,6 @@ def update_trip_item_notes(request, trip_item_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def upload_trip_item_attachment(request, trip_item_id):
-    from .views import _get_vendor_or_403
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 
@@ -178,8 +170,6 @@ def upload_trip_item_attachment(request, trip_item_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def delete_trip_item_attachment(request, attachment_id):
-    from .views import _get_vendor_or_403
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 

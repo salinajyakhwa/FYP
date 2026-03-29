@@ -11,44 +11,15 @@ from django.db.models.functions import TruncMonth
 from .decorators import role_required
 from .forms import VendorBookingOperationsForm, VendorCancellationReviewForm
 from .models import Booking, BookingOperation, BookingDispute, TravelPackage, Trip
-
-
-def send_vendor_status_email(request, vendor):
-    from django.contrib.sites.shortcuts import get_current_site
-    from django.core.mail import EmailMessage
-
-    user = vendor.user_profile.user
-    current_site = get_current_site(request)
-
-    if vendor.status == 'approved':
-        subject = 'Your vendor account has been approved'
-        body = (
-            f"Hi {user.username},\n\n"
-            "Your vendor application has been approved. "
-            f"You can now log in and access the vendor portal at http://{current_site.domain}/login/.\n\n"
-            "Regards,\nTravel Team"
-        )
-    elif vendor.status == 'rejected':
-        rejection_reason = (vendor.rejection_reason or '').strip()
-        subject = 'Your vendor application was rejected'
-        body = (
-            f"Hi {user.username},\n\n"
-            "Your vendor application was reviewed and rejected. "
-            f"{'Reason: ' + rejection_reason + '.\n\n' if rejection_reason else ''}"
-            "If you believe this was a mistake, please contact the administrator.\n\n"
-            "Regards,\nTravel Team"
-        )
-    else:
-        return
-
-    EmailMessage(subject, body, to=[user.email]).send()
+from .services.access import _get_vendor_or_403, _sync_trip_status_from_booking
+from .services.cancellations import _calculate_refund_amount
+from .services.itineraries import _build_booking_selection_items, _group_booking_selection_items
+from .services.vendor_ops import send_vendor_status_email
 
 
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_dashboard(request):
-    from .views import _get_vendor_or_403
-
     vendor = _get_vendor_or_403(request)
     vendor_bookings_qs = Booking.objects.filter(package__vendor=vendor)
     confirmed_bookings = vendor_bookings_qs.filter(status__in=['confirmed', 'trip_completed'])
@@ -79,7 +50,7 @@ def vendor_dashboard(request):
     package_labels = [item['package__name'] for item in package_booking_data]
     package_values = [item['count'] for item in package_booking_data]
 
-    recent_bookings = vendor_bookings_qs.order_by('-booking_date')[:5]
+    recent_bookings = vendor_bookings_qs.order_by('-booking_date')[:1]
 
     dashboard_queue = {
         'pending_bookings': vendor_bookings_qs.filter(status='pending').count(),
@@ -88,7 +59,7 @@ def vendor_dashboard(request):
         'active_trips': Trip.objects.filter(vendor=vendor).exclude(status__in=['completed', 'cancelled', 'no_show']).count(),
     }
 
-    return render(request, 'main/vendor_dashboard.html', {
+    return render(request, 'main/vendor/vendor_dashboard.html', {
         'total_revenue': total_revenue,
         'total_bookings_count': total_bookings_count,
         'monthly_revenue_labels': json.dumps(monthly_labels),
@@ -103,8 +74,6 @@ def vendor_dashboard(request):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_bookings(request):
-    from .views import _build_booking_selection_items, _get_vendor_or_403, _group_booking_selection_items
-
     vendor = _get_vendor_or_403(request)
 
     bookings = Booking.objects.filter(package__vendor=vendor)\
@@ -130,14 +99,12 @@ def vendor_bookings(request):
             prefix=f'ops-{booking.id}',
         )
 
-    return render(request, 'main/vendor_bookings.html', {'bookings': bookings})
+    return render(request, 'main/vendor/vendor_bookings.html', {'bookings': bookings})
 
 
 @login_required
 @role_required(allowed_roles=['vendor'])
 def update_booking_status(request, booking_id, new_status):
-    from .views import _get_vendor_or_403, _sync_trip_status_from_booking
-
     vendor = _get_vendor_or_403(request)
     booking = get_object_or_404(Booking, id=booking_id, package__vendor=vendor)
 
@@ -156,8 +123,6 @@ def update_booking_status(request, booking_id, new_status):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def update_booking_operations(request, booking_id):
-    from .views import _get_vendor_or_403, _sync_trip_status_from_booking
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 
@@ -182,8 +147,6 @@ def update_booking_operations(request, booking_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def review_cancellation_request(request, booking_id):
-    from .views import _calculate_refund_amount, _get_vendor_or_403
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 
@@ -223,8 +186,6 @@ def review_cancellation_request(request, booking_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def flight_bookings(request):
-    from .views import _get_vendor_or_403
-
     vendor = _get_vendor_or_403(request)
 
     bookings = Booking.objects.filter(
@@ -232,4 +193,4 @@ def flight_bookings(request):
         custom_itinerary__selections__selected_option__option_type='flight'
     ).select_related('user', 'package').distinct()
 
-    return render(request, 'main/flight_bookings.html', {'bookings': bookings})
+    return render(request, 'main/vendor/flight_bookings.html', {'bookings': bookings})

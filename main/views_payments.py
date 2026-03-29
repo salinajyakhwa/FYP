@@ -16,14 +16,27 @@ from django.views.decorators.csrf import csrf_exempt
 from .decorators import role_required
 from .forms import BookingTravelerForm
 from .models import CustomItinerary, TravelPackage
+from .services.access import _get_vendor_or_403, _safe_int
+from .services.notifications import _notify_booking_confirmed, _notify_payment_cancelled
+from .services.payments import (
+    _activate_pending_sponsorship,
+    _build_payment_context,
+    _build_sponsorship_payment_context,
+    _calculate_booking_pricing,
+    _clear_pending_payment_session,
+    _create_or_update_booking_from_pending_payment,
+    _create_payment_log,
+    _generate_esewa_signature,
+    _get_sponsorship_price,
+    _store_pending_payment_session,
+    _verify_esewa_payload,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @login_required
 def choose_payment(request, package_id):
-    from .views import _build_payment_context, _safe_int
-
     package = get_object_or_404(TravelPackage, pk=package_id)
     initial = {
         'adult_count': _safe_int(request.GET.get('adult_count', 1) or 1, 1, minimum=1),
@@ -32,15 +45,13 @@ def choose_payment(request, package_id):
     traveler_form = BookingTravelerForm(initial=initial)
     return render(
         request,
-        'main/choose_payment.html',
+        'main/payment/choose_payment.html',
         _build_payment_context(package=package, traveler_form=traveler_form),
     )
 
 
 @login_required
 def choose_custom_itinerary_payment(request, custom_itinerary_id):
-    from .views import _build_payment_context, _safe_int
-
     custom_itinerary = get_object_or_404(
         CustomItinerary.objects.select_related('package'),
         pk=custom_itinerary_id,
@@ -53,7 +64,7 @@ def choose_custom_itinerary_payment(request, custom_itinerary_id):
     traveler_form = BookingTravelerForm(initial=initial)
     return render(
         request,
-        'main/choose_payment.html',
+        'main/payment/choose_payment.html',
         _build_payment_context(
             package=custom_itinerary.package,
             custom_itinerary=custom_itinerary,
@@ -65,26 +76,16 @@ def choose_custom_itinerary_payment(request, custom_itinerary_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def choose_sponsorship_payment(request, package_id):
-    from .views import _build_sponsorship_payment_context, _get_vendor_or_403
-
     package = get_object_or_404(
         TravelPackage.objects.select_related('vendor'),
         pk=package_id,
         vendor=_get_vendor_or_403(request),
     )
-    return render(request, 'main/choose_payment.html', _build_sponsorship_payment_context(package))
+    return render(request, 'main/payment/choose_payment.html', _build_sponsorship_payment_context(package))
 
 
 @login_required
 def esewa_checkout(request, package_id):
-    from .views import (
-        _build_payment_context,
-        _calculate_booking_pricing,
-        _create_payment_log,
-        _generate_esewa_signature,
-        _store_pending_payment_session,
-    )
-
     package = get_object_or_404(TravelPackage, pk=package_id)
     if request.method != 'POST':
         return redirect('choose_payment', package_id=package.id)
@@ -93,7 +94,7 @@ def esewa_checkout(request, package_id):
     if not traveler_form.is_valid():
         return render(
             request,
-            'main/choose_payment.html',
+            'main/payment/choose_payment.html',
             _build_payment_context(package=package, traveler_form=traveler_form),
         )
 
@@ -140,21 +141,12 @@ def esewa_checkout(request, package_id):
         'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
         'esewa_form_url': settings.ESEWA_FORM_URL,
     }
-    return render(request, 'main/esewa_checkout.html', context)
+    return render(request, 'main/payment/esewa_checkout.html', context)
 
 
 @login_required
 @role_required(allowed_roles=['vendor'])
 def esewa_sponsorship_checkout(request, package_id):
-    from .views import (
-        _build_sponsorship_payment_context,
-        _create_payment_log,
-        _generate_esewa_signature,
-        _get_sponsorship_price,
-        _get_vendor_or_403,
-        _store_pending_payment_session,
-    )
-
     package = get_object_or_404(
         TravelPackage.objects.select_related('vendor'),
         pk=package_id,
@@ -197,19 +189,11 @@ def esewa_sponsorship_checkout(request, package_id):
         'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
         'esewa_form_url': settings.ESEWA_FORM_URL,
     }
-    return render(request, 'main/esewa_checkout.html', context)
+    return render(request, 'main/payment/esewa_checkout.html', context)
 
 
 @login_required
 def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
-    from .views import (
-        _build_payment_context,
-        _calculate_booking_pricing,
-        _create_payment_log,
-        _generate_esewa_signature,
-        _store_pending_payment_session,
-    )
-
     custom_itinerary = get_object_or_404(
         CustomItinerary.objects.select_related('package'),
         pk=custom_itinerary_id,
@@ -222,7 +206,7 @@ def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
     if not traveler_form.is_valid():
         return render(
             request,
-            'main/choose_payment.html',
+            'main/payment/choose_payment.html',
             _build_payment_context(
                 package=custom_itinerary.package,
                 custom_itinerary=custom_itinerary,
@@ -282,22 +266,12 @@ def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
         'failure_url': request.build_absolute_uri(reverse('payment_cancelled')),
         'esewa_form_url': settings.ESEWA_FORM_URL,
     }
-    return render(request, 'main/esewa_checkout.html', context)
+    return render(request, 'main/payment/esewa_checkout.html', context)
 
 
 @csrf_exempt
 @login_required
 def esewa_verify(request):
-    from .views import (
-        _activate_pending_sponsorship,
-        _clear_pending_payment_session,
-        _create_or_update_booking_from_pending_payment,
-        _create_payment_log,
-        _get_sponsorship_price,
-        _notify_booking_confirmed,
-        _verify_esewa_payload,
-    )
-
     data_b64 = request.GET.get('data') or request.POST.get('data')
     if not data_b64:
         messages.error(request, 'Missing eSewa verification payload.')
@@ -389,13 +363,6 @@ def esewa_verify(request):
 
 @login_required
 def create_checkout_session(request, package_id):
-    from .views import (
-        _build_payment_context,
-        _calculate_booking_pricing,
-        _create_payment_log,
-        _store_pending_payment_session,
-    )
-
     package = get_object_or_404(TravelPackage, pk=package_id)
     if request.method != 'POST':
         return redirect('choose_payment', package_id=package.id)
@@ -404,7 +371,7 @@ def create_checkout_session(request, package_id):
     if not traveler_form.is_valid():
         return render(
             request,
-            'main/choose_payment.html',
+            'main/payment/choose_payment.html',
             _build_payment_context(package=package, traveler_form=traveler_form),
         )
 
@@ -479,8 +446,6 @@ def create_checkout_session(request, package_id):
 @login_required
 @role_required(allowed_roles=['vendor'])
 def create_sponsorship_checkout_session(request, package_id):
-    from .views import _create_payment_log, _get_sponsorship_price, _get_vendor_or_403, _store_pending_payment_session
-
     package = get_object_or_404(
         TravelPackage.objects.select_related('vendor'),
         pk=package_id,
@@ -535,13 +500,6 @@ def create_sponsorship_checkout_session(request, package_id):
 
 @login_required
 def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
-    from .views import (
-        _build_payment_context,
-        _calculate_booking_pricing,
-        _create_payment_log,
-        _store_pending_payment_session,
-    )
-
     custom_itinerary = get_object_or_404(
         CustomItinerary.objects.select_related('package', 'package__vendor'),
         pk=custom_itinerary_id,
@@ -554,7 +512,7 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
     if not traveler_form.is_valid():
         return render(
             request,
-            'main/choose_payment.html',
+            'main/payment/choose_payment.html',
             _build_payment_context(
                 package=custom_itinerary.package,
                 custom_itinerary=custom_itinerary,
@@ -635,15 +593,6 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
 
 
 def payment_success(request):
-    from .views import (
-        _activate_pending_sponsorship,
-        _clear_pending_payment_session,
-        _create_or_update_booking_from_pending_payment,
-        _create_payment_log,
-        _get_sponsorship_price,
-        _notify_booking_confirmed,
-    )
-
     if not request.session.get('pending_custom_itinerary_id') and not request.session.get('pending_booking_package_id') and not request.session.get('pending_sponsorship_package_id'):
         messages.error(request, "Could not find a pending booking. Please try again.")
         return redirect('package_list')
@@ -666,7 +615,7 @@ def payment_success(request):
             transaction_reference=request.GET.get('session_id', ''),
         )
         messages.success(request, f"{package.name} is now sponsored through {package.sponsorship_end}.")
-        return render(request, 'main/payment_success.html', {
+        return render(request, 'main/payment/payment_success.html', {
             'sponsorship_package': package,
             'sponsorship_end': package.sponsorship_end,
         })
@@ -695,12 +644,10 @@ def payment_success(request):
     else:
         messages.success(request, f"Your booking for {package.name} is confirmed!")
 
-    return render(request, 'main/payment_success.html', {'booking': booking})
+    return render(request, 'main/payment/payment_success.html', {'booking': booking})
 
 
 def payment_cancelled(request):
-    from .views import _create_payment_log, _notify_payment_cancelled
-
     reason = request.GET.get('reason', '')
     status = request.GET.get('status', '')
     sponsorship_package = None
@@ -740,7 +687,7 @@ def payment_cancelled(request):
     messages.warning(request, detail_message)
     return render(
         request,
-        'main/payment_cancelled.html',
+        'main/payment/payment_cancelled.html',
         {
             'detail_message': detail_message,
             'payment_status': status,

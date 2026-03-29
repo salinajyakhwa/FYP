@@ -5,12 +5,12 @@ from django.utils import timezone
 
 from .forms import ChatMessageForm
 from .models import ChatThread, TravelPackage
+from .services.access import _get_chat_thread_for_user_or_403, _get_vendor_or_403
+from .services.notifications import _notify_chat_message
 
 
 @login_required
 def chat_thread_open(request, package_id):
-    from .views import _get_chat_thread_for_user_or_403  # noqa: F401
-
     package = get_object_or_404(
         TravelPackage.objects.select_related('vendor', 'vendor__user_profile', 'vendor__user_profile__user'),
         pk=package_id,
@@ -34,8 +34,6 @@ def chat_thread_open(request, package_id):
 
 @login_required
 def chat_thread_list(request):
-    from .views import _get_vendor_or_403
-
     profile = getattr(request.user, 'userprofile', None)
     if not profile:
         raise PermissionDenied
@@ -62,7 +60,7 @@ def chat_thread_list(request):
     else:
         raise PermissionDenied
 
-    return render(request, 'main/chat_thread_list.html', {
+    return render(request, 'main/chat/chat_thread_list.html', {
         'threads': threads,
         'user_role': profile.role,
     })
@@ -70,8 +68,6 @@ def chat_thread_list(request):
 
 @login_required
 def chat_thread_detail(request, thread_id):
-    from .views import _get_chat_thread_for_user_or_403, _notify_chat_message
-
     thread = _get_chat_thread_for_user_or_403(request.user, thread_id)
     messages_qs = thread.messages.select_related('sender').all()
 
@@ -89,7 +85,7 @@ def chat_thread_detail(request, thread_id):
         form = ChatMessageForm()
 
     counterpart_name = thread.vendor.name if thread.traveler_id == request.user.id else thread.traveler.username
-    return render(request, 'main/chat_thread_detail.html', {
+    return render(request, 'main/chat/chat_thread_detail.html', {
         'thread': thread,
         'messages': messages_qs,
         'form': form,

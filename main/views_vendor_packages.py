@@ -6,23 +6,21 @@ from django.shortcuts import get_object_or_404, redirect, render
 from .decorators import role_required
 from .forms import PackageDayForm, PackageDayOptionForm, TravelPackageForm
 from .models import PackageDayOption, TravelPackage
+from .services.access import _get_vendor_or_403
+from .services.itineraries import _sync_package_itinerary_json
 
 
 @login_required
 @role_required(allowed_roles=['vendor'])
 def vendor_package_list(request):
-    from .views import _get_vendor_or_403
-
     vendor = _get_vendor_or_403(request)
     packages = TravelPackage.objects.filter(vendor=vendor).order_by('-created_at')
-    return render(request, 'main/vendor_package_list.html', {'packages': packages})
+    return render(request, 'main/vendor/vendor_package_list.html', {'packages': packages})
 
 
 @login_required
 @role_required(allowed_roles=['vendor'])
 def create_package(request):
-    from .views import _get_vendor_or_403
-
     if request.method == 'POST':
         form = TravelPackageForm(request.POST, request.FILES)
         if form.is_valid():
@@ -36,14 +34,12 @@ def create_package(request):
             return redirect('vendor_dashboard')
     else:
         form = TravelPackageForm()
-    return render(request, 'main/create_package.html', {'form': form})
+    return render(request, 'main/vendor/create_package.html', {'form': form})
 
 
 @login_required
 @role_required(allowed_roles=['vendor'])
 def manage_itinerary(request, package_id):
-    from .views import _get_vendor_or_403, _sync_package_itinerary_json
-
     package = get_object_or_404(TravelPackage, pk=package_id)
 
     if package.vendor != _get_vendor_or_403(request):
@@ -112,7 +108,7 @@ def manage_itinerary(request, package_id):
                 messages.success(request, 'Itinerary option deleted.')
                 return redirect('manage_itinerary', package_id=package.id)
 
-    return render(request, 'main/manage_itinerary.html', {
+    return render(request, 'main/vendor/manage_itinerary.html', {
         'package': package,
         'package_days': package_days,
         'day_form': day_form,

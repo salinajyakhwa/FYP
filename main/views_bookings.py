@@ -7,12 +7,12 @@ from django.utils import timezone
 
 from .forms import BookingCancellationRequestForm, BookingDisputeForm, ReviewForm
 from .models import Booking, Review, TravelPackage
+from .services.access import _get_vendor_or_403
+from .services.itineraries import _build_booking_selection_items, _group_booking_selection_items
 
 
 @login_required
 def my_bookings(request):
-    from .views import _build_booking_selection_items, _group_booking_selection_items
-
     bookings = (
         Booking.objects.filter(user=request.user)
         .select_related('package', 'package__vendor', 'custom_itinerary', 'trip', 'operations')
@@ -26,7 +26,7 @@ def my_bookings(request):
         booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
         booking.selection_groups = _group_booking_selection_items(booking.selection_items)
         booking.operation_record = getattr(booking, 'operations', None)
-    return render(request, 'main/my_bookings.html', {'bookings': bookings})
+    return render(request, 'main/traveler/my_bookings.html', {'bookings': bookings})
 
 
 @login_required
@@ -108,8 +108,6 @@ def submit_booking_dispute(request, booking_id):
 
 @login_required
 def booking_confirmation(request, booking_id):
-    from .views import _build_booking_selection_items, _group_booking_selection_items
-
     booking = get_object_or_404(
         Booking.objects.select_related('package', 'package__vendor', 'custom_itinerary', 'operations').prefetch_related(
             'custom_itinerary__selections__package_day',
@@ -122,7 +120,7 @@ def booking_confirmation(request, booking_id):
         raise PermissionDenied
 
     selection_items = _build_booking_selection_items(booking.custom_itinerary)
-    return render(request, 'main/booking_confirmation.html', {
+    return render(request, 'main/traveler/booking_confirmation.html', {
         'booking': booking,
         'package': booking.package,
         'selection_items': selection_items,
@@ -133,8 +131,6 @@ def booking_confirmation(request, booking_id):
 
 @login_required
 def export_booking_csv(request, booking_id):
-    from .views import _get_vendor_or_403
-
     booking = get_object_or_404(
         Booking.objects.select_related('user', 'package', 'custom_itinerary'),
         id=booking_id,

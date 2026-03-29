@@ -10,11 +10,12 @@ from django.utils import timezone
 
 from .forms import CustomItinerarySelectionForm, ItineraryDayForm, ReviewForm
 from .models import Booking, CustomItinerary, CustomItinerarySelection, Review, TravelPackage
+from .services.itineraries import _build_selected_options_summary
+from .services.notifications import _notify_custom_itinerary_saved
+from .services.payments import _build_payment_context
 
 
 def package_detail(request, package_id):
-    from .views import _build_selected_options_summary, _notify_custom_itinerary_saved
-
     package = get_object_or_404(TravelPackage, pk=package_id)
     profile = getattr(request.user, 'userprofile', None) if request.user.is_authenticated else None
     profile_vendor = getattr(profile, 'vendor', None) if profile else None
@@ -148,7 +149,7 @@ def package_detail(request, package_id):
             if not has_already_reviewed:
                 user_can_review = True
 
-    return render(request, 'main/package_detail.html', {
+    return render(request, 'main/traveler/package_detail.html', {
         'package': package,
         'reviews': reviews,
         'user_can_review': user_can_review,
@@ -164,8 +165,6 @@ def package_detail(request, package_id):
 
 @login_required
 def custom_itinerary_detail(request, custom_itinerary_id):
-    from .views import _build_payment_context
-
     custom_itinerary = get_object_or_404(
         CustomItinerary.objects.select_related('package', 'package__vendor', 'user').prefetch_related(
             'selections__package_day',
@@ -177,7 +176,7 @@ def custom_itinerary_detail(request, custom_itinerary_id):
     if custom_itinerary.user != request.user:
         raise PermissionDenied
 
-    return render(request, 'main/custom_itinerary_detail.html', {
+    return render(request, 'main/traveler/custom_itinerary_detail.html', {
         'custom_itinerary': custom_itinerary,
         'selections': custom_itinerary.selections.all(),
         'payment_context': _build_payment_context(

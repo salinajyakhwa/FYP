@@ -10,6 +10,8 @@ from django.contrib.auth import get_user_model
 
 from .decorators import role_required
 from .models import Booking, BookingDispute, PaymentLog, TravelPackage, Vendor
+from .services.access import _sync_trip_status_from_booking
+from .services.payments import _create_payment_log
 from .views_vendor_ops import send_vendor_status_email
 
 User = get_user_model()
@@ -32,7 +34,7 @@ def admin_dashboard(request):
         'refund_approvals': Booking.objects.filter(status='cancellation_reviewed').count(),
     }
 
-    return render(request, 'main/admin_dashboard.html', {
+    return render(request, 'main/admin/admin_dashboard.html', {
         'total_users': total_users,
         'total_vendors': total_vendors,
         'total_packages': total_packages,
@@ -47,7 +49,7 @@ def admin_dashboard(request):
 @role_required(allowed_roles=['admin'])
 def manage_users(request):
     users = User.objects.filter(is_superuser=False).order_by('-date_joined')
-    return render(request, 'main/manage_users.html', {'users': users})
+    return render(request, 'main/admin/manage_users.html', {'users': users})
 
 
 @login_required
@@ -67,7 +69,7 @@ def delete_user(request, user_id):
 @role_required(allowed_roles=['admin'])
 def manage_vendors(request):
     vendors = Vendor.objects.all().select_related('user_profile__user').order_by('name')
-    return render(request, 'main/manage_vendors.html', {'vendors': vendors})
+    return render(request, 'main/admin/manage_vendors.html', {'vendors': vendors})
 
 
 @login_required
@@ -103,14 +105,12 @@ def manage_cancellation_requests(request):
         .select_related('user', 'package', 'package__vendor')
         .order_by('-cancellation_requested_at', '-booking_date')
     )
-    return render(request, 'main/manage_cancellation_requests.html', {'bookings': bookings})
+    return render(request, 'main/admin/manage_cancellation_requests.html', {'bookings': bookings})
 
 
 @login_required
 @role_required(allowed_roles=['admin'])
 def finalize_cancellation_request(request, booking_id, decision):
-    from .views import _create_payment_log, _sync_trip_status_from_booking
-
     if request.method != 'POST':
         return HttpResponseBadRequest('POST request required.')
 
@@ -158,7 +158,7 @@ def manage_payment_logs(request):
         PaymentLog.objects.select_related('user', 'booking', 'package')
         .order_by('-created_at')
     )
-    return render(request, 'main/manage_payment_logs.html', {'payment_logs': payment_logs})
+    return render(request, 'main/admin/manage_payment_logs.html', {'payment_logs': payment_logs})
 
 
 @login_required
@@ -168,7 +168,7 @@ def manage_booking_disputes(request):
         BookingDispute.objects.select_related('booking', 'booking__package', 'booking__package__vendor', 'opened_by')
         .order_by('-created_at')
     )
-    return render(request, 'main/manage_booking_disputes.html', {'disputes': disputes})
+    return render(request, 'main/admin/manage_booking_disputes.html', {'disputes': disputes})
 
 
 @login_required
@@ -197,7 +197,7 @@ def manage_package_moderation(request):
         TravelPackage.objects.select_related('vendor', 'vendor__user_profile', 'vendor__user_profile__user')
         .order_by('-created_at')
     )
-    return render(request, 'main/manage_package_moderation.html', {'packages': packages})
+    return render(request, 'main/admin/manage_package_moderation.html', {'packages': packages})
 
 
 @login_required
