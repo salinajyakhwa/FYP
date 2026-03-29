@@ -48,6 +48,7 @@ from .models import (
     ChatThread,
     ChatMessage,
     Booking,
+    BookingOperation,
     BookingDispute,
     PaymentLog,
     Review,
@@ -78,6 +79,7 @@ from .forms import (
     BookingTravelerForm,
     BookingCancellationRequestForm,
     VendorCancellationReviewForm,
+    VendorBookingOperationsForm,
     BookingDisputeForm,
 )
 
@@ -112,6 +114,26 @@ def _safe_int(value, default, minimum=0):
         return max(minimum, int(value))
     except (TypeError, ValueError):
         return default
+
+
+def _sync_trip_status_from_booking(booking):
+    trip = getattr(booking, 'trip', None)
+    if not trip:
+        return
+
+    status_map = {
+        'confirmed': 'ready',
+        'in_review': 'ready',
+        'trip_completed': 'completed',
+        'no_show': 'no_show',
+        'cancelled': 'cancelled',
+        'refund_processed': 'cancelled',
+        'partially_refunded': 'cancelled',
+    }
+    trip_status = status_map.get(booking.status)
+    if trip_status and trip.status != trip_status:
+        trip.status = trip_status
+        trip.save(update_fields=['status', 'updated_at'])
 
 def home(request):
     today = timezone.now().date()
@@ -508,7 +530,7 @@ def _build_trip_timeline_sections(trip, timeline_items):
 def _build_traveler_dashboard_summary(user):
     active_trips = list(
         Trip.objects.filter(traveler=user)
-        .exclude(status__in=['completed', 'cancelled'])
+        .exclude(status__in=['completed', 'cancelled', 'no_show'])
         .only('id', 'start_date')
     )
     unread_notifications = Notification.objects.filter(user=user, is_read=False).count()
@@ -546,7 +568,7 @@ def _build_dashboard_trip_cards(user, limit=4):
     today = timezone.now().date()
     trips = list(
         Trip.objects.filter(traveler=user)
-        .exclude(status__in=['completed', 'cancelled'])
+        .exclude(status__in=['completed', 'cancelled', 'no_show'])
         .select_related('booking', 'package', 'vendor')
     )
 
@@ -1611,7 +1633,7 @@ def dashboard(request):
 
     recent_bookings = list(
         Booking.objects.filter(user=request.user)
-        .select_related('package', 'package__vendor', 'trip')
+        .select_related('package', 'package__vendor', 'trip', 'operations')
         .order_by('-booking_date')[:5]
     )
 
@@ -1630,20 +1652,12 @@ def dashboard(request):
         messages_list = list(thread.messages.all())
         thread.latest_message = messages_list[-1] if messages_list else None
 
-    saved_custom_itineraries = list(
-        CustomItinerary.objects.filter(user=request.user)
-        .exclude(status='confirmed')
-        .select_related('package', 'package__vendor')
-        .order_by('-created_at')[:4]
-    )
-
     context = {
         'dashboard_summary': _build_traveler_dashboard_summary(request.user),
         'active_trip_cards': _build_dashboard_trip_cards(request.user),
         'next_actions': _build_dashboard_next_actions(request.user),
         'recent_notifications': recent_notifications,
         'recent_threads': recent_threads,
-        'saved_custom_itineraries': saved_custom_itineraries,
         'recent_bookings': recent_bookings,
     }
     return render(request, 'main/traveler_dashboard.html', context)
@@ -1688,7 +1702,7 @@ def profile(request):
 def my_bookings(request):
     bookings = (
         Booking.objects.filter(user=request.user)
-        .select_related('package', 'package__vendor', 'custom_itinerary', 'trip')
+        .select_related('package', 'package__vendor', 'custom_itinerary', 'trip', 'operations')
         .prefetch_related(
             'custom_itinerary__selections__package_day',
             'custom_itinerary__selections__selected_option',
@@ -1698,6 +1712,7 @@ def my_bookings(request):
     for booking in bookings:
         booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
         booking.selection_groups = _group_booking_selection_items(booking.selection_items)
+        booking.operation_record = getattr(booking, 'operations', None)
     return render(request, 'main/my_bookings.html', {'bookings': bookings})
 
 
@@ -2047,9 +2062,8 @@ def verify_email(request, uidb64, token):
 @role_required(allowed_roles=['vendor'])
 def vendor_dashboard(request):
     vendor = _get_vendor_or_403(request)
-    
-    # === Sales Data Calculation ===
-    confirmed_bookings = Booking.objects.filter(package__vendor=vendor, status='confirmed')
+    vendor_bookings_qs = Booking.objects.filter(package__vendor=vendor)
+    confirmed_bookings = vendor_bookings_qs.filter(status__in=['confirmed', 'trip_completed'])
 
     # 1. Total Revenue and Bookings
     total_stats = confirmed_bookings.aggregate(
@@ -2081,7 +2095,14 @@ def vendor_dashboard(request):
     package_values = [item['count'] for item in package_booking_data]
 
     # 4. Recent Bookings for the table
-    recent_bookings = Booking.objects.filter(package__vendor=vendor).order_by('-booking_date')[:5]
+    recent_bookings = vendor_bookings_qs.order_by('-booking_date')[:5]
+
+    dashboard_queue = {
+        'pending_bookings': vendor_bookings_qs.filter(status='pending').count(),
+        'in_review_bookings': vendor_bookings_qs.filter(status='in_review').count(),
+        'refund_requests': vendor_bookings_qs.filter(status__in=['cancellation_requested', 'cancellation_reviewed']).count(),
+        'active_trips': Trip.objects.filter(vendor=vendor).exclude(status__in=['completed', 'cancelled', 'no_show']).count(),
+    }
 
     context = {
         'total_revenue': total_revenue,
@@ -2090,6 +2111,7 @@ def vendor_dashboard(request):
         'monthly_revenue_values': json.dumps(monthly_values),
         'package_booking_labels': json.dumps(package_labels),
         'package_booking_values': json.dumps(package_values),
+        'dashboard_queue': dashboard_queue,
         'recent_bookings': recent_bookings,
     }
     return render(request, 'main/vendor_dashboard.html', context)
@@ -2100,7 +2122,7 @@ def vendor_bookings(request):
     vendor = _get_vendor_or_403(request)
 
     bookings = Booking.objects.filter(package__vendor=vendor)\
-        .select_related('user', 'package', 'custom_itinerary', 'trip')\
+        .select_related('user', 'package', 'custom_itinerary', 'trip', 'operations')\
         .prefetch_related(
             'custom_itinerary__selections__package_day',
             'custom_itinerary__selections__selected_option'
@@ -2110,12 +2132,17 @@ def vendor_bookings(request):
     for booking in bookings:
         booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
         booking.selection_groups = _group_booking_selection_items(booking.selection_items)
+        booking.operation_record = getattr(booking, 'operations', None)
         if booking.status == 'cancellation_requested':
             booking.cancellation_review_form = VendorCancellationReviewForm(
                 instance=booking,
                 booking=booking,
                 prefix=f'cancel-{booking.id}',
             )
+        booking.operation_form = VendorBookingOperationsForm(
+            instance=booking.operation_record,
+            prefix=f'ops-{booking.id}',
+        )
 
     context = {
         'bookings': bookings,
@@ -2130,13 +2157,38 @@ def update_booking_status(request, booking_id, new_status):
     booking = get_object_or_404(Booking, id=booking_id, package__vendor=vendor)
 
     if request.method == 'POST':
-        if new_status in ['confirmed', 'cancelled']:
+        if new_status in ['confirmed', 'in_review', 'trip_completed', 'no_show', 'cancelled']:
             booking.status = new_status
-            booking.save()
-            messages.success(request, f"Booking status updated to {new_status}.")
+            booking.save(update_fields=['status'])
+            _sync_trip_status_from_booking(booking)
+            messages.success(request, f"Booking status updated to {booking.get_status_display()}.")
         else:
             messages.error(request, "Invalid status.")
     
+    return redirect('vendor_bookings')
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def update_booking_operations(request, booking_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    booking = get_object_or_404(Booking, id=booking_id, package__vendor=vendor)
+    operations, _ = BookingOperation.objects.get_or_create(booking=booking)
+    form = VendorBookingOperationsForm(request.POST, request.FILES, instance=operations, prefix=f'ops-{booking.id}')
+
+    if form.is_valid():
+        form.save()
+        if booking.status == 'confirmed':
+            booking.status = 'in_review'
+            booking.save(update_fields=['status'])
+            _sync_trip_status_from_booking(booking)
+        messages.success(request, 'Booking operations updated.')
+    else:
+        messages.error(request, 'Please correct the booking operations form.')
+
     return redirect('vendor_bookings')
 
 
@@ -2300,12 +2352,19 @@ def admin_dashboard(request):
     # Recent Activity
     recent_users = User.objects.order_by('-date_joined')[:5]
     recent_packages = TravelPackage.objects.order_by('-created_at')[:5]
+    admin_queue = {
+        'pending_vendors': Vendor.objects.filter(status='pending').count(),
+        'pending_packages': TravelPackage.objects.filter(moderation_status='pending').count(),
+        'open_disputes': BookingDispute.objects.filter(status__in=['open', 'reviewing']).count(),
+        'refund_approvals': Booking.objects.filter(status='cancellation_reviewed').count(),
+    }
 
     context = {
         'total_users': total_users,
         'total_vendors': total_vendors,
         'total_packages': total_packages,
         'total_bookings': total_bookings,
+        'admin_queue': admin_queue,
         'recent_users': recent_users,
         'recent_packages': recent_packages,
     }
@@ -2385,7 +2444,7 @@ def finalize_cancellation_request(request, booking_id, decision):
         return redirect('manage_cancellation_requests')
 
     if decision == 'approve':
-        booking.status = 'cancelled'
+        booking.status = 'refund_processed' if booking.refund_amount >= booking.total_price else 'partially_refunded'
         booking.admin_cancellation_notes = admin_notes
         booking.cancellation_admin_reviewed_at = timezone.now()
         booking.save(update_fields=['status', 'admin_cancellation_notes', 'cancellation_admin_reviewed_at'])
@@ -2399,15 +2458,14 @@ def finalize_cancellation_request(request, booking_id, decision):
             package=booking.package,
             notes='Admin approved booking cancellation refund.',
         )
-        if getattr(booking, 'trip', None) and booking.trip.status != 'cancelled':
-            booking.trip.status = 'cancelled'
-            booking.trip.save(update_fields=['status', 'updated_at'])
-        messages.success(request, 'Cancellation approved and booking marked as cancelled.')
+        _sync_trip_status_from_booking(booking)
+        messages.success(request, 'Cancellation approved and refund status recorded.')
     elif decision == 'reject':
         booking.status = 'confirmed'
         booking.admin_cancellation_notes = admin_notes
         booking.cancellation_admin_reviewed_at = timezone.now()
         booking.save(update_fields=['status', 'admin_cancellation_notes', 'cancellation_admin_reviewed_at'])
+        _sync_trip_status_from_booking(booking)
         messages.success(request, 'Cancellation rejected and booking restored to confirmed.')
     else:
         messages.error(request, 'Invalid cancellation decision.')
@@ -3159,7 +3217,7 @@ def payment_cancelled(request):
 @login_required
 def booking_confirmation(request, booking_id):
     booking = get_object_or_404(
-        Booking.objects.select_related('package', 'package__vendor', 'custom_itinerary').prefetch_related(
+        Booking.objects.select_related('package', 'package__vendor', 'custom_itinerary', 'operations').prefetch_related(
             'custom_itinerary__selections__package_day',
             'custom_itinerary__selections__selected_option',
         ),
@@ -3176,6 +3234,7 @@ def booking_confirmation(request, booking_id):
         'package': package,
         'selection_items': selection_items,
         'selection_groups': _group_booking_selection_items(selection_items),
+        'operation_record': getattr(booking, 'operations', None),
     }
     return render(request, 'main/booking_confirmation.html', context)
 

@@ -68,8 +68,13 @@
     }
     .status-confirmed { background: #ecfdf5; color: #065f46; }
     .status-pending { background: #fffbeb; color: #92400e; }
+    .status-in-review { background: #eef2ff; color: #4338ca; }
     .status-cancellation-requested { background: #eff6ff; color: #1d4ed8; }
     .status-cancellation-reviewed { background: #f5f3ff; color: #6d28d9; }
+    .status-partially-refunded { background: #fff7ed; color: #c2410c; }
+    .status-refund-processed { background: #ecfeff; color: #155e75; }
+    .status-trip-completed { background: #f0fdf4; color: #166534; }
+    .status-no-show { background: #fef2f2; color: #b91c1c; }
     .status-cancelled { background: #fef2f2; color: #991b1b; }
 
     /* Package and User Meta */
@@ -93,6 +98,11 @@
     
     .btn-cancel { background-color: white; border-color: var(--border-color); color: var(--text-muted); }
     .btn-cancel:hover { background-color: var(--danger-red); color: white; border-color: var(--danger-red); }
+
+    .operations-panel {
+        background: #f9fafb;
+        border-top: 1px solid var(--border-color);
+    }
 
     .empty-state { padding: 80px 0; text-align: center; }
 </style>
@@ -164,8 +174,13 @@
                             <span class="status-pill 
                                 {% if booking.status == 'confirmed' %}status-confirmed
                                 {% elif booking.status == 'pending' %}status-pending
+                                {% elif booking.status == 'in_review' %}status-in-review
                                 {% elif booking.status == 'cancellation_requested' %}status-cancellation-requested
                                 {% elif booking.status == 'cancellation_reviewed' %}status-cancellation-reviewed
+                                {% elif booking.status == 'partially_refunded' %}status-partially-refunded
+                                {% elif booking.status == 'refund_processed' %}status-refund-processed
+                                {% elif booking.status == 'trip_completed' %}status-trip-completed
+                                {% elif booking.status == 'no_show' %}status-no-show
                                 {% elif booking.status == 'cancelled' %}status-cancelled
                                 {% endif %}">
                                 <i class="bi bi-circle-fill me-2" style="font-size: 6px;"></i>
@@ -203,6 +218,21 @@
                                     </button>
                                 </form>
                             </div>
+                            {% elif booking.status == 'confirmed' or booking.status == 'in_review' %}
+                            <div class="d-flex flex-wrap justify-content-end gap-2">
+                                <form action="{% url 'update_booking_status' booking.id 'in_review' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Mark In Review</button>
+                                </form>
+                                <form action="{% url 'update_booking_status' booking.id 'trip_completed' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-sm">Trip Completed</button>
+                                </form>
+                                <form action="{% url 'update_booking_status' booking.id 'no_show' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">No Show</button>
+                                </form>
+                            </div>
                             {% elif booking.status == 'cancellation_requested' %}
                             <span class="text-muted small">Review needed</span>
                             {% elif booking.status == 'cancellation_reviewed' %}
@@ -210,6 +240,70 @@
                             {% else %}
                             <span class="text-muted small">Processed</span>
                             {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="operations-panel">
+                        <td colspan="7">
+                            <div class="p-3">
+                                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                    <div>
+                                        <div class="fw-semibold">Vendor Operations</div>
+                                        <div class="small text-muted">Assign guide, jeep, hotel, permits, and upload proof for this booking.</div>
+                                    </div>
+                                    {% if booking.operation_record and booking.operation_record.updated_at %}
+                                    <div class="small text-muted">Updated {{ booking.operation_record.updated_at|date:"M d, Y, g:i a" }}</div>
+                                    {% endif %}
+                                </div>
+                                <form action="{% url 'update_booking_operations' booking.id %}" method="post" enctype="multipart/form-data" class="row g-3">
+                                    {% csrf_token %}
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted">Guide</label>
+                                        {{ booking.operation_form.guide_name }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted">Guide Contact</label>
+                                        {{ booking.operation_form.guide_contact }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted">Jeep Driver</label>
+                                        {{ booking.operation_form.jeep_driver_name }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted">Jeep Plate</label>
+                                        {{ booking.operation_form.jeep_plate_number }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted">Hotel</label>
+                                        {{ booking.operation_form.hotel_name }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted">Hotel Code</label>
+                                        {{ booking.operation_form.hotel_confirmation_code }}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small text-muted">Permit</label>
+                                        {{ booking.operation_form.permit_status }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted">Permit Ref</label>
+                                        {{ booking.operation_form.permit_reference }}
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label small text-muted">Operations Notes</label>
+                                        {{ booking.operation_form.operation_notes }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted">Proof Document</label>
+                                        {{ booking.operation_form.proof_document }}
+                                        {% if booking.operation_record and booking.operation_record.proof_document %}
+                                        <a href="{{ booking.operation_record.proof_document.url }}" target="_blank" rel="noopener noreferrer" class="small d-inline-block mt-2">Open current proof</a>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12 text-end">
+                                        <button type="submit" class="btn btn-primary btn-sm">Save Operations</button>
+                                    </div>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     {% if booking.status == 'cancellation_requested' or booking.status == 'cancellation_reviewed' %}

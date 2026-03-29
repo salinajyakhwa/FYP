@@ -41,6 +41,7 @@ urlpatterns = [
     path('vendor/trip-item/<int:trip_item_id>/attachments/upload/', views.upload_trip_item_attachment, name='upload_trip_item_attachment'),
     path('vendor/trip-item-attachment/<int:attachment_id>/delete/', views.delete_trip_item_attachment, name='delete_trip_item_attachment'),
     path('vendor/booking/<int:booking_id>/update/<str:new_status>/', views.update_booking_status, name='update_booking_status'),
+    path('vendor/booking/<int:booking_id>/operations/', views.update_booking_operations, name='update_booking_operations'),
     path('vendor/booking/<int:booking_id>/cancellation-review/', views.review_cancellation_request, name='review_cancellation_request'),
     path('vendor/packages/', views.vendor_package_list, name='vendor_package_list'),
     path('vendor/package/create/', views.create_package, name='create_package'),

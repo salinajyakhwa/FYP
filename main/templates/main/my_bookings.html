@@ -54,6 +54,29 @@
                 </div>
                 {% endif %}
                 {% endif %}
+                {% if booking.operation_record %}
+                <div class="border rounded p-3 bg-light mt-3">
+                    <div class="fw-semibold mb-2">Vendor Arrangements</div>
+                    <div class="row g-2 small">
+                        {% if booking.operation_record.guide_name %}
+                        <div class="col-md-6"><strong>Guide:</strong> {{ booking.operation_record.guide_name }}{% if booking.operation_record.guide_contact %} ({{ booking.operation_record.guide_contact }}){% endif %}</div>
+                        {% endif %}
+                        {% if booking.operation_record.jeep_driver_name or booking.operation_record.jeep_plate_number %}
+                        <div class="col-md-6"><strong>Jeep:</strong> {{ booking.operation_record.jeep_driver_name|default:"Assigned" }}{% if booking.operation_record.jeep_plate_number %} · {{ booking.operation_record.jeep_plate_number }}{% endif %}</div>
+                        {% endif %}
+                        {% if booking.operation_record.hotel_name %}
+                        <div class="col-md-6"><strong>Hotel:</strong> {{ booking.operation_record.hotel_name }}{% if booking.operation_record.hotel_confirmation_code %} · {{ booking.operation_record.hotel_confirmation_code }}{% endif %}</div>
+                        {% endif %}
+                        <div class="col-md-6"><strong>Permit:</strong> {{ booking.operation_record.get_permit_status_display }}</div>
+                    </div>
+                    {% if booking.operation_record.operation_notes %}
+                    <div class="small text-muted mt-2">{{ booking.operation_record.operation_notes }}</div>
+                    {% endif %}
+                    {% if booking.operation_record.proof_document %}
+                    <a href="{{ booking.operation_record.proof_document.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm mt-2">Open Vendor Proof</a>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
             <div class="col-md-4 text-md-end">
                 <p><strong>Status:</strong> <span class="badge bg-primary">{{ booking.get_status_display }}</span></p>

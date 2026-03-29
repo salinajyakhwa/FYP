@@ -104,6 +104,48 @@
                         <p class="mb-0"><strong>Dates:</strong> {{ package.start_date }} to {{ package.end_date }}</p>
                     </div>
 
+                    {% if operation_record %}
+                    <h3 class="h6 mb-3">Vendor Arrangements</h3>
+                    <div class="border rounded p-3 mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="small text-muted">Guide</div>
+                                <div class="fw-semibold">{{ operation_record.guide_name|default:"Not assigned yet" }}</div>
+                                {% if operation_record.guide_contact %}
+                                <div class="small text-muted">{{ operation_record.guide_contact }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted">Jeep</div>
+                                <div class="fw-semibold">{{ operation_record.jeep_driver_name|default:"Not assigned yet" }}</div>
+                                {% if operation_record.jeep_plate_number %}
+                                <div class="small text-muted">{{ operation_record.jeep_plate_number }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted">Hotel</div>
+                                <div class="fw-semibold">{{ operation_record.hotel_name|default:"Not assigned yet" }}</div>
+                                {% if operation_record.hotel_confirmation_code %}
+                                <div class="small text-muted">{{ operation_record.hotel_confirmation_code }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted">Permit</div>
+                                <div class="fw-semibold">{{ operation_record.get_permit_status_display }}</div>
+                                {% if operation_record.permit_reference %}
+                                <div class="small text-muted">{{ operation_record.permit_reference }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if operation_record.operation_notes %}
+                        <div class="small text-muted mt-3">{{ operation_record.operation_notes }}</div>
+                        {% endif %}
+                        {% if operation_record.proof_document %}
+                        <a href="{{ operation_record.proof_document.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm mt-3">Open Uploaded Proof</a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
                     <div class="d-flex flex-wrap gap-2">
                         {% if booking.trip %}
                         <a href="{% url 'trip_dashboard' booking.trip.id %}" class="btn btn-primary">View Trip</a>

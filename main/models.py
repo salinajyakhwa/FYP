@@ -267,8 +267,13 @@ class Booking(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
+        ('in_review', 'In Review'),
         ('cancellation_requested', 'Cancellation Requested'),
         ('cancellation_reviewed', 'Waiting Admin Decision'),
+        ('partially_refunded', 'Partially Refunded'),
+        ('refund_processed', 'Refund Processed'),
+        ('trip_completed', 'Trip Completed'),
+        ('no_show', 'No Show'),
         ('cancelled', 'Cancelled'),
     )
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
@@ -287,6 +292,31 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking for {self.package.name} by {self.user.username}"
+
+
+class BookingOperation(models.Model):
+    PERMIT_STATUS_CHOICES = (
+        ('not_required', 'Not Required'),
+        ('pending', 'Pending'),
+        ('applied', 'Applied'),
+        ('approved', 'Approved'),
+    )
+
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='operations')
+    guide_name = models.CharField(max_length=200, blank=True)
+    guide_contact = models.CharField(max_length=100, blank=True)
+    jeep_driver_name = models.CharField(max_length=200, blank=True)
+    jeep_plate_number = models.CharField(max_length=100, blank=True)
+    hotel_name = models.CharField(max_length=200, blank=True)
+    hotel_confirmation_code = models.CharField(max_length=100, blank=True)
+    permit_status = models.CharField(max_length=20, choices=PERMIT_STATUS_CHOICES, default='not_required')
+    permit_reference = models.CharField(max_length=120, blank=True)
+    operation_notes = models.TextField(blank=True)
+    proof_document = models.FileField(upload_to='booking_documents/', blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Operations for booking #{self.booking_id}"
 
 
 class BookingDispute(models.Model):
@@ -352,6 +382,7 @@ class Trip(models.Model):
         ('ready', 'Ready'),
         ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
+        ('no_show', 'No Show'),
         ('cancelled', 'Cancelled'),
     )
 
