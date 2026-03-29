@@ -15,6 +15,9 @@
                 {% endif %}
             </p>
         </div>
+        <a href="{% if user_role == 'vendor' %}{% url 'vendor_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+            Back
+        </a>
     </div>
 
     <div class="card border-0 shadow-sm">

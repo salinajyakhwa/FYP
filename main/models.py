@@ -50,6 +50,12 @@ class Vendor(models.Model):
 
 # Represents a travel package offered by a vendor.
 class TravelPackage(models.Model):
+    MODERATION_STATUS_CHOICES = (
+        ('approved', 'Approved'),
+        ('pending', 'Pending Review'),
+        ('rejected', 'Rejected'),
+    )
+
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='packages')
     name = models.CharField(max_length=255)
     description = models.TextField()
@@ -63,6 +69,9 @@ class TravelPackage(models.Model):
     sponsorship_end = models.DateField(blank=True, null=True)
     sponsorship_priority = models.PositiveIntegerField(default=0)
     sponsorship_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    moderation_status = models.CharField(max_length=20, choices=MODERATION_STATUS_CHOICES, default='approved')
+    moderation_notes = models.TextField(blank=True)
+    moderated_at = models.DateTimeField(blank=True, null=True)
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -278,6 +287,63 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking for {self.package.name} by {self.user.username}"
+
+
+class BookingDispute(models.Model):
+    STATUS_CHOICES = (
+        ('open', 'Open'),
+        ('reviewing', 'Reviewing'),
+        ('resolved', 'Resolved'),
+        ('rejected', 'Rejected'),
+    )
+
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='disputes')
+    opened_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='booking_disputes')
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    admin_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"Dispute for booking #{self.booking_id}"
+
+
+class PaymentLog(models.Model):
+    PAYMENT_TYPE_CHOICES = (
+        ('booking', 'Booking'),
+        ('custom_itinerary', 'Custom Itinerary'),
+        ('sponsorship', 'Sponsorship'),
+        ('refund', 'Refund'),
+    )
+    STATUS_CHOICES = (
+        ('initiated', 'Initiated'),
+        ('success', 'Success'),
+        ('cancelled', 'Cancelled'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    )
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='payment_logs', blank=True, null=True)
+    booking = models.ForeignKey(Booking, on_delete=models.SET_NULL, related_name='payment_logs', blank=True, null=True)
+    package = models.ForeignKey(TravelPackage, on_delete=models.SET_NULL, related_name='payment_logs', blank=True, null=True)
+    provider = models.CharField(max_length=20)
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    transaction_reference = models.CharField(max_length=200, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"{self.provider} {self.payment_type} {self.status}"
 
 
 class Trip(models.Model):

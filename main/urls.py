@@ -30,6 +30,7 @@ urlpatterns = [
     path('trip/<int:trip_id>/', views.trip_dashboard, name='trip_dashboard'),
     path('package/<int:package_id>/add_review/', views.add_review, name='add_review'),
     path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
+    path('booking/dispute/<int:booking_id>/', views.submit_booking_dispute, name='submit_booking_dispute'),
 
     # 5. VENDOR
     path('vendor/dashboard/', views.vendor_dashboard, name='vendor_dashboard'),
@@ -54,6 +55,11 @@ urlpatterns = [
     path('management/vendor/<int:vendor_id>/update/<str:new_status>/', views.update_vendor_status, name='update_vendor_status'),
     path('management/cancellations/', views.manage_cancellation_requests, name='manage_cancellation_requests'),
     path('management/cancellations/<int:booking_id>/<str:decision>/', views.finalize_cancellation_request, name='finalize_cancellation_request'),
+    path('management/payments/', views.manage_payment_logs, name='manage_payment_logs'),
+    path('management/disputes/', views.manage_booking_disputes, name='manage_booking_disputes'),
+    path('management/disputes/<int:dispute_id>/<str:new_status>/', views.update_booking_dispute, name='update_booking_dispute'),
+    path('management/packages/', views.manage_package_moderation, name='manage_package_moderation'),
+    path('management/packages/<int:package_id>/<str:new_status>/', views.update_package_moderation, name='update_package_moderation'),
 
     # 6. EXTRAS
     path('about/', views.about, name='about'),

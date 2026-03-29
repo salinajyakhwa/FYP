@@ -75,6 +75,17 @@
                         <button type="submit" class="btn btn-danger btn-sm">Request Cancellation</button>
                     </form>
                 {% endif %}
+                {% if booking.status != 'pending' %}
+                    <form action="{% url 'submit_booking_dispute' booking.id %}" method="post" class="d-grid gap-2 mt-3">
+                        {% csrf_token %}
+                        <input type="text" name="subject" class="form-control form-control-sm" placeholder="Dispute title">
+                        <textarea name="message" class="form-control form-control-sm" rows="2" placeholder="Describe the issue"></textarea>
+                        <button type="submit" class="btn btn-outline-dark btn-sm">Raise Dispute</button>
+                    </form>
+                    {% if booking.disputes.exists %}
+                    <div class="small text-muted mt-2">Disputes raised: {{ booking.disputes.count }}</div>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>

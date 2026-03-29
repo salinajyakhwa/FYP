@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Booking Disputes{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <div class="small text-muted">Admin</div>
+            <h1 class="h3 mb-1">Booking Disputes</h1>
+            <div class="text-muted">Review traveler complaints and record the admin decision.</div>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Booking</th>
+                        <th>Opened By</th>
+                        <th>Issue</th>
+                        <th>Status</th>
+                        <th>Admin Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dispute in disputes %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ dispute.booking.package.name }}</div>
+                            <div class="small text-muted">#BOK-{{ dispute.booking.id|stringformat:"05d" }}</div>
+                        </td>
+                        <td>
+                            <div>{{ dispute.opened_by.username }}</div>
+                            <div class="small text-muted">{{ dispute.created_at|date:"M d, Y g:i a" }}</div>
+                        </td>
+                        <td style="min-width: 260px;">
+                            <div class="fw-semibold">{{ dispute.subject }}</div>
+                            <div class="small text-muted mt-1">{{ dispute.message }}</div>
+                            {% if dispute.admin_notes %}
+                            <div class="small mt-2"><strong>Admin:</strong> {{ dispute.admin_notes }}</div>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge text-bg-light border">{{ dispute.get_status_display }}</span></td>
+                        <td style="min-width: 280px;">
+                            <div class="d-grid gap-2">
+                                <form action="{% url 'update_booking_dispute' dispute.id 'reviewing' %}" method="post">
+                                    {% csrf_token %}
+                                    <textarea name="admin_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Internal/admin note"></textarea>
+                                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Mark Reviewing</button>
+                                </form>
+                                <form action="{% url 'update_booking_dispute' dispute.id 'resolved' %}" method="post">
+                                    {% csrf_token %}
+                                    <textarea name="admin_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="How was it resolved?"></textarea>
+                                    <button type="submit" class="btn btn-success btn-sm w-100">Resolve</button>
+                                </form>
+                                <form action="{% url 'update_booking_dispute' dispute.id 'rejected' %}" method="post">
+                                    {% csrf_token %}
+                                    <textarea name="admin_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Why is it rejected?"></textarea>
+                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">Reject</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">No disputes raised yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

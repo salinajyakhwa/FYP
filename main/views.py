@@ -48,6 +48,8 @@ from .models import (
     ChatThread,
     ChatMessage,
     Booking,
+    BookingDispute,
+    PaymentLog,
     Review,
     UserProfile,
     Vendor,
@@ -76,6 +78,7 @@ from .forms import (
     BookingTravelerForm,
     BookingCancellationRequestForm,
     VendorCancellationReviewForm,
+    BookingDisputeForm,
 )
 
 # Decorators
@@ -113,6 +116,7 @@ def _safe_int(value, default, minimum=0):
 def home(request):
     today = timezone.now().date()
     sponsored_packages = TravelPackage.objects.select_related('vendor').filter(
+        moderation_status='approved',
         is_sponsored=True,
         sponsorship_start__isnull=False,
         sponsorship_end__isnull=False,
@@ -121,6 +125,7 @@ def home(request):
     ).order_by('-sponsorship_priority', '-created_at')[:4]
     packages = (
         TravelPackage.objects.select_related('vendor')
+        .filter(moderation_status='approved')
         .exclude(id__in=sponsored_packages.values_list('id', flat=True))
         .order_by('-created_at')[:4]
     )
@@ -320,6 +325,31 @@ def _calculate_booking_pricing(package, adult_count, child_count, custom_itinera
 def _calculate_refund_amount(total_price, committed_cost):
     refund_amount = Decimal(total_price) - Decimal(committed_cost)
     return _quantize_currency(max(refund_amount, Decimal('0.00')))
+
+
+def _create_payment_log(
+    *,
+    provider,
+    payment_type,
+    status,
+    amount,
+    user=None,
+    booking=None,
+    package=None,
+    transaction_reference='',
+    notes='',
+):
+    PaymentLog.objects.create(
+        provider=provider,
+        payment_type=payment_type,
+        status=status,
+        amount=_quantize_currency(amount),
+        user=user,
+        booking=booking,
+        package=package,
+        transaction_reference=transaction_reference,
+        notes=notes,
+    )
 
 
 def _build_trip_timeline_items(trip):
@@ -1063,21 +1093,26 @@ def about(request):
 
 def search_results(request):
     query = request.GET.get('q', '')
+    base_qs = TravelPackage.objects.filter(moderation_status='approved')
     if query:
-        packages = TravelPackage.objects.filter(
+        packages = base_qs.filter(
             Q(name__icontains=query) |
             Q(description__icontains=query) |
             Q(vendor__name__icontains=query)
         )
     else:
-        packages = TravelPackage.objects.all()
+        packages = base_qs
     
     return render(request, 'main/_package_list_partial.html', {'packages': packages})
 
 from .filters import TravelPackageFilter
 
 def package_list(request):
-    packages_list = TravelPackage.objects.select_related('vendor').all().order_by('-created_at')
+    packages_list = (
+        TravelPackage.objects.select_related('vendor')
+        .filter(moderation_status='approved')
+        .order_by('-created_at')
+    )
     package_filter = TravelPackageFilter(request.GET, queryset=packages_list)
     today = timezone.now().date()
     filtered_qs = package_filter.qs.select_related('vendor')
@@ -1104,11 +1139,25 @@ def package_list(request):
 
 def package_detail(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
+    profile = getattr(request.user, 'userprofile', None) if request.user.is_authenticated else None
+    profile_vendor = getattr(profile, 'vendor', None) if profile else None
+
+    if (
+        package.moderation_status != 'approved'
+        and not request.user.is_superuser
+        and not (
+            request.user.is_authenticated
+            and profile
+            and profile.role == 'vendor'
+            and profile_vendor
+            and profile_vendor.id == package.vendor_id
+        )
+    ):
+        raise PermissionDenied
+
     reviews = Review.objects.filter(package=package).order_by('-created_at')
     review_form = ReviewForm()
     itinerary_items = []
-    profile = getattr(request.user, 'userprofile', None) if request.user.is_authenticated else None
-    profile_vendor = getattr(profile, 'vendor', None) if profile else None
     is_vendor_owner = bool(
         request.user.is_authenticated
         and profile
@@ -2148,8 +2197,11 @@ def create_package(request):
         if form.is_valid():
             package = form.save(commit=False)
             package.vendor = _get_vendor_or_403(request)
+            package.moderation_status = 'pending'
+            package.moderation_notes = ''
+            package.moderated_at = None
             package.save()
-            messages.success(request, "Package created successfully!")
+            messages.success(request, "Package created and sent for admin review.")
             return redirect('vendor_dashboard')
     else:
         form = TravelPackageForm()
@@ -2337,6 +2389,16 @@ def finalize_cancellation_request(request, booking_id, decision):
         booking.admin_cancellation_notes = admin_notes
         booking.cancellation_admin_reviewed_at = timezone.now()
         booking.save(update_fields=['status', 'admin_cancellation_notes', 'cancellation_admin_reviewed_at'])
+        _create_payment_log(
+            provider='internal',
+            payment_type='refund',
+            status='refunded',
+            amount=booking.refund_amount,
+            user=booking.user,
+            booking=booking,
+            package=booking.package,
+            notes='Admin approved booking cancellation refund.',
+        )
         if getattr(booking, 'trip', None) and booking.trip.status != 'cancelled':
             booking.trip.status = 'cancelled'
             booking.trip.save(update_fields=['status', 'updated_at'])
@@ -2351,6 +2413,95 @@ def finalize_cancellation_request(request, booking_id, decision):
         messages.error(request, 'Invalid cancellation decision.')
 
     return redirect('manage_cancellation_requests')
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def manage_payment_logs(request):
+    payment_logs = (
+        PaymentLog.objects.select_related('user', 'booking', 'package')
+        .order_by('-created_at')
+    )
+    return render(request, 'main/manage_payment_logs.html', {'payment_logs': payment_logs})
+
+
+@login_required
+def submit_booking_dispute(request, booking_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    booking = get_object_or_404(Booking, pk=booking_id, user=request.user)
+    form = BookingDisputeForm(request.POST)
+
+    if form.is_valid():
+        dispute = form.save(commit=False)
+        dispute.booking = booking
+        dispute.opened_by = request.user
+        dispute.save()
+        messages.success(request, 'Dispute submitted for admin review.')
+    else:
+        messages.error(request, 'Please fill in both the dispute title and details.')
+
+    return redirect('my_bookings')
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def manage_booking_disputes(request):
+    disputes = (
+        BookingDispute.objects.select_related('booking', 'booking__package', 'booking__package__vendor', 'opened_by')
+        .order_by('-created_at')
+    )
+    return render(request, 'main/manage_booking_disputes.html', {'disputes': disputes})
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def update_booking_dispute(request, dispute_id, new_status):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    dispute = get_object_or_404(BookingDispute, pk=dispute_id)
+    allowed_statuses = {'reviewing', 'resolved', 'rejected'}
+    if new_status not in allowed_statuses:
+        messages.error(request, 'Invalid dispute status.')
+        return redirect('manage_booking_disputes')
+
+    dispute.status = new_status
+    dispute.admin_notes = request.POST.get('admin_notes', '').strip()
+    dispute.save(update_fields=['status', 'admin_notes', 'updated_at'])
+    messages.success(request, 'Dispute updated successfully.')
+    return redirect('manage_booking_disputes')
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def manage_package_moderation(request):
+    packages = (
+        TravelPackage.objects.select_related('vendor', 'vendor__user_profile', 'vendor__user_profile__user')
+        .order_by('-created_at')
+    )
+    return render(request, 'main/manage_package_moderation.html', {'packages': packages})
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def update_package_moderation(request, package_id, new_status):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    package = get_object_or_404(TravelPackage, pk=package_id)
+    allowed_statuses = {'approved', 'pending', 'rejected'}
+    if new_status not in allowed_statuses:
+        messages.error(request, 'Invalid package moderation status.')
+        return redirect('manage_package_moderation')
+
+    package.moderation_status = new_status
+    package.moderation_notes = request.POST.get('moderation_notes', '').strip()
+    package.moderated_at = timezone.now()
+    package.save(update_fields=['moderation_status', 'moderation_notes', 'moderated_at'])
+    messages.success(request, f'{package.name} marked as {package.get_moderation_status_display()}.')
+    return redirect('manage_package_moderation')
 
 
 # ==========================================
@@ -2387,6 +2538,15 @@ def esewa_checkout(request, package_id):
         adult_count=adult_count,
         child_count=child_count,
         total_price=pricing['total_price'],
+    )
+    _create_payment_log(
+        provider='esewa',
+        payment_type='booking',
+        status='initiated',
+        amount=pricing['total_price'],
+        user=request.user,
+        package=package,
+        transaction_reference=transaction_uuid,
     )
 
     context = {
@@ -2426,6 +2586,15 @@ def esewa_sponsorship_checkout(request, package_id):
         sponsorship_package_id=package.id,
         transaction_uuid=transaction_uuid,
         provider='esewa',
+    )
+    _create_payment_log(
+        provider='esewa',
+        payment_type='sponsorship',
+        status='initiated',
+        amount=amount,
+        user=request.user,
+        package=package,
+        transaction_reference=transaction_uuid,
     )
 
     context = {
@@ -2490,6 +2659,15 @@ def esewa_custom_itinerary_checkout(request, custom_itinerary_id):
         adult_count=adult_count,
         child_count=child_count,
         total_price=pricing['total_price'],
+    )
+    _create_payment_log(
+        provider='esewa',
+        payment_type='custom_itinerary',
+        status='initiated',
+        amount=pricing['total_price'],
+        user=request.user,
+        package=custom_itinerary.package,
+        transaction_reference=transaction_uuid,
     )
 
     context = {
@@ -2571,6 +2749,15 @@ def esewa_verify(request):
             return redirect('vendor_package_list')
 
         _clear_pending_payment_session(request)
+        _create_payment_log(
+            provider='esewa',
+            payment_type='sponsorship',
+            status='success',
+            amount=_get_sponsorship_price(package),
+            user=request.user,
+            package=package,
+            transaction_reference=transaction_uuid or '',
+        )
         messages.success(request, f"{package.name} is now sponsored through {package.sponsorship_end}.")
         return redirect('vendor_package_list')
 
@@ -2582,6 +2769,16 @@ def esewa_verify(request):
 
     _notify_booking_confirmed(booking, is_custom=is_custom)
     _clear_pending_payment_session(request)
+    _create_payment_log(
+        provider='esewa',
+        payment_type='custom_itinerary' if is_custom else 'booking',
+        status='success',
+        amount=booking.total_price,
+        user=request.user,
+        booking=booking,
+        package=package,
+        transaction_reference=transaction_uuid or '',
+    )
     if is_custom:
         messages.success(request, f"Your custom booking for {package.name} is confirmed!")
     else:
@@ -2665,6 +2862,15 @@ def create_checkout_session(request, package_id):
             child_count=child_count,
             total_price=pricing['total_price'],
         )
+        _create_payment_log(
+            provider='stripe',
+            payment_type='booking',
+            status='initiated',
+            amount=pricing['total_price'],
+            user=request.user,
+            package=package,
+            transaction_reference=checkout_session.id,
+        )
 
         return redirect(checkout_session.url, code=303)
 
@@ -2720,6 +2926,15 @@ def create_sponsorship_checkout_session(request, package_id):
             request,
             sponsorship_package_id=package.id,
             provider='stripe',
+        )
+        _create_payment_log(
+            provider='stripe',
+            payment_type='sponsorship',
+            status='initiated',
+            amount=amount,
+            user=request.user,
+            package=package,
+            transaction_reference=checkout_session.id,
         )
 
         return redirect(checkout_session.url, code=303)
@@ -2811,6 +3026,15 @@ def create_custom_itinerary_checkout_session(request, custom_itinerary_id):
             child_count=child_count,
             total_price=pricing['total_price'],
         )
+        _create_payment_log(
+            provider='stripe',
+            payment_type='custom_itinerary',
+            status='initiated',
+            amount=pricing['total_price'],
+            user=request.user,
+            package=custom_itinerary.package,
+            transaction_reference=checkout_session.id,
+        )
 
         return redirect(checkout_session.url, code=303)
     except Exception as e:
@@ -2838,6 +3062,15 @@ def payment_success(request):
             return redirect('vendor_package_list')
 
         _clear_pending_payment_session(request)
+        _create_payment_log(
+            provider='stripe',
+            payment_type='sponsorship',
+            status='success',
+            amount=_get_sponsorship_price(package),
+            user=request.user,
+            package=package,
+            transaction_reference=request.GET.get('session_id', ''),
+        )
         messages.success(request, f"{package.name} is now sponsored through {package.sponsorship_end}.")
         return render(request, 'main/payment_success.html', {
             'sponsorship_package': package,
@@ -2852,6 +3085,16 @@ def payment_success(request):
 
     _notify_booking_confirmed(booking, is_custom=is_custom)
     _clear_pending_payment_session(request)
+    _create_payment_log(
+        provider='stripe',
+        payment_type='custom_itinerary' if is_custom else 'booking',
+        status='success',
+        amount=booking.total_price,
+        user=request.user,
+        booking=booking,
+        package=package,
+        transaction_reference=request.GET.get('session_id', ''),
+    )
 
     if is_custom:
         messages.success(request, f"Your custom booking for {package.name} is confirmed!")
@@ -2886,6 +3129,21 @@ def payment_cancelled(request):
         ).first()
 
     _notify_payment_cancelled(request, detail_message)
+    pending_package_id = request.session.get('pending_booking_package_id') or request.session.get('pending_sponsorship_package_id')
+    pending_package = TravelPackage.objects.filter(pk=pending_package_id).first() if pending_package_id else None
+    payment_type = 'sponsorship' if request.session.get('pending_sponsorship_package_id') else (
+        'custom_itinerary' if request.session.get('pending_custom_itinerary_id') else 'booking'
+    )
+    _create_payment_log(
+        provider=request.session.get('pending_payment_provider') or 'unknown',
+        payment_type=payment_type,
+        status='cancelled',
+        amount=Decimal(request.session.get('pending_booking_total_price') or '0.00'),
+        user=request.user if request.user.is_authenticated else None,
+        package=pending_package,
+        transaction_reference=request.session.get('pending_payment_transaction_uuid', ''),
+        notes=detail_message,
+    )
     messages.warning(request, detail_message)
     return render(
         request,

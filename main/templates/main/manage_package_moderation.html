@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}Package Moderation{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <div class="small text-muted">Admin</div>
+            <h1 class="h3 mb-1">Package Moderation</h1>
+            <div class="text-muted">Approve, hold, or reject vendor packages before they appear publicly.</div>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Package</th>
+                        <th>Vendor</th>
+                        <th>Travel Info</th>
+                        <th>Status</th>
+                        <th>Moderation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for package in packages %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ package.name }}</div>
+                            <div class="small text-muted">{{ package.location }}</div>
+                        </td>
+                        <td>
+                            <div>{{ package.vendor.name }}</div>
+                            <div class="small text-muted">{{ package.vendor.user_profile.user.email }}</div>
+                        </td>
+                        <td>
+                            <div class="small">Rs. {{ package.price|floatformat:2 }}</div>
+                            <div class="small text-muted">{{ package.start_date }} to {{ package.end_date }}</div>
+                        </td>
+                        <td>
+                            <span class="badge text-bg-light border">{{ package.get_moderation_status_display }}</span>
+                            {% if package.moderation_notes %}
+                            <div class="small text-muted mt-2">{{ package.moderation_notes }}</div>
+                            {% endif %}
+                        </td>
+                        <td style="min-width: 270px;">
+                            <div class="d-grid gap-2">
+                                <form action="{% url 'update_package_moderation' package.id 'approved' %}" method="post">
+                                    {% csrf_token %}
+                                    <textarea name="moderation_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Approval note (optional)"></textarea>
+                                    <button type="submit" class="btn btn-success btn-sm w-100">Approve</button>
+                                </form>
+                                <form action="{% url 'update_package_moderation' package.id 'pending' %}" method="post">
+                                    {% csrf_token %}
+                                    <textarea name="moderation_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Why keep it pending?"></textarea>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm w-100">Mark Pending</button>
+                                </form>
+                                <form action="{% url 'update_package_moderation' package.id 'rejected' %}" method="post">
+                                    {% csrf_token %}
+                                    <textarea name="moderation_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Reason for rejection"></textarea>
+                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">Reject</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">No packages found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

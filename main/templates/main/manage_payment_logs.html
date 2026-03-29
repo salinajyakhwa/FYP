@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Payment Logs{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <div class="small text-muted">Admin</div>
+            <h1 class="h3 mb-1">Payment Logs</h1>
+            <div class="text-muted">Audit trail for initiated, successful, cancelled, and refunded payments.</div>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>When</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Provider</th>
+                        <th>Status</th>
+                        <th>Reference</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in payment_logs %}
+                    <tr>
+                        <td>{{ log.created_at|date:"M d, Y g:i a" }}</td>
+                        <td>{{ log.user.username|default:"System" }}</td>
+                        <td>
+                            <div>{{ log.get_payment_type_display }}</div>
+                            {% if log.package %}
+                            <div class="small text-muted">{{ log.package.name }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.provider|title }}</td>
+                        <td><span class="badge text-bg-light border">{{ log.get_status_display }}</span></td>
+                        <td>
+                            <div>{{ log.transaction_reference|default:"-" }}</div>
+                            {% if log.notes %}
+                            <div class="small text-muted">{{ log.notes|truncatechars:80 }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-semibold">Rs. {{ log.amount|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">No payment logs yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

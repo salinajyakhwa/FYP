@@ -11,6 +11,7 @@ from django.utils import timezone
 from .models import (
     Review,
     Booking,
+    BookingDispute,
     TravelPackage,
     UserProfile,
     Vendor,
@@ -220,6 +221,29 @@ class VendorCancellationReviewForm(forms.ModelForm):
 
     def clean_vendor_cancellation_notes(self):
         return self.cleaned_data.get('vendor_cancellation_notes', '').strip()
+
+
+class BookingDisputeForm(forms.ModelForm):
+    class Meta:
+        model = BookingDispute
+        fields = ['subject', 'message']
+        widgets = {
+            'subject': forms.TextInput(attrs={
+                'class': 'form-control form-control-sm',
+                'placeholder': 'Issue title',
+            }),
+            'message': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 3,
+                'placeholder': 'Explain the issue clearly',
+            }),
+        }
+
+    def clean_subject(self):
+        return self.cleaned_data['subject'].strip()
+
+    def clean_message(self):
+        return self.cleaned_data['message'].strip()
 
 class ItineraryDayForm(forms.Form):
     ACTIVITY_CHOICES = [
