@@ -146,10 +146,6 @@
                 <label class="form-label">Where to?</label>
                 {% render_field filter.form.location class="form-control input-pro" placeholder="Destination name..." %}
             </div>
-            <div class="col-lg-2 col-md-6">
-                <label class="form-label">Travel Type</label>
-                {% render_field filter.form.travel_type class="form-select input-pro" %}
-            </div>
             <div class="col-lg-3 col-md-6">
                 <label class="form-label">Price Range</label>
                 <div class="input-group">
@@ -161,7 +157,11 @@
                 <label class="form-label">Timeline</label>
                 {% render_field filter.form.start_date__gt class="form-control input-pro" type="date" %}
             </div>
-            <div class="col-lg-2 col-md-12 d-flex align-items-end">
+            <div class="col-lg-2 col-md-6">
+                <label class="form-label">Travel Type</label>
+                {% render_field filter.form.travel_type class="form-control input-pro" placeholder="Type of trip..." %}
+            </div>
+            <div class="col-lg-2 col-md-6 d-flex align-items-end">
                 <button type="submit" class="btn btn-dark w-100 py-2 fw-bold" style="border-radius: 12px; background: var(--brand-primary);">
                     Search
                 </button>
