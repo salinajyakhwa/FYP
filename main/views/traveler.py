@@ -312,8 +312,7 @@ def start_package_booking(request, package_id):
         .first()
     )
     if existing_request:
-        messages.info(request, 'Your over-capacity booking request is already pending vendor review.')
-        return redirect('package_detail', package_id=package.id)
+        return redirect('booking_capacity_request_pending', capacity_request_id=existing_request.id)
 
     capacity_request = BookingCapacityRequest.objects.create(
         traveler=request.user,
@@ -330,11 +329,25 @@ def start_package_booking(request, package_id):
         target_url=reverse('vendor_dashboard'),
         dedupe_key=f"capacity-request:{capacity_request.id}",
     )
-    messages.info(
-        request,
-        f"The number of traveler limit exceeded. The package currently has only {capacity_summary['remaining_capacity']} space(s) left, so your request has been sent to the vendor.",
+    return redirect('booking_capacity_request_pending', capacity_request_id=capacity_request.id)
+
+
+@login_required
+def booking_capacity_request_pending(request, capacity_request_id):
+    capacity_request = get_object_or_404(
+        BookingCapacityRequest.objects.select_related('package', 'package__vendor'),
+        pk=capacity_request_id,
+        traveler=request.user,
     )
-    return redirect('package_detail', package_id=package.id)
+    capacity_summary = get_package_capacity_summary(capacity_request.package)
+    return render(
+        request,
+        'main/traveler/booking_capacity_request_pending.html',
+        {
+            'capacity_request': capacity_request,
+            'capacity_summary': capacity_summary,
+        },
+    )
 
 
 @login_required

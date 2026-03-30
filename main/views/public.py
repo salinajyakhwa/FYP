@@ -32,7 +32,7 @@ def home(request):
         sponsorship_end__isnull=False,
         sponsorship_start__lte=today,
         sponsorship_end__gte=today,
-    ).order_by('-sponsorship_priority', '-created_at')[:4]
+    ).order_by('-sponsorship_amount', '-created_at')[:4]
     packages = (
         TravelPackage.objects.select_related('vendor')
         .filter(moderation_status='approved')
@@ -79,7 +79,7 @@ def package_list(request):
         sponsorship_end__isnull=False,
         sponsorship_start__lte=today,
         sponsorship_end__gte=today,
-    ).order_by('-sponsorship_priority', '-created_at')
+    ).order_by('-sponsorship_amount', '-created_at')
 
     organic_packages_qs = filtered_qs.exclude(
         id__in=sponsored_packages.values_list('id', flat=True)

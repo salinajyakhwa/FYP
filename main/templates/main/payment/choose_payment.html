@@ -32,14 +32,30 @@
             <p class="text-muted mb-4">{{ display_name }}</p>
 
             {% if sponsorship_package %}
-            <p class="mb-0">Price: <strong>Rs. {{ amount|floatformat:2 }}</strong></p>
-            <p class="text-muted mt-2 mb-0">
-              This promotes <strong>{{ sponsorship_package.name }}</strong> for {{ sponsorship_duration_days }} days.
+            <p class="mb-0">Minimum sponsorship: <strong>Rs. {{ minimum_sponsorship_amount|floatformat:2 }}</strong></p>
+            <p class="text-muted mt-2">
+              Vendors who pay more are shown first. This promotes <strong>{{ sponsorship_package.name }}</strong> for {{ sponsorship_duration_days }} days.
             </p>
-            <div class="d-flex gap-3 mt-4">
-              <a href="{% url 'create_sponsorship_checkout_session' sponsorship_package.id %}" class="btn btn-success btn-lg">Pay with Stripe</a>
-              <a href="{% url 'esewa_sponsorship_checkout' sponsorship_package.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</a>
-            </div>
+            <form method="post">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label for="sponsorshipAmount" class="form-label">Your sponsorship amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="{{ minimum_sponsorship_amount|floatformat:2 }}"
+                  name="sponsorship_amount"
+                  id="sponsorshipAmount"
+                  class="form-control"
+                  value="{{ amount|floatformat:2 }}"
+                  required
+                >
+              </div>
+              <div class="d-flex gap-3 mt-4">
+                <button type="submit" formaction="{% url 'create_sponsorship_checkout_session' sponsorship_package.id %}" class="btn btn-success btn-lg">Pay with Stripe</button>
+                <button type="submit" formaction="{% url 'esewa_sponsorship_checkout' sponsorship_package.id %}" class="btn btn-outline-primary btn-lg">Pay with eSewa (Demo)</button>
+              </div>
+            </form>
             {% else %}
             <form method="post">
               {% csrf_token %}

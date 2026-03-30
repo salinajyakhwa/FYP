@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Request Pending{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="mx-auto" style="max-width: 720px;">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <div class="small text-muted mb-2">Payment Request Pending</div>
+                <h1 class="h3 mb-3">Your booking request has been sent to the vendor</h1>
+                <p class="text-muted mb-4">
+                    The number of travelers you selected is higher than the current remaining capacity for this package.
+                    Your request is now waiting for the vendor's review before you can proceed to payment.
+                </p>
+
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Package</span>
+                        <strong>{{ capacity_request.package.name }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Requested travelers</span>
+                        <strong>{{ capacity_request.adult_count }} adult{{ capacity_request.adult_count|pluralize }}, {{ capacity_request.child_count }} child{{ capacity_request.child_count|pluralize }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total requested</span>
+                        <strong>{{ capacity_request.number_of_travelers }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Remaining capacity right now</span>
+                        <strong>{{ capacity_summary.remaining_capacity }}</strong>
+                    </div>
+                </div>
+
+                <div class="small text-muted mb-4">
+                    Status: <strong>{{ capacity_request.get_status_display }}</strong>. Once the vendor approves it, you can come back and continue to payment.
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{% url 'package_detail' capacity_request.package.id %}" class="btn btn-primary">Back to Package</a>
+                    <a href="{% url 'my_bookings' %}" class="btn btn-outline-secondary">My Bookings</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

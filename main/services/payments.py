@@ -157,19 +157,31 @@ SPONSORSHIP_DEFAULT_PRICE = Decimal('100.00')
 SPONSORSHIP_DURATION_DAYS = 30
 
 
-def _get_sponsorship_price(package):
+def _normalize_sponsorship_amount(value):
+    try:
+        amount = Decimal(value)
+    except Exception:
+        amount = SPONSORSHIP_DEFAULT_PRICE
+    return _quantize_currency(max(amount, SPONSORSHIP_DEFAULT_PRICE))
+
+
+def _get_sponsorship_price(package, requested_amount=None):
+    if requested_amount is not None:
+        return _normalize_sponsorship_amount(requested_amount)
+
     amount = Decimal(package.sponsorship_amount or 0)
-    return amount if amount > 0 else SPONSORSHIP_DEFAULT_PRICE
+    return _normalize_sponsorship_amount(amount if amount > 0 else SPONSORSHIP_DEFAULT_PRICE)
 
 
-def _build_sponsorship_payment_context(package):
-    amount = _get_sponsorship_price(package)
+def _build_sponsorship_payment_context(package, sponsorship_amount=None):
+    amount = _get_sponsorship_price(package, sponsorship_amount)
     return {
         'package': package,
         'sponsorship_package': package,
         'amount': amount,
         'display_name': f"{package.name} Sponsorship",
         'sponsorship_duration_days': SPONSORSHIP_DURATION_DAYS,
+        'minimum_sponsorship_amount': SPONSORSHIP_DEFAULT_PRICE,
     }
 
 
@@ -185,6 +197,7 @@ def _store_pending_payment_session(
     child_count=None,
     total_price=None,
     capacity_request_id=None,
+    sponsorship_amount=None,
 ):
     request.session['pending_booking_package_id'] = package_id
     request.session['pending_custom_itinerary_id'] = custom_itinerary_id
@@ -195,6 +208,9 @@ def _store_pending_payment_session(
     request.session['pending_booking_child_count'] = child_count
     request.session['pending_booking_total_price'] = str(total_price) if total_price is not None else None
     request.session['pending_capacity_request_id'] = capacity_request_id
+    request.session['pending_sponsorship_amount'] = (
+        str(sponsorship_amount) if sponsorship_amount is not None else None
+    )
 
 
 def _clear_pending_payment_session(request):
@@ -208,6 +224,7 @@ def _clear_pending_payment_session(request):
         'pending_booking_child_count',
         'pending_booking_total_price',
         'pending_capacity_request_id',
+        'pending_sponsorship_amount',
     ]:
         request.session.pop(key, None)
 
@@ -326,7 +343,10 @@ def _activate_pending_sponsorship(request):
     )
 
     today = timezone.now().date()
-    current_price = _get_sponsorship_price(package)
+    current_price = _get_sponsorship_price(
+        package,
+        request.session.get('pending_sponsorship_amount'),
+    )
 
     if package.is_sponsored and package.sponsorship_end and package.sponsorship_end >= today:
         start_anchor = package.sponsorship_end + timezone.timedelta(days=1)
@@ -339,8 +359,7 @@ def _activate_pending_sponsorship(request):
 
     package.sponsorship_end = start_anchor + timezone.timedelta(days=SPONSORSHIP_DURATION_DAYS - 1)
     package.sponsorship_amount = current_price
-    if package.sponsorship_priority == 0:
-        package.sponsorship_priority = 1
+    package.sponsorship_priority = int(current_price)
     package.save(update_fields=[
         'is_sponsored',
         'sponsorship_start',

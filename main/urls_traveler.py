@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path('package/<int:package_id>/', views.package_detail, name='package_detail'),
     path('package/<int:package_id>/start-booking/', views.start_package_booking, name='start_package_booking'),
+    path('booking/capacity-request/<int:capacity_request_id>/', views.booking_capacity_request_pending, name='booking_capacity_request_pending'),
     path('custom-itinerary/<int:custom_itinerary_id>/', views.custom_itinerary_detail, name='custom_itinerary_detail'),
     path('chat/', views.chat_thread_list, name='chat_thread_list'),
     path('chat/open/package/<int:package_id>/', views.chat_thread_open, name='chat_thread_open'),

@@ -28,6 +28,7 @@ from ..services.payments import (
     _create_or_update_booking_from_pending_payment,
     _create_payment_log,
     _generate_esewa_signature,
+    _normalize_sponsorship_amount,
     _get_sponsorship_price,
     _store_pending_payment_session,
     _verify_esewa_payload,
@@ -108,7 +109,12 @@ def choose_sponsorship_payment(request, package_id):
         pk=package_id,
         vendor=_get_vendor_or_403(request),
     )
-    return render(request, 'main/payment/choose_payment.html', _build_sponsorship_payment_context(package))
+    sponsorship_amount = _normalize_sponsorship_amount(request.GET.get('amount'))
+    return render(
+        request,
+        'main/payment/choose_payment.html',
+        _build_sponsorship_payment_context(package, sponsorship_amount),
+    )
 
 
 @login_required
@@ -189,8 +195,11 @@ def esewa_sponsorship_checkout(request, package_id):
         pk=package_id,
         vendor=_get_vendor_or_403(request),
     )
+    if request.method != 'POST':
+        return redirect('choose_sponsorship_payment', package_id=package.id)
+
     transaction_uuid = str(uuid.uuid4())
-    amount = _get_sponsorship_price(package).quantize(Decimal('0.01'))
+    amount = _normalize_sponsorship_amount(request.POST.get('sponsorship_amount'))
     tax_amount = Decimal('0.00')
     total_amount = amount + tax_amount
 
@@ -199,6 +208,7 @@ def esewa_sponsorship_checkout(request, package_id):
         sponsorship_package_id=package.id,
         transaction_uuid=transaction_uuid,
         provider='esewa',
+        sponsorship_amount=amount,
     )
     _create_payment_log(
         provider='esewa',
@@ -498,11 +508,14 @@ def create_sponsorship_checkout_session(request, package_id):
         pk=package_id,
         vendor=_get_vendor_or_403(request),
     )
+    if request.method != 'POST':
+        return redirect('choose_sponsorship_payment', package_id=package.id)
+
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     success_url = request.build_absolute_uri(reverse('payment_success')) + '?session_id={CHECKOUT_SESSION_ID}'
     cancel_url = request.build_absolute_uri(reverse('payment_cancelled'))
-    amount = _get_sponsorship_price(package)
+    amount = _normalize_sponsorship_amount(request.POST.get('sponsorship_amount'))
 
     try:
         checkout_session = stripe.checkout.Session.create(
@@ -528,6 +541,7 @@ def create_sponsorship_checkout_session(request, package_id):
             request,
             sponsorship_package_id=package.id,
             provider='stripe',
+            sponsorship_amount=amount,
         )
         _create_payment_log(
             provider='stripe',
