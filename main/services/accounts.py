@@ -61,6 +61,37 @@ def send_account_deleted_email(user, app_name='TravelBooker'):
     ).send()
 
 
+def get_traveler_deletion_blockers(user):
+    active_booking_count = Booking.objects.filter(
+        user=user,
+        status__in=['pending', 'confirmed', 'in_review', 'cancellation_requested', 'cancellation_reviewed'],
+    ).count()
+    active_trip_count = Trip.objects.filter(
+        traveler=user,
+        status__in=['planned', 'ready', 'in_progress'],
+    ).count()
+    open_dispute_count = BookingDispute.objects.filter(
+        opened_by=user,
+        status__in=['open', 'reviewing'],
+    ).count()
+    refund_in_progress_count = Booking.objects.filter(
+        user=user,
+        status__in=['cancellation_requested', 'cancellation_reviewed'],
+    ).count()
+
+    return {
+        'active_bookings': active_booking_count,
+        'active_trips': active_trip_count,
+        'open_disputes': open_dispute_count,
+        'refunds_in_progress': refund_in_progress_count,
+    }
+
+
+def traveler_can_be_deactivated(user):
+    blockers = get_traveler_deletion_blockers(user)
+    return not any(blockers.values()), blockers
+
+
 def get_vendor_deletion_blockers(vendor):
     active_package_count = TravelPackage.objects.filter(
         vendor=vendor,

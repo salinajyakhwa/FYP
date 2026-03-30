@@ -22,7 +22,13 @@ from ..forms import (
     UserUpdateForm,
 )
 from ..models import EmailOTP, UserProfile
-from ..services.accounts import anonymize_user_account, deactivate_user_account, reactivate_user_account
+from ..services.accounts import (
+    anonymize_user_account,
+    deactivate_user_account,
+    reactivate_user_account,
+    traveler_can_be_deactivated,
+    vendor_can_be_deactivated,
+)
 from ..utils import send_otp
 
 User = get_user_model()
@@ -154,6 +160,13 @@ def profile(request):
                     elif vendor.deletion_request_status == 'pending':
                         messages.info(request, 'Your vendor permanent deletion request is already pending admin review.')
                     else:
+                        can_deactivate, blockers = vendor_can_be_deactivated(vendor)
+                        if not can_deactivate:
+                            messages.error(
+                                request,
+                                'You cannot deactivate your vendor account while you still have active packages, bookings, trips, disputes, or refunds in progress.',
+                            )
+                            return redirect('profile')
                         profile.account_deletion_reason = reason
                         profile.save(update_fields=['account_deletion_reason'])
                         deactivate_user_account(request.user)
@@ -161,6 +174,13 @@ def profile(request):
                         messages.success(request, 'Your vendor account has been deactivated. You can reactivate it later if needed.')
                         return redirect('home')
                 else:
+                    can_deactivate, blockers = traveler_can_be_deactivated(request.user)
+                    if not can_deactivate:
+                        messages.error(
+                            request,
+                            'You cannot deactivate your account while you still have active bookings, trips, disputes, or refunds in progress.',
+                        )
+                        return redirect('profile')
                     profile.account_deletion_reason = reason
                     profile.save(update_fields=['account_deletion_reason'])
                     deactivate_user_account(request.user)
@@ -186,6 +206,13 @@ def profile(request):
                     elif vendor.deletion_request_status == 'pending':
                         messages.info(request, 'Your vendor permanent deletion request is already pending admin review.')
                     else:
+                        can_deactivate, blockers = vendor_can_be_deactivated(vendor)
+                        if not can_deactivate:
+                            messages.error(
+                                request,
+                                'You cannot request permanent deletion while you still have active packages, bookings, trips, disputes, or refunds in progress.',
+                            )
+                            return redirect('profile')
                         vendor.deletion_request_status = 'pending'
                         vendor.deletion_requested_at = timezone.now()
                         vendor.deletion_reason = reason
@@ -201,6 +228,13 @@ def profile(request):
                         messages.success(request, 'Your vendor permanent deletion request has been submitted for admin review.')
                         return redirect('profile')
                 else:
+                    can_deactivate, blockers = traveler_can_be_deactivated(request.user)
+                    if not can_deactivate:
+                        messages.error(
+                            request,
+                            'You cannot request permanent deletion while you still have active bookings, trips, disputes, or refunds in progress.',
+                        )
+                        return redirect('profile')
                     profile.account_deletion_requested_at = timezone.now()
                     profile.account_deletion_reason = reason
                     profile.account_deletion_request_status = 'pending'
