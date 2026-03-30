@@ -57,7 +57,12 @@ def choose_payment(request, package_id):
         'child_count': child_count,
     }
     traveler_form = BookingTravelerForm(initial=initial)
-    context = _build_payment_context(package=package, traveler_form=traveler_form)
+    context = _build_payment_context(
+        package=package,
+        traveler_form=traveler_form,
+        adult_count=adult_count,
+        child_count=child_count,
+    )
     context.update({
         'approved_capacity_request': approved_request if approved_request_id else None,
         'capacity_request_id': approved_request.id if approved_request else '',
@@ -89,6 +94,8 @@ def choose_custom_itinerary_payment(request, custom_itinerary_id):
             package=custom_itinerary.package,
             custom_itinerary=custom_itinerary,
             traveler_form=traveler_form,
+            adult_count=initial['adult_count'],
+            child_count=initial['child_count'],
         ),
     )
 

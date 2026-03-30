@@ -271,6 +271,8 @@
                                 <span class="text-muted">Estimated package total</span>
                                 <strong id="packageTravelerEstimate">Rs. {{ customization_total|floatformat:2 }}</strong>
                             </div>
+                            <div class="small text-muted mt-3">If your selected group exceeds the remaining capacity, your request will be sent to the vendor first.</div>
+                            <button type="submit" class="btn btn-primary w-100 mt-3">Proceed to Payment</button>
                         </form>
                     </div>
                     {% endif %}
@@ -308,9 +310,7 @@
                     {% elif is_vendor_owner %}
                     <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-primary w-100">Add Itinerary Options</a>
                     {% elif user.is_authenticated %}
-                    {% if user.userprofile.role == 'traveler' %}
-                    <button type="submit" form="package-traveler-form" class="btn btn-primary w-100">Continue</button>
-                    {% else %}
+                    {% if user.userprofile.role != 'traveler' %}
                     <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
                     {% endif %}
                     {% else %}

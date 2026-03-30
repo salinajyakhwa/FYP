@@ -82,28 +82,60 @@ def _create_payment_log(
     )
 
 
-def _build_payment_context(*, package, custom_itinerary=None, traveler_form=None):
+def _build_payment_context(
+    *,
+    package,
+    custom_itinerary=None,
+    traveler_form=None,
+    adult_count=None,
+    child_count=None,
+):
     traveler_form = traveler_form or BookingTravelerForm(initial={'adult_count': 1, 'child_count': 0})
-    adult_count = 1
-    child_count = 0
+    resolved_adult_count = 1
+    resolved_child_count = 0
 
-    if traveler_form.is_bound and traveler_form.is_valid():
-        adult_count = traveler_form.cleaned_data['adult_count']
-        child_count = traveler_form.cleaned_data['child_count']
-    else:
+    if adult_count is not None:
         try:
-            adult_count = max(1, int(traveler_form['adult_count'].value() or 1))
+            resolved_adult_count = max(1, int(adult_count))
         except (TypeError, ValueError):
-            adult_count = 1
+            resolved_adult_count = 1
+
+    if child_count is not None:
         try:
-            child_count = max(0, int(traveler_form['child_count'].value() or 0))
+            resolved_child_count = max(0, int(child_count))
         except (TypeError, ValueError):
-            child_count = 0
+            resolved_child_count = 0
+
+    if adult_count is None or child_count is None:
+        if traveler_form.is_bound and traveler_form.is_valid():
+            resolved_adult_count = traveler_form.cleaned_data['adult_count']
+            resolved_child_count = traveler_form.cleaned_data['child_count']
+        else:
+            try:
+                adult_value = traveler_form.initial.get('adult_count')
+                if adult_value is None:
+                    adult_value = traveler_form['adult_count'].value()
+                resolved_adult_count = max(
+                    1,
+                    int(adult_value if adult_value is not None else 1),
+                )
+            except (TypeError, ValueError):
+                resolved_adult_count = 1
+            try:
+                child_value = traveler_form.initial.get('child_count')
+                if child_value is None:
+                    child_value = traveler_form['child_count'].value()
+                resolved_child_count = max(
+                    0,
+                    int(child_value if child_value is not None else 0),
+                )
+            except (TypeError, ValueError):
+                resolved_child_count = 0
 
     pricing = _calculate_booking_pricing(
         package,
-        adult_count,
-        child_count,
+        resolved_adult_count,
+        resolved_child_count,
         custom_itinerary=custom_itinerary,
     )
 

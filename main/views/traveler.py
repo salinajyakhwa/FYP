@@ -332,7 +332,7 @@ def start_package_booking(request, package_id):
     )
     messages.info(
         request,
-        f"The package currently has only {capacity_summary['remaining_capacity']} space(s) left. Your request has been sent to the vendor for approval.",
+        f"The number of traveler limit exceeded. The package currently has only {capacity_summary['remaining_capacity']} space(s) left, so your request has been sent to the vendor.",
     )
     return redirect('package_detail', package_id=package.id)
 
