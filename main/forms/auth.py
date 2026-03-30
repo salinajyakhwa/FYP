@@ -1,6 +1,7 @@
 import uuid
 
 from django import forms
+from django.contrib.auth import authenticate
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm, UserChangeForm, UserCreationForm
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -123,3 +124,28 @@ class CustomAuthenticationForm(AuthenticationForm):
                 'Your vendor registration was rejected. Please contact the administrator.',
                 code='inactive',
             )
+
+
+class AccountDeletionRequestForm(forms.Form):
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm your password'}),
+        label='Password',
+    )
+    reason = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Reason (optional)'}),
+        label='Reason',
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self):
+        password = self.cleaned_data['password']
+        if not self.user or not authenticate(username=self.user.username, password=password):
+            raise forms.ValidationError('Password confirmation failed.')
+        return password
+
+    def clean_reason(self):
+        return self.cleaned_data.get('reason', '').strip()

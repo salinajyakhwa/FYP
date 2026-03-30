@@ -120,6 +120,7 @@
                                 <th scope="col">Applicant</th>
                                 <th scope="col">Verification Documents</th>
                                 <th scope="col">Status</th>
+                                <th scope="col">Deletion Request</th>
                                 <th scope="col">Actions</th>
                             </tr>
                         </thead>
@@ -180,6 +181,24 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    <div class="small fw-semibold mb-2">{{ vendor.get_deletion_request_status_display }}</div>
+                                    {% if vendor.deletion_reason %}
+                                    <div class="small text-muted mb-2"><strong>Reason:</strong> {{ vendor.deletion_reason }}</div>
+                                    {% endif %}
+                                    {% if vendor.deletion_request_status == 'pending' %}
+                                    <div class="small text-muted">
+                                        <div>Active packages: {{ vendor.deletion_blockers.active_packages }}</div>
+                                        <div>Pending bookings: {{ vendor.deletion_blockers.pending_bookings }}</div>
+                                        <div>Active trips: {{ vendor.deletion_blockers.active_trips }}</div>
+                                        <div>Open disputes: {{ vendor.deletion_blockers.open_disputes }}</div>
+                                        <div>Refunds in progress: {{ vendor.deletion_blockers.refunds_in_progress }}</div>
+                                    </div>
+                                    {% endif %}
+                                    {% if vendor.deletion_review_notes %}
+                                    <div class="small text-muted mt-2"><strong>Admin notes:</strong> {{ vendor.deletion_review_notes }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     <div class="action-stack">
                                         {% if vendor.status != 'approved' %}
                                         <form action="{% url 'update_vendor_status' vendor.id 'approved' %}" method="post" class="d-inline">
@@ -202,12 +221,28 @@
                                             <button type="submit" class="btn btn-outline-secondary btn-sm">Mark Pending</button>
                                         </form>
                                         {% endif %}
+                                        {% if vendor.deletion_request_status == 'pending' %}
+                                        <form action="{% url 'review_vendor_deletion_request' vendor.id 'approve' %}" method="post" class="d-inline-block">
+                                            {% csrf_token %}
+                                            <div class="mb-2">
+                                                <textarea name="deletion_review_notes" class="form-control form-control-sm" placeholder="Admin notes for approval or rejection">{{ vendor.deletion_review_notes|default:'' }}</textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">Approve Deletion</button>
+                                        </form>
+                                        <form action="{% url 'review_vendor_deletion_request' vendor.id 'reject' %}" method="post" class="d-inline-block">
+                                            {% csrf_token %}
+                                            <div class="mb-2">
+                                                <textarea name="deletion_review_notes" class="form-control form-control-sm" placeholder="Reason for rejecting deletion">{{ vendor.deletion_review_notes|default:'' }}</textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm">Reject Deletion</button>
+                                        </form>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-center py-4">No vendor applications found.</td>
+                                <td colspan="6" class="text-center py-4">No vendor applications found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

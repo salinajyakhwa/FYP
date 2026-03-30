@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth import login, update_session_auth_hash
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.sites.shortcuts import get_current_site
@@ -15,11 +15,13 @@ from django.contrib.auth import get_user_model
 from ..forms import (
     CustomAuthenticationForm,
     CustomUserCreationForm,
+    AccountDeletionRequestForm,
     PasswordChangeForm,
     UserProfileUpdateForm,
     UserUpdateForm,
 )
 from ..models import EmailOTP, UserProfile
+from ..services.accounts import anonymize_user_account
 from ..utils import send_otp
 
 User = get_user_model()
@@ -108,6 +110,7 @@ def verify_otp(request):
 @login_required
 def profile(request):
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    deletion_form = AccountDeletionRequestForm(user=request.user)
 
     if request.method == 'POST':
         if 'update_profile' in request.POST:
@@ -127,6 +130,49 @@ def profile(request):
                 messages.success(request, 'Your password was successfully updated!')
                 return redirect('profile')
             messages.error(request, 'Please correct the password error below.')
+            user_form = UserUpdateForm(instance=request.user)
+            profile_form = UserProfileUpdateForm(instance=profile)
+            deletion_form = AccountDeletionRequestForm(user=request.user)
+
+        elif 'delete_account' in request.POST:
+            user_form = UserUpdateForm(instance=request.user)
+            profile_form = UserProfileUpdateForm(instance=profile)
+            pass_form = PasswordChangeForm(request.user)
+            deletion_form = AccountDeletionRequestForm(request.POST, user=request.user)
+            if deletion_form.is_valid():
+                reason = deletion_form.cleaned_data['reason']
+
+                if profile.role == 'vendor':
+                    vendor = getattr(profile, 'vendor', None)
+                    if not vendor:
+                        messages.error(request, 'Vendor profile is incomplete.')
+                    elif vendor.deletion_request_status == 'pending':
+                        messages.info(request, 'Your vendor account deletion request is already pending admin review.')
+                    else:
+                        vendor.deletion_request_status = 'pending'
+                        vendor.deletion_requested_at = timezone.now()
+                        vendor.deletion_reason = reason
+                        vendor.deletion_reviewed_at = None
+                        vendor.deletion_review_notes = ''
+                        vendor.save(update_fields=[
+                            'deletion_request_status',
+                            'deletion_requested_at',
+                            'deletion_reason',
+                            'deletion_reviewed_at',
+                            'deletion_review_notes',
+                        ])
+                        messages.success(request, 'Your vendor account deletion request has been submitted for admin review.')
+                        return redirect('profile')
+                else:
+                    profile.account_deletion_requested_at = timezone.now()
+                    profile.account_deletion_reason = reason
+                    profile.save(update_fields=['account_deletion_requested_at', 'account_deletion_reason'])
+                    anonymize_user_account(request.user)
+                    logout(request)
+                    messages.success(request, 'Your account has been deactivated successfully.')
+                    return redirect('home')
+            else:
+                messages.error(request, 'Please confirm your password to continue.')
 
     else:
         user_form = UserUpdateForm(instance=request.user)
@@ -137,6 +183,7 @@ def profile(request):
         'user_form': user_form,
         'profile_form': profile_form,
         'pass_form': pass_form,
+        'deletion_form': deletion_form,
     })
 
 

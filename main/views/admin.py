@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 
 from ..decorators import role_required
 from ..models import Booking, BookingDispute, PaymentLog, TravelPackage, Vendor
+from ..services.accounts import anonymize_user_account, get_vendor_deletion_blockers, vendor_can_be_deactivated
 from ..services.access import _sync_trip_status_from_booking
 from ..services.payments import _create_payment_log
 from ..services.vendor_ops import send_vendor_status_email
@@ -69,6 +70,8 @@ def delete_user(request, user_id):
 @role_required(allowed_roles=['admin'])
 def manage_vendors(request):
     vendors = Vendor.objects.all().select_related('user_profile__user').order_by('name')
+    for vendor in vendors:
+        vendor.deletion_blockers = get_vendor_deletion_blockers(vendor)
     return render(request, 'main/admin/manage_vendors.html', {'vendors': vendors})
 
 
@@ -94,6 +97,49 @@ def update_vendor_status(request, vendor_id, new_status):
             messages.success(request, f"Vendor {vendor.name} has been {new_status}.")
         else:
             messages.error(request, "Invalid status.")
+    return redirect('manage_vendors')
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def review_vendor_deletion_request(request, vendor_id, decision):
+    if request.method != 'POST':
+        return redirect('manage_vendors')
+
+    vendor = get_object_or_404(Vendor, id=vendor_id)
+    review_notes = request.POST.get('deletion_review_notes', '').strip()
+
+    if vendor.deletion_request_status != 'pending':
+        messages.error(request, 'This vendor has no pending deletion request.')
+        return redirect('manage_vendors')
+
+    if decision == 'approve':
+        can_deactivate, blockers = vendor_can_be_deactivated(vendor)
+        if not can_deactivate:
+            messages.error(
+                request,
+                'Vendor cannot be deactivated yet because there are unresolved obligations.',
+            )
+            return redirect('manage_vendors')
+
+        vendor.deletion_request_status = 'approved'
+        vendor.deletion_reviewed_at = timezone.now()
+        vendor.deletion_review_notes = review_notes
+        vendor.save(update_fields=['deletion_request_status', 'deletion_reviewed_at', 'deletion_review_notes'])
+        profile = vendor.user_profile
+        profile.account_deleted_at = timezone.now()
+        profile.save(update_fields=['account_deleted_at'])
+        anonymize_user_account(profile.user)
+        messages.success(request, f'Vendor {vendor.name} has been deactivated.')
+    elif decision == 'reject':
+        vendor.deletion_request_status = 'rejected'
+        vendor.deletion_reviewed_at = timezone.now()
+        vendor.deletion_review_notes = review_notes
+        vendor.save(update_fields=['deletion_request_status', 'deletion_reviewed_at', 'deletion_review_notes'])
+        messages.success(request, f'Vendor deletion request for {vendor.name} has been rejected.')
+    else:
+        messages.error(request, 'Invalid deletion review action.')
+
     return redirect('manage_vendors')
 
 

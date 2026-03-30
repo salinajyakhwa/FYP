@@ -18,6 +18,9 @@ class UserProfile(models.Model):
     is_verified = models.BooleanField(default=False)
     verification_token = models.CharField(max_length=100, blank=True, null=True)
     token_created_at = models.DateTimeField(blank=True, null=True)
+    account_deletion_requested_at = models.DateTimeField(blank=True, null=True)
+    account_deletion_reason = models.TextField(blank=True, null=True)
+    account_deleted_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.get_role_display()}"
@@ -28,6 +31,12 @@ class Vendor(models.Model):
         ('national_id', 'National ID Card'),
         ('passport', 'Passport'),
         ('citizenship', 'Citizenship'),
+    )
+    DELETION_REQUEST_STATUS_CHOICES = (
+        ('none', 'No Request'),
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     )
 
     user_profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE)
@@ -44,6 +53,15 @@ class Vendor(models.Model):
         ('rejected', 'Rejected'),
     )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    deletion_request_status = models.CharField(
+        max_length=10,
+        choices=DELETION_REQUEST_STATUS_CHOICES,
+        default='none',
+    )
+    deletion_requested_at = models.DateTimeField(blank=True, null=True)
+    deletion_reason = models.TextField(blank=True, null=True)
+    deletion_reviewed_at = models.DateTimeField(blank=True, null=True)
+    deletion_review_notes = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user_profile.user.username} - {self.status}"

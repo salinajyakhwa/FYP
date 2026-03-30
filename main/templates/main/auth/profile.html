@@ -129,6 +129,13 @@
         display: flex;
     }
 
+    .danger-card {
+        border: 1px solid #f5c2c7;
+        border-radius: 14px;
+        padding: 1.25rem;
+        background: #fff5f5;
+    }
+
     @media (max-width: 767.98px) {
         .profile-side,
         .profile-main {
@@ -265,6 +272,40 @@
                                 <div class="alert alert-danger py-2">{{ error }}</div>
                                 {% endfor %}
                                 <button type="submit" name="change_password" class="btn btn-danger">Change Password</button>
+                            </form>
+                        </div>
+
+                        <div class="danger-card mt-4">
+                            <h3 class="section-title text-danger mb-2">Account Deletion</h3>
+                            {% if user.userprofile.role == 'vendor' %}
+                            <p class="text-muted mb-3">Submit a deletion request for admin review. Your account will only be deactivated after active packages, bookings, trips, disputes, and refund work are cleared.</p>
+                            {% else %}
+                            <p class="text-muted mb-3">Deactivate your account after confirming your password. Your personal details will be anonymized, but booking and payment records will be preserved for admin records.</p>
+                            {% endif %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="{{ deletion_form.password.id_for_label }}" class="form-label">Confirm Password</label>
+                                    {{ deletion_form.password }}
+                                    {% for error in deletion_form.password.errors %}
+                                    <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mb-3">
+                                    <label for="{{ deletion_form.reason.id_for_label }}" class="form-label">Reason</label>
+                                    {{ deletion_form.reason }}
+                                    {% for error in deletion_form.reason.errors %}
+                                    <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% if user.userprofile.role == 'vendor' and user.userprofile.vendor.deletion_request_status == 'pending' %}
+                                <div class="alert alert-warning py-2">Your deletion request is currently pending admin review.</div>
+                                {% elif user.userprofile.role == 'vendor' and user.userprofile.vendor.deletion_request_status == 'rejected' %}
+                                <div class="alert alert-secondary py-2">Your last deletion request was rejected. You can submit a new request.</div>
+                                {% endif %}
+                                <button type="submit" name="delete_account" class="btn btn-outline-danger">
+                                    {% if user.userprofile.role == 'vendor' %}Request Account Deletion{% else %}Deactivate Account{% endif %}
+                                </button>
                             </form>
                         </div>
                     </div>
