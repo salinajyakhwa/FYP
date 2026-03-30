@@ -243,6 +243,51 @@
         </div>
     </div>
 
+    {% if pending_capacity_requests %}
+    <div class="app-card overflow-hidden mb-4">
+        <div class="px-4 py-3 border-bottom">
+            <h6 class="fw-bold mb-0">Pending Capacity Requests</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Package</th>
+                        <th>Traveler</th>
+                        <th>Requested Group</th>
+                        <th>Requested At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for capacity_request in pending_capacity_requests %}
+                    <tr>
+                        <td>{{ capacity_request.package.name }}</td>
+                        <td>{{ capacity_request.traveler.username }}</td>
+                        <td>{{ capacity_request.adult_count }}A / {{ capacity_request.child_count }}C ({{ capacity_request.number_of_travelers }} total)</td>
+                        <td>{{ capacity_request.created_at|date:"M j, Y g:i a" }}</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <form method="post" action="{% url 'review_capacity_request' capacity_request.id 'approve' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="vendor_notes" value="Approved by vendor">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Approve</button>
+                                </form>
+                                <form method="post" action="{% url 'review_capacity_request' capacity_request.id 'reject' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="vendor_notes" value="Rejected by vendor">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Recent Transactions Table -->
     <div class="app-card overflow-hidden">
         <div class="px-4 py-3 border-bottom d-flex justify-content-between align-items-center">

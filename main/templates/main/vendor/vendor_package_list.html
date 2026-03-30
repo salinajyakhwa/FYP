@@ -83,7 +83,7 @@
                         <span class="small text-light opacity-75"><i class="bi bi-tag"></i> {{ package.travel_type }}</span>
                         
                         <div class="d-flex justify-content-between align-items-center mt-2 small">
-                            <span class="text-light opacity-75"><i class="bi bi-clock"></i> 5 days</span> {# Placeholder for duration #}
+                            <span class="text-light opacity-75"><i class="bi bi-people"></i> {{ package.capacity_summary.booked_travelers }}/{{ package.max_travelers }}</span>
                             <span class="text-warning"><i class="bi bi-star-fill"></i> 4.5</span> {# Placeholder for rating #}
                         </div>
                         
@@ -110,6 +110,9 @@
                 </a>
             </div>
             <div class="small mt-2 text-muted">
+                Capacity: {{ package.capacity_summary.remaining_capacity }} remaining spots
+            </div>
+            <div class="small mt-1 text-muted">
                 {% if package.is_sponsored and package.sponsorship_end %}
                 Sponsored through {{ package.sponsorship_end }}{% if package.sponsorship_amount %} for Rs. {{ package.sponsorship_amount }}{% endif %}
                 {% else %}

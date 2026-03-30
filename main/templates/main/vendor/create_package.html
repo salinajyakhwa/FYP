@@ -70,6 +70,13 @@
                                 {% endfor %}
                             </div>
                             <div class="mb-3">
+                                <label for="{{ form.max_travelers.id_for_label }}" class="form-label">Maximum Travelers</label>
+                                {{ form.max_travelers }}
+                                {% for error in form.max_travelers.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="mb-3">
                                 <label for="{{ form.start_date.id_for_label }}" class="form-label">Start Date</label>
                                 {{ form.start_date }}
                                 {% for error in form.start_date.errors %}

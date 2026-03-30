@@ -20,9 +20,10 @@ from ..forms import (
     VendorBookingOperationsForm,
     VendorCancellationReviewForm,
 )
-from ..models import Booking, BookingOperation, PackageDayOption, TravelPackage, Trip, TripItem, TripItemAttachment
+from ..models import Booking, BookingCapacityRequest, BookingOperation, PackageDayOption, TravelPackage, Trip, TripItem, TripItemAttachment
 from ..notifications import create_notification
 from ..services.access import _get_vendor_or_403, _sync_trip_status_from_booking
+from ..services.capacity import get_package_capacity_summary
 from ..services.cancellations import _calculate_refund_amount
 from ..services.itineraries import (
     _build_booking_selection_items,
@@ -37,6 +38,11 @@ from ..services.trips import _build_trip_progress_summary, _build_trip_timeline_
 def vendor_dashboard(request):
     vendor = _get_vendor_or_403(request)
     vendor_bookings_qs = Booking.objects.filter(package__vendor=vendor)
+    pending_capacity_requests = (
+        BookingCapacityRequest.objects.filter(package__vendor=vendor, status='pending')
+        .select_related('traveler', 'package')
+        .order_by('-created_at')[:5]
+    )
     confirmed_bookings = vendor_bookings_qs.filter(status__in=['confirmed', 'trip_completed'])
 
     total_stats = confirmed_bookings.aggregate(
@@ -83,6 +89,7 @@ def vendor_dashboard(request):
         'package_booking_values': json.dumps(package_values),
         'dashboard_queue': dashboard_queue,
         'recent_bookings': recent_bookings,
+        'pending_capacity_requests': pending_capacity_requests,
     })
 
 
@@ -216,6 +223,8 @@ def flight_bookings(request):
 def vendor_package_list(request):
     vendor = _get_vendor_or_403(request)
     packages = TravelPackage.objects.filter(vendor=vendor).order_by('-created_at')
+    for package in packages:
+        package.capacity_summary = get_package_capacity_summary(package)
     return render(request, 'main/vendor/vendor_package_list.html', {'packages': packages})
 
 
@@ -488,6 +497,56 @@ def delete_trip_item_attachment(request, attachment_id):
     attachment.delete()
     messages.success(request, 'Attachment deleted.')
     return redirect('vendor_trip_dashboard', trip_id=trip_id)
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
+def review_capacity_request(request, request_id, decision):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    capacity_request = get_object_or_404(
+        vendor.capacity_requests.select_related('traveler', 'package'),
+        pk=request_id,
+    )
+
+    if capacity_request.status != 'pending':
+        messages.error(request, 'This capacity request has already been reviewed.')
+        return redirect('vendor_dashboard')
+
+    notes = request.POST.get('vendor_notes', '').strip()
+    capacity_request.vendor_notes = notes
+    capacity_request.reviewed_at = timezone.now()
+
+    if decision == 'approve':
+        capacity_request.status = 'approved'
+        capacity_request.save(update_fields=['status', 'vendor_notes', 'reviewed_at', 'updated_at'])
+        create_notification(
+            user=capacity_request.traveler,
+            title='Booking request approved',
+            message=f"Your booking request for {capacity_request.package.name} was approved. You can now continue to payment.",
+            notification_type='vendor_alert',
+            target_url=reverse('package_detail', args=[capacity_request.package_id]),
+            dedupe_key=f"capacity-approved:{capacity_request.id}",
+        )
+        messages.success(request, 'Capacity request approved.')
+    elif decision == 'reject':
+        capacity_request.status = 'rejected'
+        capacity_request.save(update_fields=['status', 'vendor_notes', 'reviewed_at', 'updated_at'])
+        create_notification(
+            user=capacity_request.traveler,
+            title='Booking request rejected',
+            message=f"Your booking request for {capacity_request.package.name} was rejected by the vendor.",
+            notification_type='vendor_alert',
+            target_url=reverse('package_detail', args=[capacity_request.package_id]),
+            dedupe_key=f"capacity-rejected:{capacity_request.id}",
+        )
+        messages.success(request, 'Capacity request rejected.')
+    else:
+        messages.error(request, 'Invalid decision.')
+
+    return redirect('vendor_dashboard')
 
 
 @login_required

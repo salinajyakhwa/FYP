@@ -97,6 +97,7 @@ class TravelPackage(models.Model):
     image = models.ImageField(upload_to='packages/', blank=True, null=True)
     itinerary = models.JSONField(default=list)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    max_travelers = models.PositiveIntegerField(default=20)
     is_sponsored = models.BooleanField(default=False)
     sponsorship_start = models.DateField(blank=True, null=True)
     sponsorship_end = models.DateField(blank=True, null=True)
@@ -325,6 +326,33 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking for {self.package.name} by {self.user.username}"
+
+
+class BookingCapacityRequest(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending Vendor Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('converted', 'Converted To Booking'),
+    )
+
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name='capacity_requests')
+    traveler = models.ForeignKey(User, on_delete=models.CASCADE, related_name='capacity_requests')
+    adult_count = models.PositiveIntegerField(default=1)
+    child_count = models.PositiveIntegerField(default=0)
+    number_of_travelers = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    vendor_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    approved_payment_used_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"Capacity request for {self.package.name} by {self.traveler.username}"
 
 
 class BookingOperation(models.Model):

@@ -19,6 +19,7 @@ from ..forms import (
 )
 from ..models import (
     Booking,
+    BookingCapacityRequest,
     ChatThread,
     CustomItinerary,
     CustomItinerarySelection,
@@ -28,12 +29,14 @@ from ..models import (
     Trip,
 )
 from ..notifications import mark_notification_read
+from ..notifications import create_notification
+from ..services.access import _get_chat_thread_for_user_or_403, _get_vendor_or_403, _safe_int
+from ..services.capacity import can_proceed_with_capacity, get_package_capacity_summary
 from ..services.dashboard import (
     _build_dashboard_next_actions,
     _build_dashboard_trip_cards,
     _build_traveler_dashboard_summary,
 )
-from ..services.access import _get_chat_thread_for_user_or_403, _get_vendor_or_403
 from ..services.itineraries import (
     _build_booking_selection_items,
     _build_selected_options_summary,
@@ -153,6 +156,7 @@ def package_detail(request, package_id):
         and profile_vendor.id == package.vendor_id
     )
     package_days = package.package_days.prefetch_related('options').all()
+    capacity_summary = get_package_capacity_summary(package)
     customization_form = CustomItinerarySelectionForm(package=package) if package_days.exists() else None
     selected_options_summary = []
     customization_extra_cost = Decimal('0.00')
@@ -269,7 +273,68 @@ def package_detail(request, package_id):
         'customization_extra_cost': customization_extra_cost,
         'customization_total': customization_total,
         'is_vendor_owner': is_vendor_owner,
+        'capacity_summary': capacity_summary,
     })
+
+
+@login_required
+def start_package_booking(request, package_id):
+    package = get_object_or_404(TravelPackage, pk=package_id, moderation_status='approved')
+    profile = getattr(request.user, 'userprofile', None)
+    if not profile or profile.role != 'traveler':
+        raise PermissionDenied
+
+    adult_count = _safe_int(request.GET.get('adult_count', 1), 1, minimum=1)
+    child_count = _safe_int(request.GET.get('child_count', 0), 0, minimum=0)
+    total_travelers = adult_count + child_count
+
+    allowed, approved_request, capacity_summary = can_proceed_with_capacity(
+        traveler=request.user,
+        package=package,
+        adult_count=adult_count,
+        child_count=child_count,
+    )
+    if allowed:
+        payment_url = f"{reverse('choose_payment', args=[package.id])}?adult_count={adult_count}&child_count={child_count}"
+        if approved_request:
+            payment_url += f"&capacity_request_id={approved_request.id}"
+        return redirect(payment_url)
+
+    existing_request = (
+        BookingCapacityRequest.objects.filter(
+            traveler=request.user,
+            package=package,
+            adult_count=adult_count,
+            child_count=child_count,
+            status='pending',
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if existing_request:
+        messages.info(request, 'Your over-capacity booking request is already pending vendor review.')
+        return redirect('package_detail', package_id=package.id)
+
+    capacity_request = BookingCapacityRequest.objects.create(
+        traveler=request.user,
+        package=package,
+        adult_count=adult_count,
+        child_count=child_count,
+        number_of_travelers=total_travelers,
+    )
+    create_notification(
+        user=package.vendor.user_profile.user,
+        title='Over-capacity booking request',
+        message=f"{request.user.username} requested {total_travelers} spot(s) for {package.name}, which exceeds the current package capacity.",
+        notification_type='vendor_alert',
+        target_url=reverse('vendor_dashboard'),
+        dedupe_key=f"capacity-request:{capacity_request.id}",
+    )
+    messages.info(
+        request,
+        f"The package currently has only {capacity_summary['remaining_capacity']} space(s) left. Your request has been sent to the vendor for approval.",
+    )
+    return redirect('package_detail', package_id=package.id)
 
 
 @login_required

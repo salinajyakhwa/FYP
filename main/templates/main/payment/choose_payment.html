@@ -45,8 +45,16 @@
               {% csrf_token %}
               <input type="hidden" name="adult_count" value="{{ adult_count }}">
               <input type="hidden" name="child_count" value="{{ child_count }}">
+              {% if capacity_request_id %}
+              <input type="hidden" name="capacity_request_id" value="{{ capacity_request_id }}">
+              {% endif %}
 
               <div class="summary-box p-3">
+                {% if approved_capacity_request %}
+                <div class="alert alert-success py-2 mb-3">
+                  Vendor approved this over-capacity booking request. You can proceed to payment.
+                </div>
+                {% endif %}
                 <div class="row g-3">
                   <div class="col-md-6">
                     <div class="small text-muted">Adults</div>
@@ -110,6 +118,10 @@
             <div class="d-flex justify-content-between mb-2">
               <span class="text-muted">Dates</span>
               <span>{{ package.start_date }} to {{ package.end_date }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-muted">Package capacity</span>
+              <span>{{ capacity_summary.booked_travelers }}/{{ capacity_summary.max_travelers }} booked</span>
             </div>
             {% endif %}
             <hr>

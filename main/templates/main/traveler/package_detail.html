@@ -242,7 +242,11 @@
                     <div class="border rounded p-3 mb-4">
                         <div class="fw-semibold mb-1">Travelers</div>
                         <div class="small text-muted mb-3">Choose your group size before payment.</div>
-                        <form action="{% url 'choose_payment' package.id %}" method="get" id="package-traveler-form">
+                        <div class="d-flex justify-content-between small mb-3">
+                            <span class="text-muted">Capacity</span>
+                            <strong>{{ capacity_summary.booked_travelers }}/{{ capacity_summary.max_travelers }} booked · {{ capacity_summary.remaining_capacity }} left</strong>
+                        </div>
+                        <form action="{% url 'start_package_booking' package.id %}" method="get" id="package-traveler-form">
                             <div class="mb-3">
                                 <label for="package-adult-count" class="form-label small text-muted">Adults</label>
                                 <div class="traveler-mini-stepper">
@@ -305,7 +309,7 @@
                     <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-primary w-100">Add Itinerary Options</a>
                     {% elif user.is_authenticated %}
                     {% if user.userprofile.role == 'traveler' %}
-                    <button type="submit" form="package-traveler-form" class="btn btn-primary w-100">Continue to Payment</button>
+                    <button type="submit" form="package-traveler-form" class="btn btn-primary w-100">Continue</button>
                     {% else %}
                     <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
                     {% endif %}

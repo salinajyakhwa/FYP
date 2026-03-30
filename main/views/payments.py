@@ -17,6 +17,7 @@ from ..decorators import role_required
 from ..forms import BookingTravelerForm
 from ..models import CustomItinerary, TravelPackage
 from ..services.access import _get_vendor_or_403, _safe_int
+from ..services.capacity import can_proceed_with_capacity
 from ..services.notifications import _notify_booking_confirmed, _notify_payment_cancelled
 from ..services.payments import (
     _activate_pending_sponsorship,
@@ -38,15 +39,34 @@ logger = logging.getLogger(__name__)
 @login_required
 def choose_payment(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
+    adult_count = _safe_int(request.GET.get('adult_count', 1) or 1, 1, minimum=1)
+    child_count = _safe_int(request.GET.get('child_count', 0) or 0, 0, minimum=0)
+    approved_request_id = request.GET.get('capacity_request_id')
+    allowed, approved_request, capacity_summary = can_proceed_with_capacity(
+        traveler=request.user,
+        package=package,
+        adult_count=adult_count,
+        child_count=child_count,
+    )
+    if not allowed:
+        messages.error(request, 'This package is currently full for the requested group size. Wait for vendor approval before proceeding to payment.')
+        return redirect('package_detail', package_id=package.id)
+
     initial = {
-        'adult_count': _safe_int(request.GET.get('adult_count', 1) or 1, 1, minimum=1),
-        'child_count': _safe_int(request.GET.get('child_count', 0) or 0, 0, minimum=0),
+        'adult_count': adult_count,
+        'child_count': child_count,
     }
     traveler_form = BookingTravelerForm(initial=initial)
+    context = _build_payment_context(package=package, traveler_form=traveler_form)
+    context.update({
+        'approved_capacity_request': approved_request if approved_request_id else None,
+        'capacity_request_id': approved_request.id if approved_request else '',
+        'capacity_summary': capacity_summary,
+    })
     return render(
         request,
         'main/payment/choose_payment.html',
-        _build_payment_context(package=package, traveler_form=traveler_form),
+        context,
     )
 
 
@@ -100,6 +120,15 @@ def esewa_checkout(request, package_id):
 
     adult_count = traveler_form.cleaned_data['adult_count']
     child_count = traveler_form.cleaned_data['child_count']
+    allowed, approved_request, capacity_summary = can_proceed_with_capacity(
+        traveler=request.user,
+        package=package,
+        adult_count=adult_count,
+        child_count=child_count,
+    )
+    if not allowed:
+        messages.error(request, 'This package is currently full for the requested group size. Vendor approval is required before payment.')
+        return redirect('package_detail', package_id=package.id)
     pricing = _calculate_booking_pricing(package, adult_count, child_count)
     transaction_uuid = str(uuid.uuid4())
     amount = pricing['total_price']
@@ -114,6 +143,7 @@ def esewa_checkout(request, package_id):
         adult_count=adult_count,
         child_count=child_count,
         total_price=pricing['total_price'],
+        capacity_request_id=approved_request.id if approved_request else None,
     )
     _create_payment_log(
         provider='esewa',
@@ -377,6 +407,15 @@ def create_checkout_session(request, package_id):
 
     adult_count = traveler_form.cleaned_data['adult_count']
     child_count = traveler_form.cleaned_data['child_count']
+    allowed, approved_request, capacity_summary = can_proceed_with_capacity(
+        traveler=request.user,
+        package=package,
+        adult_count=adult_count,
+        child_count=child_count,
+    )
+    if not allowed:
+        messages.error(request, 'This package is currently full for the requested group size. Vendor approval is required before payment.')
+        return redirect('package_detail', package_id=package.id)
     pricing = _calculate_booking_pricing(package, adult_count, child_count)
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -425,6 +464,7 @@ def create_checkout_session(request, package_id):
             adult_count=adult_count,
             child_count=child_count,
             total_price=pricing['total_price'],
+            capacity_request_id=approved_request.id if approved_request else None,
         )
         _create_payment_log(
             provider='stripe',

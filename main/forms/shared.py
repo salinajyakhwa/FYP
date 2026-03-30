@@ -16,7 +16,7 @@ class ReviewForm(forms.ModelForm):
 class TravelPackageForm(forms.ModelForm):
     class Meta:
         model = TravelPackage
-        fields = ['name', 'description', 'location', 'travel_type', 'image', 'price', 'start_date', 'end_date']
+        fields = ['name', 'description', 'location', 'travel_type', 'image', 'price', 'max_travelers', 'start_date', 'end_date']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
@@ -24,6 +24,7 @@ class TravelPackageForm(forms.ModelForm):
             'travel_type': forms.TextInput(attrs={'class': 'form-control'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'price': forms.NumberInput(attrs={'class': 'form-control'}),
+            'max_travelers': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }

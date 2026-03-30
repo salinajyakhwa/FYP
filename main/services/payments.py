@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from ..forms import BookingTravelerForm
 from ..models import Booking, CustomItinerary, PaymentLog, TravelPackage
+from .capacity import mark_capacity_request_used
 from ..notifications import create_notification
 from .access import _get_vendor_or_403, _get_vendor_user
 from .itineraries import _build_action_button_label
@@ -151,6 +152,7 @@ def _store_pending_payment_session(
     adult_count=None,
     child_count=None,
     total_price=None,
+    capacity_request_id=None,
 ):
     request.session['pending_booking_package_id'] = package_id
     request.session['pending_custom_itinerary_id'] = custom_itinerary_id
@@ -160,6 +162,7 @@ def _store_pending_payment_session(
     request.session['pending_booking_adult_count'] = adult_count
     request.session['pending_booking_child_count'] = child_count
     request.session['pending_booking_total_price'] = str(total_price) if total_price is not None else None
+    request.session['pending_capacity_request_id'] = capacity_request_id
 
 
 def _clear_pending_payment_session(request):
@@ -172,6 +175,7 @@ def _clear_pending_payment_session(request):
         'pending_booking_adult_count',
         'pending_booking_child_count',
         'pending_booking_total_price',
+        'pending_capacity_request_id',
     ]:
         request.session.pop(key, None)
 
@@ -181,6 +185,7 @@ def _create_or_update_booking_from_pending_payment(request):
     package_id = request.session.get('pending_booking_package_id')
     adult_count = int(request.session.get('pending_booking_adult_count') or 1)
     child_count = int(request.session.get('pending_booking_child_count') or 0)
+    capacity_request_id = request.session.get('pending_capacity_request_id')
 
     if not custom_itinerary_id and not package_id:
         raise ValueError('No pending payment target found.')
@@ -241,6 +246,13 @@ def _create_or_update_booking_from_pending_payment(request):
             custom_itinerary.save(update_fields=['status', 'updated_at'])
 
         _create_trip_from_booking(booking)
+        if capacity_request_id:
+            from ..models import BookingCapacityRequest
+            capacity_request = BookingCapacityRequest.objects.filter(
+                pk=capacity_request_id,
+                traveler=request.user,
+            ).first()
+            mark_capacity_request_used(capacity_request)
 
         return booking, custom_itinerary.package, True
 
@@ -258,6 +270,13 @@ def _create_or_update_booking_from_pending_payment(request):
         total_price=total_price,
         status='confirmed'
     )
+    if capacity_request_id:
+        from ..models import BookingCapacityRequest
+        capacity_request = BookingCapacityRequest.objects.filter(
+            pk=capacity_request_id,
+            traveler=request.user,
+        ).first()
+        mark_capacity_request_used(capacity_request)
     _create_trip_from_booking(booking)
     return booking, package, False
 
