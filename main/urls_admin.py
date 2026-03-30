@@ -7,6 +7,7 @@ urlpatterns = [
     path('management/dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('management/users/', views.manage_users, name='manage_users'),
     path('management/users/delete/<int:user_id>/', views.delete_user, name='delete_user'),
+    path('management/users/<int:user_id>/deletion/<str:decision>/', views.review_user_deletion_request, name='review_user_deletion_request'),
     path('management/vendors/', views.manage_vendors, name='manage_vendors'),
     path('management/vendor/<int:vendor_id>/update/<str:new_status>/', views.update_vendor_status, name='update_vendor_status'),
     path('management/vendor/<int:vendor_id>/deletion/<str:decision>/', views.review_vendor_deletion_request, name='review_vendor_deletion_request'),

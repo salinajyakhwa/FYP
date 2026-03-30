@@ -17,11 +17,12 @@ from ..forms import (
     CustomUserCreationForm,
     AccountDeletionRequestForm,
     PasswordChangeForm,
+    ReactivateAccountForm,
     UserProfileUpdateForm,
     UserUpdateForm,
 )
 from ..models import EmailOTP, UserProfile
-from ..services.accounts import anonymize_user_account
+from ..services.accounts import anonymize_user_account, deactivate_user_account, reactivate_user_account
 from ..utils import send_otp
 
 User = get_user_model()
@@ -110,12 +111,14 @@ def verify_otp(request):
 @login_required
 def profile(request):
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    deletion_form = AccountDeletionRequestForm(user=request.user)
+    deactivate_form = AccountDeletionRequestForm(user=request.user)
+    permanent_delete_form = AccountDeletionRequestForm(user=request.user)
 
     if request.method == 'POST':
         if 'update_profile' in request.POST:
             user_form = UserUpdateForm(request.POST, instance=request.user)
             profile_form = UserProfileUpdateForm(request.POST, request.FILES, instance=profile)
+            pass_form = PasswordChangeForm(request.user)
             if user_form.is_valid() and profile_form.is_valid():
                 user_form.save()
                 profile_form.save()
@@ -132,22 +135,56 @@ def profile(request):
             messages.error(request, 'Please correct the password error below.')
             user_form = UserUpdateForm(instance=request.user)
             profile_form = UserProfileUpdateForm(instance=profile)
-            deletion_form = AccountDeletionRequestForm(user=request.user)
+            deactivate_form = AccountDeletionRequestForm(user=request.user)
+            permanent_delete_form = AccountDeletionRequestForm(user=request.user)
 
-        elif 'delete_account' in request.POST:
+        elif 'deactivate_account' in request.POST:
             user_form = UserUpdateForm(instance=request.user)
             profile_form = UserProfileUpdateForm(instance=profile)
             pass_form = PasswordChangeForm(request.user)
-            deletion_form = AccountDeletionRequestForm(request.POST, user=request.user)
-            if deletion_form.is_valid():
-                reason = deletion_form.cleaned_data['reason']
+            deactivate_form = AccountDeletionRequestForm(request.POST, user=request.user)
+            permanent_delete_form = AccountDeletionRequestForm(user=request.user)
+            if deactivate_form.is_valid():
+                reason = deactivate_form.cleaned_data['reason']
 
                 if profile.role == 'vendor':
                     vendor = getattr(profile, 'vendor', None)
                     if not vendor:
                         messages.error(request, 'Vendor profile is incomplete.')
                     elif vendor.deletion_request_status == 'pending':
-                        messages.info(request, 'Your vendor account deletion request is already pending admin review.')
+                        messages.info(request, 'Your vendor permanent deletion request is already pending admin review.')
+                    else:
+                        profile.account_deletion_reason = reason
+                        profile.save(update_fields=['account_deletion_reason'])
+                        deactivate_user_account(request.user)
+                        logout(request)
+                        messages.success(request, 'Your vendor account has been deactivated. You can reactivate it later if needed.')
+                        return redirect('home')
+                else:
+                    profile.account_deletion_reason = reason
+                    profile.save(update_fields=['account_deletion_reason'])
+                    deactivate_user_account(request.user)
+                    logout(request)
+                    messages.success(request, 'Your account has been deactivated successfully.')
+                    return redirect('home')
+            else:
+                messages.error(request, 'Please confirm your password to continue.')
+
+        elif 'permanent_delete_account' in request.POST:
+            user_form = UserUpdateForm(instance=request.user)
+            profile_form = UserProfileUpdateForm(instance=profile)
+            pass_form = PasswordChangeForm(request.user)
+            deactivate_form = AccountDeletionRequestForm(user=request.user)
+            permanent_delete_form = AccountDeletionRequestForm(request.POST, user=request.user)
+            if permanent_delete_form.is_valid():
+                reason = permanent_delete_form.cleaned_data['reason']
+
+                if profile.role == 'vendor':
+                    vendor = getattr(profile, 'vendor', None)
+                    if not vendor:
+                        messages.error(request, 'Vendor profile is incomplete.')
+                    elif vendor.deletion_request_status == 'pending':
+                        messages.info(request, 'Your vendor permanent deletion request is already pending admin review.')
                     else:
                         vendor.deletion_request_status = 'pending'
                         vendor.deletion_requested_at = timezone.now()
@@ -161,16 +198,23 @@ def profile(request):
                             'deletion_reviewed_at',
                             'deletion_review_notes',
                         ])
-                        messages.success(request, 'Your vendor account deletion request has been submitted for admin review.')
+                        messages.success(request, 'Your vendor permanent deletion request has been submitted for admin review.')
                         return redirect('profile')
                 else:
                     profile.account_deletion_requested_at = timezone.now()
                     profile.account_deletion_reason = reason
-                    profile.save(update_fields=['account_deletion_requested_at', 'account_deletion_reason'])
-                    anonymize_user_account(request.user)
-                    logout(request)
-                    messages.success(request, 'Your account has been deactivated successfully.')
-                    return redirect('home')
+                    profile.account_deletion_request_status = 'pending'
+                    profile.account_deletion_reviewed_at = None
+                    profile.account_deletion_review_notes = ''
+                    profile.save(update_fields=[
+                        'account_deletion_requested_at',
+                        'account_deletion_reason',
+                        'account_deletion_request_status',
+                        'account_deletion_reviewed_at',
+                        'account_deletion_review_notes',
+                    ])
+                    messages.success(request, 'Your permanent deletion request has been submitted for admin review.')
+                    return redirect('profile')
             else:
                 messages.error(request, 'Please confirm your password to continue.')
 
@@ -183,8 +227,26 @@ def profile(request):
         'user_form': user_form,
         'profile_form': profile_form,
         'pass_form': pass_form,
-        'deletion_form': deletion_form,
+        'deactivate_form': deactivate_form,
+        'permanent_delete_form': permanent_delete_form,
     })
+
+
+def reactivate_account(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = ReactivateAccountForm(request.POST)
+        if form.is_valid():
+            user = form.cleaned_data['user']
+            reactivate_user_account(user)
+            messages.success(request, 'Your account has been reactivated. You can log in now.')
+            return redirect('login')
+    else:
+        form = ReactivateAccountForm()
+
+    return render(request, 'main/auth/reactivate_account.html', {'form': form})
 
 
 def send_verification_email(request, user, profile):

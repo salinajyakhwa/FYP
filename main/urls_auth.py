@@ -11,6 +11,7 @@ urlpatterns = [
     path('check-email/', views.check_email, name='check_email'),
     path('activate/<uidb64>/<token>/', views.verify_email, name='verify_email'),
     path('login/', views.CustomLoginView.as_view(), name='login'),
+    path('reactivate-account/', views.reactivate_account, name='reactivate_account'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('profile/', views.profile, name='profile'),
     path(

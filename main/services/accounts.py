@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.core.mail import EmailMessage
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -18,6 +20,45 @@ def anonymize_user_account(user):
         profile.bio = ''
         profile.account_deleted_at = timezone.now()
         profile.save(update_fields=['bio', 'account_deleted_at'])
+
+
+def deactivate_user_account(user):
+    user.is_active = False
+    user.save(update_fields=['is_active'])
+
+    profile = getattr(user, 'userprofile', None)
+    if profile:
+        profile.deactivated_at = timezone.now()
+        profile.save(update_fields=['deactivated_at'])
+
+
+def reactivate_user_account(user):
+    user.is_active = True
+    user.save(update_fields=['is_active'])
+
+    profile = getattr(user, 'userprofile', None)
+    if profile:
+        profile.deactivated_at = None
+        profile.save(update_fields=['deactivated_at'])
+
+
+def send_account_deleted_email(user, app_name='TravelBooker'):
+    if not user.email:
+        return
+
+    subject = f'Your account has been successfully deleted from {app_name}'
+    body = (
+        f"Hi {user.username},\n\n"
+        f"Your account has been successfully deleted from {app_name}.\n"
+        "If you did not expect this action, please contact the administrator.\n\n"
+        f"Regards,\n{app_name}"
+    )
+    EmailMessage(
+        subject,
+        body,
+        getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+        [user.email],
+    ).send()
 
 
 def get_vendor_deletion_blockers(vendor):

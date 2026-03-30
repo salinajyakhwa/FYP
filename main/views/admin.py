@@ -9,8 +9,13 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from ..decorators import role_required
-from ..models import Booking, BookingDispute, PaymentLog, TravelPackage, Vendor
-from ..services.accounts import anonymize_user_account, get_vendor_deletion_blockers, vendor_can_be_deactivated
+from ..models import Booking, BookingDispute, PaymentLog, TravelPackage, UserProfile, Vendor
+from ..services.accounts import (
+    anonymize_user_account,
+    get_vendor_deletion_blockers,
+    send_account_deleted_email,
+    vendor_can_be_deactivated,
+)
 from ..services.access import _sync_trip_status_from_booking
 from ..services.payments import _create_payment_log
 from ..services.vendor_ops import send_vendor_status_email
@@ -49,7 +54,7 @@ def admin_dashboard(request):
 @login_required
 @role_required(allowed_roles=['admin'])
 def manage_users(request):
-    users = User.objects.filter(is_superuser=False).order_by('-date_joined')
+    users = User.objects.filter(is_superuser=False).select_related('userprofile').order_by('-date_joined')
     return render(request, 'main/admin/manage_users.html', {'users': users})
 
 
@@ -63,6 +68,48 @@ def delete_user(request, user_id):
             messages.success(request, f"User {user_to_delete.username} has been deleted.")
         else:
             messages.error(request, "Superusers cannot be deleted.")
+    return redirect('manage_users')
+
+
+@login_required
+@role_required(allowed_roles=['admin'])
+def review_user_deletion_request(request, user_id, decision):
+    if request.method != 'POST':
+        return redirect('manage_users')
+
+    user = get_object_or_404(User, id=user_id, is_superuser=False)
+    profile = get_object_or_404(UserProfile, user=user)
+    review_notes = request.POST.get('deletion_review_notes', '').strip()
+
+    if profile.account_deletion_request_status != 'pending':
+        messages.error(request, 'This user has no pending permanent deletion request.')
+        return redirect('manage_users')
+
+    if decision == 'approve':
+        profile.account_deletion_request_status = 'approved'
+        profile.account_deletion_reviewed_at = timezone.now()
+        profile.account_deletion_review_notes = review_notes
+        profile.save(update_fields=[
+            'account_deletion_request_status',
+            'account_deletion_reviewed_at',
+            'account_deletion_review_notes',
+        ])
+        send_account_deleted_email(user)
+        anonymize_user_account(user)
+        messages.success(request, f'User {user.id} has been permanently deleted through anonymization.')
+    elif decision == 'reject':
+        profile.account_deletion_request_status = 'rejected'
+        profile.account_deletion_reviewed_at = timezone.now()
+        profile.account_deletion_review_notes = review_notes
+        profile.save(update_fields=[
+            'account_deletion_request_status',
+            'account_deletion_reviewed_at',
+            'account_deletion_review_notes',
+        ])
+        messages.success(request, f'Permanent deletion request for {user.username} has been rejected.')
+    else:
+        messages.error(request, 'Invalid deletion review action.')
+
     return redirect('manage_users')
 
 
@@ -122,6 +169,7 @@ def review_vendor_deletion_request(request, vendor_id, decision):
             )
             return redirect('manage_vendors')
 
+        user = vendor.user_profile.user
         vendor.deletion_request_status = 'approved'
         vendor.deletion_reviewed_at = timezone.now()
         vendor.deletion_review_notes = review_notes
@@ -129,7 +177,8 @@ def review_vendor_deletion_request(request, vendor_id, decision):
         profile = vendor.user_profile
         profile.account_deleted_at = timezone.now()
         profile.save(update_fields=['account_deleted_at'])
-        anonymize_user_account(profile.user)
+        send_account_deleted_email(user)
+        anonymize_user_account(user)
         messages.success(request, f'Vendor {vendor.name} has been deactivated.')
     elif decision == 'reject':
         vendor.deletion_request_status = 'rejected'

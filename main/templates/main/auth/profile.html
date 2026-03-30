@@ -276,35 +276,58 @@
                         </div>
 
                         <div class="danger-card mt-4">
-                            <h3 class="section-title text-danger mb-2">Account Deletion</h3>
+                            <h3 class="section-title text-danger mb-2">Deactivate Account</h3>
+                            <p class="text-muted mb-3">This is reversible. Your account will be disabled, but your identity will be kept so you can reactivate it later.</p>
+                            <form method="post" class="mb-4">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="{{ deactivate_form.password.id_for_label }}" class="form-label">Confirm Password</label>
+                                    {{ deactivate_form.password }}
+                                    {% for error in deactivate_form.password.errors %}
+                                    <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mb-3">
+                                    <label for="{{ deactivate_form.reason.id_for_label }}" class="form-label">Reason</label>
+                                    {{ deactivate_form.reason }}
+                                    {% for error in deactivate_form.reason.errors %}
+                                    <div class="text-danger small mt-1">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <button type="submit" name="deactivate_account" class="btn btn-outline-warning">Deactivate Account</button>
+                            </form>
+
+                            <h3 class="section-title text-danger mb-2">Permanent Delete</h3>
                             {% if user.userprofile.role == 'vendor' %}
-                            <p class="text-muted mb-3">Submit a deletion request for admin review. Your account will only be deactivated after active packages, bookings, trips, disputes, and refund work are cleared.</p>
+                            <p class="text-muted mb-3">Submit a permanent deletion request for admin review. It will only be approved after active packages, bookings, trips, disputes, and refund work are cleared.</p>
                             {% else %}
-                            <p class="text-muted mb-3">Deactivate your account after confirming your password. Your personal details will be anonymized, but booking and payment records will be preserved for admin records.</p>
+                            <p class="text-muted mb-3">Permanent deletion is irreversible and admin-reviewed. Your identity will be anonymized, while booking and payment records are kept for audit purposes.</p>
                             {% endif %}
                             <form method="post">
                                 {% csrf_token %}
                                 <div class="mb-3">
-                                    <label for="{{ deletion_form.password.id_for_label }}" class="form-label">Confirm Password</label>
-                                    {{ deletion_form.password }}
-                                    {% for error in deletion_form.password.errors %}
+                                    <label for="{{ permanent_delete_form.password.id_for_label }}" class="form-label">Confirm Password</label>
+                                    {{ permanent_delete_form.password }}
+                                    {% for error in permanent_delete_form.password.errors %}
                                     <div class="text-danger small mt-1">{{ error }}</div>
                                     {% endfor %}
                                 </div>
                                 <div class="mb-3">
-                                    <label for="{{ deletion_form.reason.id_for_label }}" class="form-label">Reason</label>
-                                    {{ deletion_form.reason }}
-                                    {% for error in deletion_form.reason.errors %}
+                                    <label for="{{ permanent_delete_form.reason.id_for_label }}" class="form-label">Reason</label>
+                                    {{ permanent_delete_form.reason }}
+                                    {% for error in permanent_delete_form.reason.errors %}
                                     <div class="text-danger small mt-1">{{ error }}</div>
                                     {% endfor %}
                                 </div>
                                 {% if user.userprofile.role == 'vendor' and user.userprofile.vendor.deletion_request_status == 'pending' %}
-                                <div class="alert alert-warning py-2">Your deletion request is currently pending admin review.</div>
+                                <div class="alert alert-warning py-2">Your permanent deletion request is currently pending admin review.</div>
                                 {% elif user.userprofile.role == 'vendor' and user.userprofile.vendor.deletion_request_status == 'rejected' %}
-                                <div class="alert alert-secondary py-2">Your last deletion request was rejected. You can submit a new request.</div>
+                                <div class="alert alert-secondary py-2">Your last permanent deletion request was rejected. You can submit a new request.</div>
+                                {% elif user.userprofile.role != 'vendor' and user.userprofile.account_deletion_request_status == 'pending' %}
+                                <div class="alert alert-warning py-2">Your permanent deletion request is currently pending admin review.</div>
                                 {% endif %}
-                                <button type="submit" name="delete_account" class="btn btn-outline-danger">
-                                    {% if user.userprofile.role == 'vendor' %}Request Account Deletion{% else %}Deactivate Account{% endif %}
+                                <button type="submit" name="permanent_delete_account" class="btn btn-outline-danger">
+                                    {% if user.userprofile.role == 'vendor' %}Request Permanent Deletion{% else %}Request Permanent Deletion{% endif %}
                                 </button>
                             </form>
                         </div>

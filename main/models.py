@@ -5,6 +5,13 @@ import datetime
 
 # Represents a user's profile, extending the built-in User model with additional information.
 class UserProfile(models.Model):
+    DELETION_REQUEST_STATUS_CHOICES = (
+        ('none', 'No Request'),
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     # Defines the user's role, which can be 'traveler', 'vendor', or 'admin'.
     ROLE_CHOICES = (
@@ -18,8 +25,16 @@ class UserProfile(models.Model):
     is_verified = models.BooleanField(default=False)
     verification_token = models.CharField(max_length=100, blank=True, null=True)
     token_created_at = models.DateTimeField(blank=True, null=True)
+    deactivated_at = models.DateTimeField(blank=True, null=True)
     account_deletion_requested_at = models.DateTimeField(blank=True, null=True)
     account_deletion_reason = models.TextField(blank=True, null=True)
+    account_deletion_request_status = models.CharField(
+        max_length=10,
+        choices=DELETION_REQUEST_STATUS_CHOICES,
+        default='none',
+    )
+    account_deletion_reviewed_at = models.DateTimeField(blank=True, null=True)
+    account_deletion_review_notes = models.TextField(blank=True, null=True)
     account_deleted_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):

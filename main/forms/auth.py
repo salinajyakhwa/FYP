@@ -4,6 +4,7 @@ from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm, UserChangeForm, UserCreationForm
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from ..models import UserProfile, Vendor
@@ -149,3 +150,42 @@ class AccountDeletionRequestForm(forms.Form):
 
     def clean_reason(self):
         return self.cleaned_data.get('reason', '').strip()
+
+
+class ReactivateAccountForm(forms.Form):
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Your email'}),
+        label='Email',
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Your password'}),
+        label='Password',
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        email = cleaned_data.get('email')
+        password = cleaned_data.get('password')
+        if not email or not password:
+            return cleaned_data
+
+        matching_users = []
+        for user in User.objects.filter(email=email).select_related('userprofile').order_by('-id'):
+            profile = getattr(user, 'userprofile', None)
+            if not profile or not profile.deactivated_at:
+                continue
+            if profile.account_deleted_at:
+                continue
+            if profile.account_deletion_request_status == 'pending':
+                continue
+            if user.check_password(password):
+                matching_users.append(user)
+
+        if not matching_users:
+            raise ValidationError('No deactivated account matched that email and password.')
+
+        if len(matching_users) > 1:
+            raise ValidationError('Multiple deactivated accounts matched this email. Please contact support to reactivate the correct one.')
+
+        cleaned_data['user'] = matching_users[0]
+        return cleaned_data

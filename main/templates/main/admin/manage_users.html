@@ -27,6 +27,7 @@
                             <th scope="col">Email</th>
                             <th scope="col">Role</th>
                             <th scope="col">Date Joined</th>
+                            <th scope="col">Deletion Request</th>
                             <th scope="col" class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -45,7 +46,28 @@
                                 </span>
                             </td>
                             <td>{{ user.date_joined|date:"Y-m-d" }}</td>
+                            <td>
+                                <div class="small fw-semibold">{{ user.userprofile.get_account_deletion_request_status_display }}</div>
+                                {% if user.userprofile.account_deletion_reason %}
+                                <div class="small text-muted mt-1"><strong>Reason:</strong> {{ user.userprofile.account_deletion_reason }}</div>
+                                {% endif %}
+                                {% if user.userprofile.account_deletion_review_notes %}
+                                <div class="small text-muted mt-1"><strong>Admin notes:</strong> {{ user.userprofile.account_deletion_review_notes }}</div>
+                                {% endif %}
+                            </td>
                             <td class="text-end">
+                                {% if user.userprofile.role != 'vendor' and user.userprofile.account_deletion_request_status == 'pending' %}
+                                <form action="{% url 'review_user_deletion_request' user.id 'approve' %}" method="post" class="d-inline-block mb-2">
+                                    {% csrf_token %}
+                                    <textarea name="deletion_review_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Admin notes"></textarea>
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Approve Permanent Delete</button>
+                                </form>
+                                <form action="{% url 'review_user_deletion_request' user.id 'reject' %}" method="post" class="d-inline-block mb-2">
+                                    {% csrf_token %}
+                                    <textarea name="deletion_review_notes" class="form-control form-control-sm mb-2" rows="2" placeholder="Reason for rejection"></textarea>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Reject Request</button>
+                                </form>
+                                {% endif %}
                                 <button class="btn btn-danger btn-sm delete-user-btn" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#deleteUserModal"
@@ -57,7 +79,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center">No users found.</td>
+                            <td colspan="6" class="text-center">No users found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
