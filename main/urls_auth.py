@@ -8,6 +8,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('register/', views.register, name='register'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('verify-otp/resend/', views.resend_otp, name='resend_otp'),
     path('check-email/', views.check_email, name='check_email'),
     path('activate/<uidb64>/<token>/', views.verify_email, name='verify_email'),
     path('login/', views.CustomLoginView.as_view(), name='login'),

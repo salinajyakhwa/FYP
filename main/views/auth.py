@@ -32,6 +32,37 @@ from ..services.accounts import (
 from ..utils import send_otp
 
 User = get_user_model()
+OTP_MAX_ATTEMPTS = 5
+OTP_LOCKOUT_SECONDS = 600
+OTP_RESEND_COOLDOWN_SECONDS = 60
+
+
+def _mark_otp_sent(session):
+    session['pending_otp_attempts'] = 0
+    session['pending_otp_lockout_until'] = None
+    session['pending_otp_last_sent_at'] = int(timezone.now().timestamp())
+
+
+def _clear_pending_otp_state(session):
+    session.pop('pending_otp_attempts', None)
+    session.pop('pending_otp_lockout_until', None)
+    session.pop('pending_otp_last_sent_at', None)
+
+
+def _get_otp_state(request):
+    now_ts = int(timezone.now().timestamp())
+    lockout_until = request.session.get('pending_otp_lockout_until')
+    last_sent_at = request.session.get('pending_otp_last_sent_at')
+
+    lockout_remaining = max(0, int(lockout_until - now_ts)) if lockout_until else 0
+    resend_remaining = max(0, OTP_RESEND_COOLDOWN_SECONDS - int(now_ts - last_sent_at)) if last_sent_at else 0
+
+    return {
+        'otp_attempts': request.session.get('pending_otp_attempts', 0),
+        'otp_lockout_remaining': lockout_remaining,
+        'resend_cooldown_remaining': resend_remaining,
+        'otp_max_attempts': OTP_MAX_ATTEMPTS,
+    }
 
 
 class CustomLoginView(auth_views.LoginView):
@@ -53,6 +84,7 @@ def register(request):
 
             request.session['pending_email'] = email
             request.session['pending_user_id'] = user.id
+            _mark_otp_sent(request.session)
             messages.success(
                 request,
                 f"An OTP has been sent to {email}. Please enter it to complete registration.",
@@ -71,7 +103,16 @@ def verify_otp(request):
         messages.info(request, 'Start registration first to verify your email.')
         return redirect('register')
 
+    otp_state = _get_otp_state(request)
+
     if request.method == 'POST':
+        if otp_state['otp_lockout_remaining'] > 0:
+            return render(request, 'main/auth/verify_otp.html', {
+                'email': pending_email,
+                'error': f"Too many incorrect attempts. Try again in {otp_state['otp_lockout_remaining']} seconds.",
+                **otp_state,
+            })
+
         otp = request.POST.get('otp', '').strip()
         otp_obj = (
             EmailOTP.objects
@@ -91,6 +132,7 @@ def verify_otp(request):
             EmailOTP.objects.filter(email=pending_email, user_id=pending_user_id).delete()
             request.session.pop('pending_email', None)
             request.session.pop('pending_user_id', None)
+            _clear_pending_otp_state(request.session)
 
             vendor = getattr(profile, 'vendor', None)
             if profile.role == 'vendor' and vendor:
@@ -106,12 +148,54 @@ def verify_otp(request):
             messages.success(request, 'Your account has been verified successfully.')
             return redirect('dashboard')
 
+        attempts = request.session.get('pending_otp_attempts', 0) + 1
+        request.session['pending_otp_attempts'] = attempts
+        if attempts >= OTP_MAX_ATTEMPTS:
+            request.session['pending_otp_lockout_until'] = int(timezone.now().timestamp()) + OTP_LOCKOUT_SECONDS
+            request.session['pending_otp_attempts'] = 0
+            otp_state = _get_otp_state(request)
+            error_message = (
+                f"Too many incorrect attempts. OTP entry is locked for {otp_state['otp_lockout_remaining']} seconds."
+            )
+        else:
+            remaining_attempts = OTP_MAX_ATTEMPTS - attempts
+            otp_state = _get_otp_state(request)
+            error_message = f"Invalid or expired OTP. You have {remaining_attempts} attempt(s) left."
+
         return render(request, 'main/auth/verify_otp.html', {
             'email': pending_email,
-            'error': 'Invalid or expired OTP. Please try again.',
+            'error': error_message,
+            **otp_state,
         })
 
-    return render(request, 'main/auth/verify_otp.html', {'email': pending_email})
+    return render(request, 'main/auth/verify_otp.html', {'email': pending_email, **otp_state})
+
+
+def resend_otp(request):
+    pending_email = request.session.get('pending_email')
+    pending_user_id = request.session.get('pending_user_id')
+
+    if request.method != 'POST':
+        return redirect('verify_otp')
+
+    if not pending_email or not pending_user_id:
+        messages.info(request, 'Start registration first to request a new OTP.')
+        return redirect('register')
+
+    otp_state = _get_otp_state(request)
+    if otp_state['otp_lockout_remaining'] > 0:
+        messages.error(request, f"Too many incorrect attempts. Try again in {otp_state['otp_lockout_remaining']} seconds.")
+        return redirect('verify_otp')
+
+    if otp_state['resend_cooldown_remaining'] > 0:
+        messages.error(request, f"Please wait {otp_state['resend_cooldown_remaining']} seconds before requesting a new OTP.")
+        return redirect('verify_otp')
+
+    user = get_object_or_404(User, pk=pending_user_id, email=pending_email)
+    send_otp(pending_email, user)
+    _mark_otp_sent(request.session)
+    messages.success(request, 'A new OTP has been sent to your email.')
+    return redirect('verify_otp')
 
 
 @login_required
@@ -344,6 +428,7 @@ def vendor_register(request):
 
             request.session['pending_email'] = email
             request.session['pending_user_id'] = user.id
+            _mark_otp_sent(request.session)
             messages.success(
                 request,
                 f"An OTP has been sent to {email}. Please enter it to complete registration.",
