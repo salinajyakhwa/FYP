@@ -50,6 +50,16 @@ class CustomUserCreationForm(UserCreationForm):
         model = User
         fields = UserCreationForm.Meta.fields + ('first_name', 'last_name', 'email', 'role',)
 
+    def clean_email(self):
+        email = (self.cleaned_data.get('email') or '').strip().lower()
+        if not email:
+            return email
+
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('An account with this email already exists.')
+
+        return email
+
     def clean(self):
         cleaned_data = super().clean()
         role = cleaned_data.get('role')

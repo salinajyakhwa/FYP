@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.mail import EmailMessage
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -77,10 +78,14 @@ def register(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST, request.FILES)
         if form.is_valid():
-            user = form.save()
             email = form.cleaned_data['email']
-
-            send_otp(email, user)
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    send_otp(email, user)
+            except Exception:
+                messages.error(request, 'We could not send your OTP right now. Please try again.')
+                return render(request, 'main/auth/register.html', {'form': form})
 
             request.session['pending_email'] = email
             request.session['pending_user_id'] = user.id
@@ -91,7 +96,8 @@ def register(request):
             )
             return redirect('verify_otp')
     else:
-        form = CustomUserCreationForm()
+        initial_role = 'vendor' if request.GET.get('role') == 'vendor' else 'traveler'
+        form = CustomUserCreationForm(initial={'role': initial_role})
     return render(request, 'main/auth/register.html', {'form': form})
 
 
@@ -421,10 +427,17 @@ def vendor_register(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST, request.FILES)
         if form.is_valid():
-            user = form.save()
             email = form.cleaned_data['email']
-
-            send_otp(email, user)
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    send_otp(email, user)
+            except Exception:
+                messages.error(request, 'We could not send your OTP right now. Please try again.')
+                return render(request, 'main/auth/register.html', {
+                    'form': form,
+                    'registration_mode': 'vendor',
+                })
 
             request.session['pending_email'] = email
             request.session['pending_user_id'] = user.id

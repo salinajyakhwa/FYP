@@ -7,10 +7,13 @@ from . import views
 urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('register/', views.register, name='register'),
+    path('register/vendor/', views.vendor_register, name='vendor_register'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('verify-otp/resend/', views.resend_otp, name='resend_otp'),
     path('check-email/', views.check_email, name='check_email'),
     path('activate/<uidb64>/<token>/', views.verify_email, name='verify_email'),
     path('login/', views.CustomLoginView.as_view(), name='login'),
+    path('reactivate-account/', views.reactivate_account, name='reactivate_account'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('profile/', views.profile, name='profile'),
     path(
