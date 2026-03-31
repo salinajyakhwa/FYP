@@ -9,6 +9,30 @@
         <p class="mb-1"><strong>{{ display_name }}</strong></p>
         <p class="text-muted">Your payment request is being sent to the eSewa portal.</p>
 
+        {% if not sponsorship_package %}
+        <div class="border rounded p-3 bg-light mb-3">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">Travelers</span>
+                <span>{{ adult_count }} adult{{ adult_count|pluralize }}, {{ child_count }} child{{ child_count|pluralize }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">Total travelers</span>
+                <span>{{ total_travelers }}</span>
+            </div>
+            <div class="d-flex justify-content-between fw-semibold">
+                <span>Amount being sent to eSewa</span>
+                <span>Rs. {{ total_amount }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="border rounded p-3 bg-light mb-3">
+            <div class="d-flex justify-content-between fw-semibold">
+                <span>Sponsorship total</span>
+                <span>Rs. {{ total_amount }}</span>
+            </div>
+        </div>
+        {% endif %}
+
         <form action="{{ esewa_form_url }}" method="POST" id="esewa-handoff-form">
             <input type="hidden" name="amount" value="{{ amount }}">
             <input type="hidden" name="tax_amount" value="{{ tax_amount }}">
