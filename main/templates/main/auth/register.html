@@ -98,6 +98,26 @@
         font-size: 14px;
     }
 
+    .password-field {
+        position: relative;
+    }
+
+    .password-field .form-control-pill {
+        padding-right: 52px !important;
+    }
+
+    .password-toggle {
+        position: absolute;
+        top: 50%;
+        right: 16px;
+        transform: translateY(-58%);
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        padding: 0;
+        line-height: 1;
+    }
+
     .btn-voyger {
         background-color: var(--voyger-green);
         color: white;
@@ -202,12 +222,25 @@
                 {% for field in form %}
                     {% if field.name != 'role' and field.name != 'pan_card_photo' and field.name != 'id_document_type' and field.name != 'id_document_photo' %}
                     <div class="mb-2">
+                        {% if field.field.widget.input_type == 'password' %}
+                        <div class="password-field">
+                            <input type="password"
+                                   name="{{ field.name }}"
+                                   id="{{ field.id_for_label }}"
+                                   placeholder="{{ field.label }}"
+                                   class="form-control-pill w-100 js-password-input" required>
+                            <button type="button" class="password-toggle js-password-toggle" aria-label="Show password">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        {% else %}
                         <input type="{{ field.field.widget.input_type|default:'text' }}"
                                name="{{ field.name }}"
                                id="{{ field.id_for_label }}"
                                placeholder="{{ field.label }}"
                                value="{% if field.field.widget.input_type != 'password' %}{{ field.value|default:'' }}{% endif %}"
                                class="form-control-pill w-100" required>
+                        {% endif %}
                         {% for error in field.errors %}
                             <div class="text-danger extra-small px-2" style="font-size: 11px;">{{ error }}</div>
                         {% endfor %}
@@ -274,6 +307,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     roleInputs.forEach((input) => {
         input.addEventListener('change', syncVendorDocsVisibility);
+    });
+
+    document.querySelectorAll('.js-password-toggle').forEach((toggle) => {
+        toggle.addEventListener('click', function () {
+            const input = toggle.parentElement.querySelector('.js-password-input');
+            const icon = toggle.querySelector('i');
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            icon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
+            toggle.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        });
     });
 
     syncVendorDocsVisibility();
