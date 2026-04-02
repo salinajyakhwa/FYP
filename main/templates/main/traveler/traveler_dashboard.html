@@ -4,103 +4,191 @@
 
 {% block extra_css %}
 <style>
-    .dashboard-shell {
-        max-width: 1180px;
-    }
-
-    .dashboard-hero {
-        background: linear-gradient(135deg, #f5f8f5 0%, #edf3ee 65%, #e7efe8 100%);
-        border: 1px solid #d8e2da;
-        border-radius: 18px;
-        padding: 28px;
-    }
-
-    .dashboard-kicker {
-        font-size: 0.78rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #5f6f61;
-        margin-bottom: 8px;
-    }
-
-    .dashboard-subtext {
-        color: #667085;
-        max-width: 620px;
-    }
-
-    .summary-tile {
-        background: #fff;
-        border: 1px solid #e4e7ec;
-        border-radius: 16px;
-        padding: 18px;
-        height: 100%;
-    }
-
-    .summary-value {
-        font-size: 1.9rem;
-        font-weight: 700;
-        line-height: 1.1;
-        color: #1d2939;
-    }
-
-    .dashboard-panel {
-        border: 1px solid #e4e7ec;
-        border-radius: 18px;
-        box-shadow: 0 8px 24px rgba(16, 24, 40, 0.05);
-    }
-
-    .dashboard-panel .card-header {
-        border-bottom: 1px solid #eef1f4;
-        padding: 18px 22px;
-    }
-
-    .dashboard-panel .card-body {
-        padding: 22px;
-    }
-
-    .item-card {
-        border: 1px solid #e7eaee;
-        border-radius: 14px;
-        padding: 16px;
-        background: #fff;
-    }
-
-    .muted-chip {
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid #d9dee5;
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-size: 0.78rem;
-        color: #475467;
-        background: #f8fafc;
-    }
-
-    .mini-meta {
-        font-size: 0.88rem;
-        color: #667085;
-    }
-
-    .soft-unread {
-        background: #f6f9ff;
-        border-color: #dce7fb;
-    }
-
-    .empty-note {
-        color: #667085;
-        line-height: 1.6;
-    }
-
-    @media (max-width: 767.98px) {
-        .dashboard-hero {
-            padding: 22px 18px;
+    .dashboard-shell{
+        max-width:1180px;
         }
-
-        .dashboard-panel .card-header,
-        .dashboard-panel .card-body {
-            padding: 18px;
+        
+        /* HERO */
+        
+        .dashboard-hero{
+        background:linear-gradient(135deg,#e7efe8,#d8e6d8,#cfe0cf);
+        border-radius:26px;
+        padding:36px;
+        border: 2px dashed #6f8f6f;
+        box-shadow:0 20px 35px rgba(0,0,0,.08);
+        position:relative;
         }
-    }
+        
+        .dashboard-hero::after{
+        content:"✈️";
+        position:absolute;
+        right:25px;
+        top:20px;
+        font-size:36px;
+        opacity:0.5;
+        }
+        
+        .dashboard-kicker{
+        font-size:.8rem;
+        letter-spacing:.1em;
+        text-transform:uppercase;
+        color:#4f6f55;
+        }
+        
+        .dashboard-subtext{
+        color:#546b59;
+        font-size:.95rem;
+        }
+        
+        /* SUMMARY TILES */
+        
+        .summary-tile{
+        background:#f8fbf8;
+        border-radius:20px;
+        padding:20px;
+        border:2px solid #e4efe4;
+        height:100%;
+        transition:.25s;
+        position:relative;
+        }
+        
+        .summary-tile:hover{
+        transform:translateY(-5px) rotate(-.3deg);
+        background:#eef7ee;
+        box-shadow:0 12px 25px rgba(0,0,0,.08);
+        }
+        
+        .summary-tile::before{
+        content:"🌿";
+        position:absolute;
+        top:10px;
+        right:12px;
+        opacity:.25;
+        }
+        
+        .summary-value{
+        font-size:2.3rem;
+        font-weight:800;
+        color:#355e3b;
+        }
+        
+        /* PANELS */
+        
+        .dashboard-panel{
+        border-radius:22px;
+        border:2px solid #e4efe4;
+        background:#ffffff;
+        box-shadow:0 12px 30px rgba(0,0,0,.05);
+        }
+        
+        .dashboard-panel .card-header{
+        border-bottom:1px dashed #dbe7db;
+        padding:20px 24px;
+        background:#f6faf6;
+        }
+        
+        .dashboard-panel .card-body{
+        padding:24px;
+        }
+        
+        /* TRIP / BOOKING CARDS */
+        
+        .item-card{
+        border-radius:18px;
+        padding:18px;
+        background:#f8fbf8;
+        border:2px solid #e6efe6;
+        transition:.25s;
+        position:relative;
+        }
+        
+        .item-card:hover{
+        transform:translateY(-4px);
+        background:#eef7ee;
+        box-shadow:0 10px 25px rgba(0,0,0,.08);
+        }
+        
+        /* STATUS CHIP */
+        
+        .muted-chip{
+        display:inline-flex;
+        align-items:center;
+        border-radius:999px;
+        padding:5px 12px;
+        font-size:.75rem;
+        font-weight:600;
+        background:#6b8f71;
+        color:white;
+        }
+        
+        /* META TEXT */
+        
+        .mini-meta{
+        font-size:.88rem;
+        color:#667085;
+        }
+        
+        /* EMPTY STATES */
+        
+        .empty-note{
+        color:#6b7280;
+        font-style:italic;
+        padding:10px 0;
+        }
+        
+        /* BUTTONS */
+        
+        .btn-primary{
+        background:#6b8f71;
+        border:none;
+        border-radius:999px;
+        padding:6px 14px;
+        box-shadow:0 6px 15px rgba(107,143,113,.3);
+        }
+        
+        .btn-primary:hover{
+        background:#55765a;
+        }
+        
+        .btn-outline-secondary{
+        border-radius:999px;
+        border-color:#d0ddd0;
+        }
+        
+        /* CHAT */
+        
+        .soft-unread{
+        background:#eef6ee;
+        border-color:#cdd9cd;
+        }
+        
+        /* PLAYFUL EMOJIS */
+        
+        h2.h5::before{
+        content:"🧭 ";
+        }
+        
+        h3::before{
+        content:"🌍 ";
+        }
+        
+        /* MOBILE */
+        
+        @media (max-width:768px){
+        
+        .dashboard-hero{
+        padding:24px;
+        }
+        
+        .dashboard-panel .card-body{
+        padding:18px;
+        }
+        
+        .summary-value{
+        font-size:1.8rem;
+        }
+        
+        }
 </style>
 {% endblock %}
 
