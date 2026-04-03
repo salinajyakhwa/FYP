@@ -38,6 +38,11 @@ OTP_LOCKOUT_SECONDS = 600
 OTP_RESEND_COOLDOWN_SECONDS = 60
 
 
+def _remove_autofocus(form):
+    for field in form.fields.values():
+        field.widget.attrs.pop('autofocus', None)
+
+
 def _mark_otp_sent(session):
     session['pending_otp_attempts'] = 0
     session['pending_otp_lockout_until'] = None
@@ -346,6 +351,12 @@ def profile(request):
         user_form = UserUpdateForm(instance=request.user)
         profile_form = UserProfileUpdateForm(instance=profile)
         pass_form = PasswordChangeForm(request.user)
+
+    _remove_autofocus(user_form)
+    _remove_autofocus(profile_form)
+    _remove_autofocus(pass_form)
+    _remove_autofocus(deactivate_form)
+    _remove_autofocus(permanent_delete_form)
 
     return render(request, 'main/auth/profile.html', {
         'user_form': user_form,
