@@ -282,6 +282,36 @@ def edit_package(request, package_id):
 
 @login_required
 @role_required(allowed_roles=['vendor'])
+def delete_package(request, package_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest('POST request required.')
+
+    vendor = _get_vendor_or_403(request)
+    package = get_object_or_404(TravelPackage, pk=package_id, vendor=vendor)
+
+    has_dependencies = any([
+        package.bookings.exists(),
+        package.capacity_requests.exists(),
+        package.trips.exists(),
+        package.reviews.exists(),
+        package.chat_threads.exists(),
+        package.custom_itineraries.exists(),
+    ])
+
+    if has_dependencies:
+        messages.error(
+            request,
+            'This package cannot be deleted because it already has related bookings, trips, reviews, chats, or itinerary records.',
+        )
+        return redirect('vendor_package_list')
+
+    package.delete()
+    messages.success(request, 'Package deleted successfully.')
+    return redirect('vendor_package_list')
+
+
+@login_required
+@role_required(allowed_roles=['vendor'])
 def manage_itinerary(request, package_id):
     package = get_object_or_404(TravelPackage, pk=package_id)
 

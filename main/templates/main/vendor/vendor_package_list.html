@@ -105,9 +105,12 @@
                 <a href="{% url 'edit_package' package.id %}" class="btn btn-sm btn-outline-secondary" title="Edit Package">
                     <i class="bi bi-pencil"></i> Edit
                 </a>
-                <a href="#" class="btn btn-sm btn-outline-danger" title="Delete Package">
-                    <i class="bi bi-trash"></i> Delete
-                </a>
+                <form action="{% url 'delete_package' package.id %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Package" onclick="return confirm('Delete this package? This cannot be undone.');">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </form>
             </div>
             <div class="small mt-2 text-muted">
                 Capacity: {{ package.capacity_summary.remaining_capacity }} remaining spots

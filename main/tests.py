@@ -116,3 +116,57 @@ class ReviewFlowTests(TestCase):
             reverse('package_detail', args=[booking.package.id]) + '#reviews',
         )
         self.assertContains(response, 'You already reviewed this trip.')
+
+
+class VendorPackageDeletionTests(TestCase):
+    def setUp(self):
+        self.vendor_user = User.objects.create_user(username='vendor_delete', password='pass12345')
+        self.traveler = User.objects.create_user(username='traveler_delete', password='pass12345')
+        self.vendor_profile = UserProfile.objects.create(user=self.vendor_user, role='vendor')
+        self.traveler_profile = UserProfile.objects.create(user=self.traveler, role='traveler')
+        self.vendor = Vendor.objects.create(
+            user_profile=self.vendor_profile,
+            name='Delete Test Vendor',
+            description='Vendor description',
+            status='approved',
+        )
+        self.package = TravelPackage.objects.create(
+            vendor=self.vendor,
+            name='Delete Me',
+            description='Package description',
+            location='Nepal',
+            travel_type='Trek',
+            price=Decimal('450.00'),
+            max_travelers=10,
+            start_date=timezone.now().date() + timedelta(days=10),
+            end_date=timezone.now().date() + timedelta(days=15),
+        )
+
+    def test_vendor_can_delete_unused_package(self):
+        self.client.login(username='vendor_delete', password='pass12345')
+
+        response = self.client.post(
+            reverse('delete_package', args=[self.package.id]),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(TravelPackage.objects.filter(id=self.package.id).exists())
+
+    def test_vendor_cannot_delete_package_with_booking(self):
+        Booking.objects.create(
+            user=self.traveler,
+            package=self.package,
+            total_price=Decimal('450.00'),
+            status='confirmed',
+        )
+        self.client.login(username='vendor_delete', password='pass12345')
+
+        response = self.client.post(
+            reverse('delete_package', args=[self.package.id]),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(TravelPackage.objects.filter(id=self.package.id).exists())
+        self.assertContains(response, 'This package cannot be deleted')

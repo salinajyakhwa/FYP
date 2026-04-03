@@ -19,6 +19,7 @@ urlpatterns = [
     path('vendor/packages/', views.vendor_package_list, name='vendor_package_list'),
     path('vendor/package/create/', views.create_package, name='create_package'),
     path('vendor/package/<int:package_id>/edit/', views.edit_package, name='edit_package'),
+    path('vendor/package/<int:package_id>/delete/', views.delete_package, name='delete_package'),
     path('vendor/package/<int:package_id>/manage-itinerary/', views.manage_itinerary, name='manage_itinerary'),
     path('vendor/package/<int:package_id>/sponsorship/', views.choose_sponsorship_payment, name='choose_sponsorship_payment'),
     path('vendor/capacity-request/<int:request_id>/<str:decision>/', views.review_capacity_request, name='review_capacity_request'),
