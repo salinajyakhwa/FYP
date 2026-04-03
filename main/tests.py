@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -290,3 +291,12 @@ class VendorCapacityRequestReviewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.capacity_request.refresh_from_db()
         self.assertEqual(self.capacity_request.status, 'approved')
+        notification = self.traveler.notifications.get(dedupe_key=f'capacity-approved:{self.capacity_request.id}')
+        self.assertIn(reverse('choose_payment', args=[self.package.id]), notification.target_url)
+        self.assertIn('adult_count=2', notification.target_url)
+        self.assertIn('child_count=1', notification.target_url)
+        self.assertIn(f'capacity_request_id={self.capacity_request.id}', notification.target_url)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.traveler.email])
+        self.assertIn('approved', mail.outbox[0].subject.lower())
+        self.assertIn(reverse('choose_payment', args=[self.package.id]), mail.outbox[0].body)

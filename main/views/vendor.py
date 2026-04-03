@@ -1,8 +1,11 @@
 import json
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import PermissionDenied
+from django.core.mail import EmailMessage
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponseBadRequest
@@ -31,6 +34,36 @@ from ..services.itineraries import (
     _sync_package_itinerary_json,
 )
 from ..services.trips import _build_trip_progress_summary, _build_trip_timeline_items
+
+
+def _build_capacity_request_checkout_url(capacity_request):
+    return (
+        f"{reverse('choose_payment', args=[capacity_request.package_id])}?"
+        f"{urlencode({
+            'adult_count': capacity_request.adult_count,
+            'child_count': capacity_request.child_count,
+            'child_under_seven_count': capacity_request.child_under_seven_count,
+            'capacity_request_id': capacity_request.id,
+        })}"
+    )
+
+
+def _send_capacity_request_approved_email(request, capacity_request):
+    traveler = capacity_request.traveler
+    if not traveler.email:
+        return
+
+    current_site = get_current_site(request)
+    checkout_url = request.build_absolute_uri(_build_capacity_request_checkout_url(capacity_request))
+    subject = 'Your booking request was approved'
+    body = (
+        f"Hi {traveler.username},\n\n"
+        f"Your over-capacity booking request for {capacity_request.package.name} was approved.\n"
+        f"You can return to {current_site.domain} and continue your payment from where you left off using this link:\n"
+        f"{checkout_url}\n\n"
+        "Regards,\nTravel Team"
+    )
+    EmailMessage(subject, body, to=[traveler.email]).send()
 
 
 @login_required
@@ -552,14 +585,16 @@ def review_capacity_request(request, request_id, decision):
     if decision == 'approve':
         capacity_request.status = 'approved'
         capacity_request.save(update_fields=['status', 'vendor_notes', 'reviewed_at', 'updated_at'])
+        checkout_target_url = _build_capacity_request_checkout_url(capacity_request)
         create_notification(
             user=capacity_request.traveler,
             title='Booking request approved',
             message=f"Your booking request for {capacity_request.package.name} was approved. You can now continue to payment.",
             notification_type='vendor_alert',
-            target_url=reverse('package_detail', args=[capacity_request.package_id]),
+            target_url=checkout_target_url,
             dedupe_key=f"capacity-approved:{capacity_request.id}",
         )
+        _send_capacity_request_approved_email(request, capacity_request)
         messages.success(request, 'Capacity request approved.')
     elif decision == 'reject':
         capacity_request.status = 'rejected'
