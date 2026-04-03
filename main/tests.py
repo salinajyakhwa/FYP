@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .forms import BookingTravelerForm
-from .models import Booking, Review, TravelPackage, UserProfile, Vendor
+from .models import Booking, BookingCapacityRequest, Review, TravelPackage, UserProfile, Vendor
 from .services.capacity import can_proceed_with_capacity
 from .services.payments import _calculate_booking_pricing
 
@@ -244,3 +244,49 @@ class TravelerPricingRulesTests(TestCase):
         self.assertFalse(allowed)
         self.assertIsNone(approved_request)
         self.assertEqual(summary['remaining_capacity'], 2)
+
+
+class VendorCapacityRequestReviewTests(TestCase):
+    def setUp(self):
+        self.vendor_user = User.objects.create_user(username='vendor_capacity', password='pass12345')
+        self.traveler = User.objects.create_user(username='traveler_capacity', password='pass12345')
+        self.vendor_profile = UserProfile.objects.create(user=self.vendor_user, role='vendor')
+        self.traveler_profile = UserProfile.objects.create(user=self.traveler, role='traveler')
+        self.vendor = Vendor.objects.create(
+            user_profile=self.vendor_profile,
+            name='Capacity Vendor',
+            description='Vendor description',
+            status='approved',
+        )
+        self.package = TravelPackage.objects.create(
+            vendor=self.vendor,
+            name='Capacity Package',
+            description='Package description',
+            location='Nepal',
+            travel_type='Tour',
+            price=Decimal('800.00'),
+            max_travelers=2,
+            start_date=timezone.now().date() + timedelta(days=10),
+            end_date=timezone.now().date() + timedelta(days=15),
+        )
+        self.capacity_request = BookingCapacityRequest.objects.create(
+            package=self.package,
+            traveler=self.traveler,
+            adult_count=2,
+            child_count=1,
+            child_under_seven_count=0,
+            number_of_travelers=3,
+        )
+
+    def test_vendor_can_approve_own_capacity_request(self):
+        self.client.login(username='vendor_capacity', password='pass12345')
+
+        response = self.client.post(
+            reverse('review_capacity_request', args=[self.capacity_request.id, 'approve']),
+            {'vendor_notes': 'Approved'},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.capacity_request.refresh_from_db()
+        self.assertEqual(self.capacity_request.status, 'approved')

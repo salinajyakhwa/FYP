@@ -537,7 +537,7 @@ def review_capacity_request(request, request_id, decision):
 
     vendor = _get_vendor_or_403(request)
     capacity_request = get_object_or_404(
-        vendor.capacity_requests.select_related('traveler', 'package'),
+        BookingCapacityRequest.objects.select_related('traveler', 'package').filter(package__vendor=vendor),
         pk=request_id,
     )
 
