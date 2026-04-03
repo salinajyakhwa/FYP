@@ -91,6 +91,11 @@
                 {% if booking.trip %}
                 <a href="{% url 'trip_dashboard' booking.trip.id %}" class="btn btn-outline-primary btn-sm mb-2">View Trip</a>
                 {% endif %}
+                {% if booking.can_leave_review %}
+                <a href="{% url 'package_detail' booking.package.id %}#reviews" class="btn btn-outline-success btn-sm mb-2">Leave Review</a>
+                {% elif booking.has_review %}
+                <div class="small text-muted mb-2">You already reviewed this trip.</div>
+                {% endif %}
                 {% if booking.status == 'pending' or booking.status == 'confirmed' %}
                     <form action="{% url 'cancel_booking' booking.id %}" method="post" class="d-grid gap-2">
                         {% csrf_token %}

@@ -53,6 +53,15 @@ from ..services.trips import (
 )
 
 
+def _user_can_review_package(user, package):
+    return Booking.objects.filter(
+        user=user,
+        package=package,
+        status__in=['confirmed', 'trip_completed'],
+        package__end_date__lt=timezone.now().date(),
+    ).exists()
+
+
 @login_required
 def dashboard(request):
     if request.user.is_superuser:
@@ -250,12 +259,7 @@ def package_detail(request, package_id):
 
     user_can_review = False
     if request.user.is_authenticated:
-        completed_booking_exists = Booking.objects.filter(
-            user=request.user,
-            package=package,
-            status='confirmed',
-            package__end_date__lt=timezone.now().date(),
-        ).exists()
+        completed_booking_exists = _user_can_review_package(request.user, package)
 
         if completed_booking_exists:
             has_already_reviewed = Review.objects.filter(user=request.user, package=package).exists()
@@ -388,6 +392,12 @@ def my_bookings(request):
         booking.selection_items = _build_booking_selection_items(booking.custom_itinerary)
         booking.selection_groups = _group_booking_selection_items(booking.selection_items)
         booking.operation_record = getattr(booking, 'operations', None)
+        booking.has_review = Review.objects.filter(user=request.user, package=booking.package).exists()
+        booking.can_leave_review = (
+            booking.status in ['confirmed', 'trip_completed']
+            and booking.package.end_date < timezone.now().date()
+            and not booking.has_review
+        )
     return render(request, 'main/traveler/my_bookings.html', {'bookings': bookings})
 
 
@@ -423,12 +433,7 @@ def add_review(request, package_id):
         messages.error(request, 'You have already submitted a review for this package.')
         return redirect('package_detail', package_id=package.id)
 
-    can_review = Booking.objects.filter(
-        user=request.user,
-        package=package,
-        status='confirmed',
-        package__end_date__lt=timezone.now().date(),
-    ).exists()
+    can_review = _user_can_review_package(request.user, package)
 
     if not can_review:
         messages.error(request, 'You can only review packages after you have completed the trip.')
@@ -444,6 +449,7 @@ def add_review(request, package_id):
             review.save()
             messages.success(request, 'Thank you for your review!')
             return redirect('package_detail', package_id=package.id)
+        messages.error(request, 'Please provide a rating and comment for your review.')
 
     return redirect('package_detail', package_id=package.id)
 
