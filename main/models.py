@@ -313,6 +313,7 @@ class Booking(models.Model):
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
     adult_count = models.PositiveIntegerField(default=1)
     child_count = models.PositiveIntegerField(default=0)
+    child_under_seven_count = models.PositiveIntegerField(default=0)
     number_of_travelers = models.PositiveIntegerField(default=1)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     cancellation_reason = models.TextField(blank=True)
@@ -327,6 +328,14 @@ class Booking(models.Model):
     def __str__(self):
         return f"Booking for {self.package.name} by {self.user.username}"
 
+    @property
+    def traveler_summary(self):
+        return (
+            f"{self.adult_count} adult{'s' if self.adult_count != 1 else ''}, "
+            f"{self.child_count} child age 7+, "
+            f"{self.child_under_seven_count} child under 7"
+        )
+
 
 class BookingCapacityRequest(models.Model):
     STATUS_CHOICES = (
@@ -340,6 +349,7 @@ class BookingCapacityRequest(models.Model):
     traveler = models.ForeignKey(User, on_delete=models.CASCADE, related_name='capacity_requests')
     adult_count = models.PositiveIntegerField(default=1)
     child_count = models.PositiveIntegerField(default=0)
+    child_under_seven_count = models.PositiveIntegerField(default=0)
     number_of_travelers = models.PositiveIntegerField(default=1)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     vendor_notes = models.TextField(blank=True)
@@ -353,6 +363,14 @@ class BookingCapacityRequest(models.Model):
 
     def __str__(self):
         return f"Capacity request for {self.package.name} by {self.traveler.username}"
+
+    @property
+    def traveler_summary(self):
+        return (
+            f"{self.adult_count} adult{'s' if self.adult_count != 1 else ''}, "
+            f"{self.child_count} child age 7+, "
+            f"{self.child_under_seven_count} child under 7"
+        )
 
 
 class BookingOperation(models.Model):

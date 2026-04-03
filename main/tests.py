@@ -6,7 +6,10 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from .forms import BookingTravelerForm
 from .models import Booking, Review, TravelPackage, UserProfile, Vendor
+from .services.capacity import can_proceed_with_capacity
+from .services.payments import _calculate_booking_pricing
 
 
 class ReviewFlowTests(TestCase):
@@ -170,3 +173,74 @@ class VendorPackageDeletionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(TravelPackage.objects.filter(id=self.package.id).exists())
         self.assertContains(response, 'This package cannot be deleted')
+
+
+class TravelerPricingRulesTests(TestCase):
+    def setUp(self):
+        self.vendor_user = User.objects.create_user(username='vendor_pricing', password='pass12345')
+        self.traveler = User.objects.create_user(username='traveler_pricing', password='pass12345')
+        self.vendor_profile = UserProfile.objects.create(user=self.vendor_user, role='vendor')
+        self.traveler_profile = UserProfile.objects.create(user=self.traveler, role='traveler')
+        self.vendor = Vendor.objects.create(
+            user_profile=self.vendor_profile,
+            name='Pricing Vendor',
+            description='Vendor description',
+            status='approved',
+        )
+        self.package = TravelPackage.objects.create(
+            vendor=self.vendor,
+            name='Family Package',
+            description='Package description',
+            location='Nepal',
+            travel_type='Tour',
+            price=Decimal('500.00'),
+            max_travelers=10,
+            start_date=timezone.now().date() + timedelta(days=10),
+            end_date=timezone.now().date() + timedelta(days=15),
+        )
+
+    def test_booking_pricing_excludes_children_under_seven_from_total(self):
+        pricing = _calculate_booking_pricing(
+            self.package,
+            adult_count=2,
+            child_count=1,
+            child_under_seven_count=2,
+        )
+
+        self.assertEqual(pricing['total_travelers'], 5)
+        self.assertEqual(pricing['total_price'], Decimal('1500.00'))
+
+    def test_traveler_form_counts_children_under_seven_in_total_travelers(self):
+        form = BookingTravelerForm(
+            data={'adult_count': 2, 'child_count': 1, 'child_under_seven_count': 2}
+        )
+
+        self.assertTrue(form.is_valid())
+        self.assertEqual(form.total_travelers(), 5)
+        self.assertEqual(form.calculate_total(Decimal('500.00'), Decimal('500.00')), Decimal('1500.00'))
+
+    def test_capacity_check_counts_children_under_seven(self):
+        Booking.objects.create(
+            user=self.traveler,
+            package=self.package,
+            total_price=Decimal('1000.00'),
+            status='confirmed',
+            adult_count=2,
+            child_count=0,
+            child_under_seven_count=0,
+            number_of_travelers=2,
+        )
+        self.package.max_travelers = 4
+        self.package.save(update_fields=['max_travelers'])
+
+        allowed, approved_request, summary = can_proceed_with_capacity(
+            traveler=self.traveler,
+            package=self.package,
+            adult_count=1,
+            child_count=0,
+            child_under_seven_count=2,
+        )
+
+        self.assertFalse(allowed)
+        self.assertIsNone(approved_request)
+        self.assertEqual(summary['remaining_capacity'], 2)

@@ -22,13 +22,14 @@ def get_package_capacity_summary(package):
     }
 
 
-def get_matching_approved_capacity_request(*, traveler, package, adult_count, child_count):
+def get_matching_approved_capacity_request(*, traveler, package, adult_count, child_count, child_under_seven_count):
     return (
         BookingCapacityRequest.objects.filter(
             traveler=traveler,
             package=package,
             adult_count=adult_count,
             child_count=child_count,
+            child_under_seven_count=child_under_seven_count,
             status='approved',
             approved_payment_used_at__isnull=True,
         )
@@ -37,8 +38,8 @@ def get_matching_approved_capacity_request(*, traveler, package, adult_count, ch
     )
 
 
-def can_proceed_with_capacity(*, traveler, package, adult_count, child_count):
-    requested_total = adult_count + child_count
+def can_proceed_with_capacity(*, traveler, package, adult_count, child_count, child_under_seven_count=0):
+    requested_total = adult_count + child_count + child_under_seven_count
     summary = get_package_capacity_summary(package)
     if requested_total <= summary['remaining_capacity']:
         return True, None, summary
@@ -48,6 +49,7 @@ def can_proceed_with_capacity(*, traveler, package, adult_count, child_count):
         package=package,
         adult_count=adult_count,
         child_count=child_count,
+        child_under_seven_count=child_under_seven_count,
     )
     return approved_request is not None, approved_request, summary
 

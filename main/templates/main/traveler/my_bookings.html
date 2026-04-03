@@ -13,7 +13,7 @@
             <div class="col-md-8">
                 <p><strong>Vendor:</strong> {{ booking.package.vendor.name }}</p>
                 <p><strong>Booked on:</strong> {{ booking.booking_date|date:"F j, Y" }}</p>
-                <p><strong>Travelers:</strong> {{ booking.adult_count }} adult{{ booking.adult_count|pluralize }}, {{ booking.child_count }} child{{ booking.child_count|pluralize }} ({{ booking.number_of_travelers }} total)</p>
+                <p><strong>Travelers:</strong> {{ booking.traveler_summary }} ({{ booking.number_of_travelers }} total)</p>
                 {% if booking.custom_itinerary %}
                 <p class="mb-0"><strong>Type:</strong> Custom itinerary booking</p>
                 {% if booking.selection_groups %}

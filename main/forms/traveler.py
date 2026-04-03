@@ -16,13 +16,23 @@ class BookingTravelerForm(forms.Form):
         min_value=0,
         initial=0,
         widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
-        label='Children',
+        label='Children Age 7+',
+    )
+    child_under_seven_count = forms.IntegerField(
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        label='Children Under 7',
     )
 
     def total_travelers(self):
         if not hasattr(self, 'cleaned_data'):
             return 1
-        return self.cleaned_data['adult_count'] + self.cleaned_data['child_count']
+        return (
+            self.cleaned_data['adult_count']
+            + self.cleaned_data['child_count']
+            + self.cleaned_data['child_under_seven_count']
+        )
 
     def calculate_total(self, adult_unit_price, child_unit_price):
         adult_total = Decimal(self.cleaned_data['adult_count']) * Decimal(adult_unit_price)

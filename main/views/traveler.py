@@ -290,16 +290,21 @@ def start_package_booking(request, package_id):
 
     adult_count = _safe_int(request.GET.get('adult_count', 1), 1, minimum=1)
     child_count = _safe_int(request.GET.get('child_count', 0), 0, minimum=0)
-    total_travelers = adult_count + child_count
+    child_under_seven_count = _safe_int(request.GET.get('child_under_seven_count', 0), 0, minimum=0)
+    total_travelers = adult_count + child_count + child_under_seven_count
 
     allowed, approved_request, capacity_summary = can_proceed_with_capacity(
         traveler=request.user,
         package=package,
         adult_count=adult_count,
         child_count=child_count,
+        child_under_seven_count=child_under_seven_count,
     )
     if allowed:
-        payment_url = f"{reverse('choose_payment', args=[package.id])}?adult_count={adult_count}&child_count={child_count}"
+        payment_url = (
+            f"{reverse('choose_payment', args=[package.id])}"
+            f"?adult_count={adult_count}&child_count={child_count}&child_under_seven_count={child_under_seven_count}"
+        )
         if approved_request:
             payment_url += f"&capacity_request_id={approved_request.id}"
         return redirect(payment_url)
@@ -310,6 +315,7 @@ def start_package_booking(request, package_id):
             package=package,
             adult_count=adult_count,
             child_count=child_count,
+            child_under_seven_count=child_under_seven_count,
             status='pending',
         )
         .order_by('-created_at')
@@ -323,6 +329,7 @@ def start_package_booking(request, package_id):
         package=package,
         adult_count=adult_count,
         child_count=child_count,
+        child_under_seven_count=child_under_seven_count,
         number_of_travelers=total_travelers,
     )
     create_notification(

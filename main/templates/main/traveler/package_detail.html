@@ -256,15 +256,24 @@
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label for="package-child-count" class="form-label small text-muted">Children</label>
+                                <label for="package-child-count" class="form-label small text-muted">Children Age 7+</label>
                                 <div class="traveler-mini-stepper">
                                     <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="-1">-</button>
                                     <input type="number" id="package-child-count" name="child_count" class="form-control" min="0" value="0">
                                     <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="1">+</button>
                                 </div>
                             </div>
+                            <div class="mb-3">
+                                <label for="package-child-under-seven-count" class="form-label small text-muted">Children Under 7</label>
+                                <div class="traveler-mini-stepper">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-under-seven-count" data-change="-1">-</button>
+                                    <input type="number" id="package-child-under-seven-count" name="child_under_seven_count" class="form-control" min="0" value="0">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-under-seven-count" data-change="1">+</button>
+                                </div>
+                                <div class="small text-muted mt-1">Children under 7 travel free but still count toward capacity.</div>
+                            </div>
                             <div class="d-flex justify-content-between small mb-1">
-                                <span class="text-muted">Current price per traveler</span>
+                                <span class="text-muted">Current price per paying traveler</span>
                                 <strong>Rs. <span id="packagePerTravelerPrice">{{ customization_total|floatformat:2 }}</span></strong>
                             </div>
                             <div class="d-flex justify-content-between">
@@ -328,10 +337,11 @@
     (function () {
         const adultInput = document.getElementById('package-adult-count');
         const childInput = document.getElementById('package-child-count');
+        const childUnderSevenInput = document.getElementById('package-child-under-seven-count');
         const estimateEl = document.getElementById('packageTravelerEstimate');
         const unitPrice = Number('{{ customization_total }}');
 
-        if (!adultInput || !childInput || !estimateEl) {
+        if (!adultInput || !childInput || !childUnderSevenInput || !estimateEl) {
             return;
         }
 
@@ -343,8 +353,9 @@
         function updateEstimate() {
             clampValue(adultInput, 1);
             clampValue(childInput, 0);
-            const totalTravelers = Number(adultInput.value) + Number(childInput.value);
-            estimateEl.textContent = `Rs. ${(totalTravelers * unitPrice).toFixed(2)}`;
+            clampValue(childUnderSevenInput, 0);
+            const payableTravelers = Number(adultInput.value) + Number(childInput.value);
+            estimateEl.textContent = `Rs. ${(payableTravelers * unitPrice).toFixed(2)}`;
         }
 
         document.querySelectorAll('.traveler-adjust').forEach((button) => {
@@ -360,6 +371,7 @@
 
         adultInput.addEventListener('input', updateEstimate);
         childInput.addEventListener('input', updateEstimate);
+        childUnderSevenInput.addEventListener('input', updateEstimate);
         updateEstimate();
     }());
 </script>

@@ -35,9 +35,9 @@ def _get_package_unit_prices(package, custom_itinerary=None):
     }
 
 
-def _calculate_booking_pricing(package, adult_count, child_count, custom_itinerary=None):
+def _calculate_booking_pricing(package, adult_count, child_count, child_under_seven_count=0, custom_itinerary=None):
     unit_prices = _get_package_unit_prices(package, custom_itinerary=custom_itinerary)
-    total_travelers = adult_count + child_count
+    total_travelers = adult_count + child_count + child_under_seven_count
     total_price = (
         Decimal(adult_count) * unit_prices['adult_unit_price'] +
         Decimal(child_count) * unit_prices['child_unit_price']
@@ -47,6 +47,7 @@ def _calculate_booking_pricing(package, adult_count, child_count, custom_itinera
         **unit_prices,
         'adult_count': adult_count,
         'child_count': child_count,
+        'child_under_seven_count': child_under_seven_count,
         'total_travelers': total_travelers,
         'total_price': _quantize_currency(total_price),
     }
@@ -89,10 +90,14 @@ def _build_payment_context(
     traveler_form=None,
     adult_count=None,
     child_count=None,
+    child_under_seven_count=None,
 ):
-    traveler_form = traveler_form or BookingTravelerForm(initial={'adult_count': 1, 'child_count': 0})
+    traveler_form = traveler_form or BookingTravelerForm(
+        initial={'adult_count': 1, 'child_count': 0, 'child_under_seven_count': 0}
+    )
     resolved_adult_count = 1
     resolved_child_count = 0
+    resolved_child_under_seven_count = 0
 
     if adult_count is not None:
         try:
@@ -106,10 +111,17 @@ def _build_payment_context(
         except (TypeError, ValueError):
             resolved_child_count = 0
 
-    if adult_count is None or child_count is None:
+    if child_under_seven_count is not None:
+        try:
+            resolved_child_under_seven_count = max(0, int(child_under_seven_count))
+        except (TypeError, ValueError):
+            resolved_child_under_seven_count = 0
+
+    if adult_count is None or child_count is None or child_under_seven_count is None:
         if traveler_form.is_bound and traveler_form.is_valid():
             resolved_adult_count = traveler_form.cleaned_data['adult_count']
             resolved_child_count = traveler_form.cleaned_data['child_count']
+            resolved_child_under_seven_count = traveler_form.cleaned_data['child_under_seven_count']
         else:
             try:
                 adult_value = traveler_form.initial.get('adult_count')
@@ -131,11 +143,22 @@ def _build_payment_context(
                 )
             except (TypeError, ValueError):
                 resolved_child_count = 0
+            try:
+                child_under_seven_value = traveler_form.initial.get('child_under_seven_count')
+                if child_under_seven_value is None:
+                    child_under_seven_value = traveler_form['child_under_seven_count'].value()
+                resolved_child_under_seven_count = max(
+                    0,
+                    int(child_under_seven_value if child_under_seven_value is not None else 0),
+                )
+            except (TypeError, ValueError):
+                resolved_child_under_seven_count = 0
 
     pricing = _calculate_booking_pricing(
         package,
         resolved_adult_count,
         resolved_child_count,
+        resolved_child_under_seven_count,
         custom_itinerary=custom_itinerary,
     )
 
@@ -147,6 +170,7 @@ def _build_payment_context(
         'child_unit_price': pricing['child_unit_price'],
         'adult_count': pricing['adult_count'],
         'child_count': pricing['child_count'],
+        'child_under_seven_count': pricing['child_under_seven_count'],
         'total_travelers': pricing['total_travelers'],
         'traveler_form': traveler_form,
         'display_name': f"{package.name} (Custom Itinerary)" if custom_itinerary else package.name,
@@ -195,6 +219,7 @@ def _store_pending_payment_session(
     provider=None,
     adult_count=None,
     child_count=None,
+    child_under_seven_count=None,
     total_price=None,
     capacity_request_id=None,
     sponsorship_amount=None,
@@ -206,6 +231,7 @@ def _store_pending_payment_session(
     request.session['pending_payment_transaction_uuid'] = transaction_uuid
     request.session['pending_booking_adult_count'] = adult_count
     request.session['pending_booking_child_count'] = child_count
+    request.session['pending_booking_child_under_seven_count'] = child_under_seven_count
     request.session['pending_booking_total_price'] = str(total_price) if total_price is not None else None
     request.session['pending_capacity_request_id'] = capacity_request_id
     request.session['pending_sponsorship_amount'] = (
@@ -222,6 +248,7 @@ def _clear_pending_payment_session(request):
         'pending_payment_transaction_uuid',
         'pending_booking_adult_count',
         'pending_booking_child_count',
+        'pending_booking_child_under_seven_count',
         'pending_booking_total_price',
         'pending_capacity_request_id',
         'pending_sponsorship_amount',
@@ -234,6 +261,7 @@ def _create_or_update_booking_from_pending_payment(request):
     package_id = request.session.get('pending_booking_package_id')
     adult_count = int(request.session.get('pending_booking_adult_count') or 1)
     child_count = int(request.session.get('pending_booking_child_count') or 0)
+    child_under_seven_count = int(request.session.get('pending_booking_child_under_seven_count') or 0)
     capacity_request_id = request.session.get('pending_capacity_request_id')
 
     if not custom_itinerary_id and not package_id:
@@ -249,6 +277,7 @@ def _create_or_update_booking_from_pending_payment(request):
             custom_itinerary.package,
             adult_count,
             child_count,
+            child_under_seven_count,
             custom_itinerary=custom_itinerary,
         )
         total_price = _quantize_currency(
@@ -262,6 +291,7 @@ def _create_or_update_booking_from_pending_payment(request):
                 'package': custom_itinerary.package,
                 'adult_count': adult_count,
                 'child_count': child_count,
+                'child_under_seven_count': child_under_seven_count,
                 'number_of_travelers': pricing['total_travelers'],
                 'total_price': total_price,
                 'status': 'confirmed',
@@ -272,7 +302,8 @@ def _create_or_update_booking_from_pending_payment(request):
             booking.total_price != total_price or
             booking.number_of_travelers != pricing['total_travelers'] or
             booking.adult_count != adult_count or
-            booking.child_count != child_count
+            booking.child_count != child_count or
+            booking.child_under_seven_count != child_under_seven_count
         ):
             booking.status = 'confirmed'
             booking.total_price = total_price
@@ -281,6 +312,7 @@ def _create_or_update_booking_from_pending_payment(request):
             booking.number_of_travelers = pricing['total_travelers']
             booking.adult_count = adult_count
             booking.child_count = child_count
+            booking.child_under_seven_count = child_under_seven_count
             booking.save(update_fields=[
                 'status',
                 'total_price',
@@ -289,6 +321,7 @@ def _create_or_update_booking_from_pending_payment(request):
                 'number_of_travelers',
                 'adult_count',
                 'child_count',
+                'child_under_seven_count',
             ])
         if custom_itinerary.status != 'confirmed':
             custom_itinerary.status = 'confirmed'
@@ -306,7 +339,7 @@ def _create_or_update_booking_from_pending_payment(request):
         return booking, custom_itinerary.package, True
 
     package = get_object_or_404(TravelPackage, pk=package_id)
-    pricing = _calculate_booking_pricing(package, adult_count, child_count)
+    pricing = _calculate_booking_pricing(package, adult_count, child_count, child_under_seven_count)
     total_price = _quantize_currency(
         request.session.get('pending_booking_total_price') or pricing['total_price']
     )
@@ -315,6 +348,7 @@ def _create_or_update_booking_from_pending_payment(request):
         package=package,
         adult_count=adult_count,
         child_count=child_count,
+        child_under_seven_count=child_under_seven_count,
         number_of_travelers=pricing['total_travelers'],
         total_price=total_price,
         status='confirmed'

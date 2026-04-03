@@ -59,11 +59,34 @@
             {% else %}
             <form method="post">
               {% csrf_token %}
-              <input type="hidden" name="adult_count" value="{{ adult_count }}">
-              <input type="hidden" name="child_count" value="{{ child_count }}">
               {% if capacity_request_id %}
               <input type="hidden" name="capacity_request_id" value="{{ capacity_request_id }}">
               {% endif %}
+
+              <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                  <label for="{{ traveler_form.adult_count.id_for_label }}" class="form-label">Adults</label>
+                  {{ traveler_form.adult_count }}
+                  {% for error in traveler_form.adult_count.errors %}
+                  <div class="text-danger small mt-1">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-md-6">
+                  <label for="{{ traveler_form.child_count.id_for_label }}" class="form-label">Children Age 7+</label>
+                  {{ traveler_form.child_count }}
+                  {% for error in traveler_form.child_count.errors %}
+                  <div class="text-danger small mt-1">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-md-6">
+                  <label for="{{ traveler_form.child_under_seven_count.id_for_label }}" class="form-label">Children Under 7</label>
+                  {{ traveler_form.child_under_seven_count }}
+                  {% for error in traveler_form.child_under_seven_count.errors %}
+                  <div class="text-danger small mt-1">{{ error }}</div>
+                  {% endfor %}
+                  <div class="small text-muted mt-1">Free of charge, but included in capacity.</div>
+                </div>
+              </div>
 
               <div class="summary-box p-3">
                 {% if approved_capacity_request %}
@@ -74,22 +97,27 @@
                 <div class="row g-3">
                   <div class="col-md-6">
                     <div class="small text-muted">Adults</div>
-                    <div class="fw-semibold">{{ adult_count }}</div>
+                    <div class="fw-semibold" id="checkoutAdultCount">{{ adult_count }}</div>
                     <div class="small text-muted mt-1">Rs. {{ adult_unit_price|floatformat:2 }} each</div>
                   </div>
                   <div class="col-md-6">
-                    <div class="small text-muted">Children</div>
-                    <div class="fw-semibold">{{ child_count }}</div>
+                    <div class="small text-muted">Children Age 7+</div>
+                    <div class="fw-semibold" id="checkoutChildCount">{{ child_count }}</div>
                     <div class="small text-muted mt-1">Rs. {{ child_unit_price|floatformat:2 }} each</div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="small text-muted">Children Under 7</div>
+                    <div class="fw-semibold" id="checkoutChildUnderSevenCount">{{ child_under_seven_count }}</div>
+                    <div class="small text-muted mt-1">Free</div>
                   </div>
                 </div>
                 <div class="d-flex justify-content-between mt-3 pt-3 border-top">
                   <span class="text-muted">Total travelers</span>
-                  <strong>{{ total_travelers }}</strong>
+                  <strong id="checkoutTotalTravelers">{{ total_travelers }}</strong>
                 </div>
                 <div class="d-flex justify-content-between">
                   <span class="text-muted">Estimated total</span>
-                  <strong>Rs. {{ amount|floatformat:2 }}</strong>
+                  <strong id="checkoutEstimatedTotal">Rs. {{ amount|floatformat:2 }}</strong>
                 </div>
               </div>
 
@@ -121,7 +149,7 @@
             {% if not sponsorship_package %}
             <div class="d-flex justify-content-between mb-2">
               <span class="text-muted">Travelers</span>
-              <span>{{ adult_count }} adult{{ adult_count|pluralize }}, {{ child_count }} child{{ child_count|pluralize }}</span>
+              <span id="sidebarTravelerSummary">{{ adult_count }} adult{{ adult_count|pluralize }}, {{ child_count }} child age 7+, {{ child_under_seven_count }} child under 7</span>
             </div>
             <div class="d-flex justify-content-between mb-2">
               <span class="text-muted">Adult price</span>
@@ -151,4 +179,64 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if not sponsorship_package %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const adultInput = document.getElementById('{{ traveler_form.adult_count.id_for_label }}');
+  const childInput = document.getElementById('{{ traveler_form.child_count.id_for_label }}');
+  const childUnderSevenInput = document.getElementById('{{ traveler_form.child_under_seven_count.id_for_label }}');
+  const adultCountEl = document.getElementById('checkoutAdultCount');
+  const childCountEl = document.getElementById('checkoutChildCount');
+  const childUnderSevenCountEl = document.getElementById('checkoutChildUnderSevenCount');
+  const totalTravelersEl = document.getElementById('checkoutTotalTravelers');
+  const estimatedTotalEl = document.getElementById('checkoutEstimatedTotal');
+  const sidebarTravelerSummaryEl = document.getElementById('sidebarTravelerSummary');
+  const sidebarTotalEl = document.getElementById('sidebarBookingTotal');
+  const adultUnitPrice = Number('{{ adult_unit_price }}');
+  const childUnitPrice = Number('{{ child_unit_price }}');
+
+  if (!adultInput || !childInput || !childUnderSevenInput) {
+    return;
+  }
+
+  function clamp(input, minimum) {
+    const parsed = Number(input.value || minimum);
+    input.value = Number.isNaN(parsed) ? minimum : Math.max(minimum, parsed);
+  }
+
+  function pluralize(value, singular, plural) {
+    return value === 1 ? singular : plural;
+  }
+
+  function updateSummary() {
+    clamp(adultInput, 1);
+    clamp(childInput, 0);
+    clamp(childUnderSevenInput, 0);
+
+    const adultCount = Number(adultInput.value);
+    const childCount = Number(childInput.value);
+    const childUnderSevenCount = Number(childUnderSevenInput.value);
+    const totalTravelers = adultCount + childCount + childUnderSevenCount;
+    const totalPrice = (adultCount * adultUnitPrice) + (childCount * childUnitPrice);
+    const formattedTotal = `Rs. ${totalPrice.toFixed(2)}`;
+
+    adultCountEl.textContent = adultCount;
+    childCountEl.textContent = childCount;
+    childUnderSevenCountEl.textContent = childUnderSevenCount;
+    totalTravelersEl.textContent = totalTravelers;
+    estimatedTotalEl.textContent = formattedTotal;
+    sidebarTotalEl.textContent = formattedTotal;
+    sidebarTravelerSummaryEl.textContent = `${adultCount} ${pluralize(adultCount, 'adult', 'adults')}, ${childCount} child age 7+, ${childUnderSevenCount} child under 7`;
+  }
+
+  adultInput.addEventListener('input', updateSummary);
+  childInput.addEventListener('input', updateSummary);
+  childUnderSevenInput.addEventListener('input', updateSummary);
+  updateSummary();
+});
+</script>
+{% endif %}
 {% endblock %}
