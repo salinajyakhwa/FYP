@@ -300,3 +300,50 @@ class VendorCapacityRequestReviewTests(TestCase):
         self.assertEqual(mail.outbox[0].to, [self.traveler.email])
         self.assertIn('approved', mail.outbox[0].subject.lower())
         self.assertIn(reverse('choose_payment', args=[self.package.id]), mail.outbox[0].body)
+
+
+class CustomItineraryConfirmationTests(TestCase):
+    def setUp(self):
+        self.traveler = User.objects.create_user(username='traveler_custom', password='pass12345')
+        self.vendor_user = User.objects.create_user(username='vendor_custom', password='pass12345')
+        self.traveler_profile = UserProfile.objects.create(user=self.traveler, role='traveler')
+        self.vendor_profile = UserProfile.objects.create(user=self.vendor_user, role='vendor')
+        self.vendor = Vendor.objects.create(
+            user_profile=self.vendor_profile,
+            name='Custom Vendor',
+            description='Vendor description',
+            status='approved',
+        )
+        self.package = TravelPackage.objects.create(
+            vendor=self.vendor,
+            name='Custom Package',
+            description='Package description',
+            location='Nepal',
+            travel_type='Tour',
+            price=Decimal('1000.00'),
+            max_travelers=10,
+            start_date=timezone.now().date() + timedelta(days=10),
+            end_date=timezone.now().date() + timedelta(days=15),
+        )
+        self.day_one = self.package.package_days.create(day_number=1, title='Arrival', description='Day one')
+        self.option_one = self.day_one.options.create(
+            option_type='flight',
+            title='Morning Flight',
+            description='Flight option',
+            additional_cost=Decimal('150.00'),
+        )
+
+    def test_custom_booking_confirmation_creates_custom_itinerary(self):
+        self.client.login(username='traveler_custom', password='pass12345')
+
+        response = self.client.post(
+            reverse('custom_booking_confirmation', args=[self.package.id]),
+            {f'day_{self.day_one.id}': str(self.option_one.id)},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        custom_itinerary = self.traveler.custom_itineraries.get(package=self.package)
+        self.assertEqual(custom_itinerary.final_price, Decimal('1150.00'))
+        self.assertEqual(custom_itinerary.selections.count(), 1)
+        self.assertContains(response, 'Customization Confirmation')
