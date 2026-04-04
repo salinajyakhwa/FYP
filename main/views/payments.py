@@ -426,10 +426,6 @@ def create_checkout_session(request, package_id):
     if request.method != 'POST':
         return redirect('choose_payment', package_id=package.id)
 
-    custom_itinerary_id = request.POST.get('custom_itinerary_id')
-    if custom_itinerary_id:
-        return create_custom_itinerary_checkout_session(request, custom_itinerary_id)
-
     traveler_form = BookingTravelerForm(request.POST)
     if not traveler_form.is_valid():
         return render(

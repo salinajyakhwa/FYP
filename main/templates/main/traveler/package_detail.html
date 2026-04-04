@@ -15,35 +15,6 @@
         max-width: 76px;
         text-align: center;
     }
-
-    .customizer-day-card {
-        border: 1px solid #e9ecef;
-        border-radius: 16px;
-        background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
-    }
-
-    .customizer-option-chip {
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid #dfe6ee;
-        border-radius: 999px;
-        padding: 0.35rem 0.7rem;
-        font-size: 0.8rem;
-        color: #495057;
-        background: #fff;
-        margin: 0 0.5rem 0.5rem 0;
-    }
-
-    .customizer-summary-list > div + div {
-        border-top: 1px solid #eef1f4;
-        padding-top: 0.75rem;
-        margin-top: 0.75rem;
-    }
-
-    .customizer-select {
-        min-height: 48px;
-        border-radius: 12px;
-    }
 </style>
 {% endblock %}
 
@@ -51,6 +22,11 @@
 <div class="container py-5">
     <div class="row g-4">
         <div class="col-lg-8">
+            {% if customization_form %}
+            <form method="post" id="customization-form">
+                {% csrf_token %}
+            {% endif %}
+
             <div class="card border-0 shadow-sm overflow-hidden">
                 {% if package.image %}
                 <img src="{{ package.image.url }}" alt="{{ package.name }}" class="img-fluid" style="max-height: 420px; object-fit: cover;">
@@ -66,7 +42,7 @@
                             <h1 class="h2 mb-1">{{ package.name }}</h1>
                             <p class="text-muted mb-0">Offered by {{ package.vendor.name }}</p>
                         </div>
-                        <span class="badge bg-primary fs-6">From Rs. {{ package.price }}</span>
+                        <span class="badge bg-primary fs-6">Rs. {{ package.price }}</span>
                     </div>
 
                     <div class="row g-3 mb-4">
@@ -93,43 +69,80 @@
                     <h2 class="h5 mb-3">Overview</h2>
                     <p class="mb-4">{{ package.description }}</p>
 
-                    <h2 class="h5 mb-3">Customize By Day</h2>
+                    <h2 class="h5 mb-3">Itinerary</h2>
                     {% if itinerary_items %}
                     <div class="d-grid gap-3">
                         {% for item in itinerary_items %}
-                        <div class="customizer-day-card p-3">
-                            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-                                <div>
-                                    <div class="small text-muted">Day {{ item.day }}</div>
-                                    <div class="fw-semibold">{{ item.title }}</div>
-                                </div>
-                                {% if item.required %}
-                                <span class="badge text-bg-dark">Required</span>
+                        <div class="border rounded p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Day {{ item.day }}</strong>
+                                <span class="badge text-bg-light">{{ item.activity_label }}</span>
+                            </div>
+                            <div class="fw-semibold mb-1">{{ item.title }}</div>
+                            <p class="mb-2">{{ item.description }}</p>
+                            {% if item.options %}
+                            <div class="small text-muted mb-1">
+                                {% if item.selection_field %}
+                                Choose one option
+                                {% else %}
+                                Available options
                                 {% endif %}
                             </div>
-                            <p class="mb-3 text-muted">{{ item.description }}</p>
-                            {% for group in item.option_groups %}
-                            <div class="mb-2">
-                                <div class="small text-uppercase text-muted fw-semibold mb-2">{{ group.label }}</div>
-                                <div>
-                                    {% for option in group.options %}
-                                    <span class="customizer-option-chip">
-                                        {{ option.title }} · Rs. {{ option.additional_cost }}
-                                    </span>
-                                    {% endfor %}
+                            <div class="d-grid gap-2 mb-2">
+                                {% for option in item.options %}
+                                <div class="bg-light rounded p-2">
+                                    {% if item.selection_field %}
+                                    <label class="d-flex justify-content-between align-items-start gap-3 mb-0">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <input
+                                                class="form-check-input mt-1"
+                                                type="radio"
+                                                name="{{ item.selection_field.name }}"
+                                                value="{{ option.id }}"
+                                                {% if item.selection_field.value == option.id|stringformat:"s" %}checked{% endif %}
+                                                {% if item.selection_field.field.required %}required{% endif %}
+                                            >
+                                            <div>
+                                                <strong>{{ option.title }}</strong>
+                                                <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                                {% if option.description %}
+                                                <div class="small mt-1">{{ option.description }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="fw-semibold">Rs. {{ option.additional_cost }}</div>
+                                    </label>
+                                    {% else %}
+                                    <div class="d-flex justify-content-between align-items-center gap-3">
+                                        <div>
+                                            <strong>{{ option.title }}</strong>
+                                            <div class="small text-muted">{{ option.get_option_type_display }}{% if option.is_required %} · Required{% else %} · Optional{% endif %}</div>
+                                        </div>
+                                        <div class="fw-semibold">Rs. {{ option.additional_cost }}</div>
+                                    </div>
+                                    {% if option.description %}
+                                    <div class="small mt-1">{{ option.description }}</div>
+                                    {% endif %}
+                                    {% endif %}
                                 </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
                             {% if item.selection_field and item.selection_field.errors %}
                             {% for error in item.selection_field.errors %}
-                            <div class="text-danger small mt-2">{{ error }}</div>
+                            <div class="text-danger small mb-2">{{ error }}</div>
                             {% endfor %}
+                            {% endif %}
+                            {% endif %}
+                            {% if item.inclusions %}
+                            <div class="small text-muted">
+                                Inclusions: {{ item.inclusions|join:", " }}
+                            </div>
                             {% endif %}
                         </div>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="alert alert-secondary mb-0">
+                    <div class="alert alert-secondary mb-4">
                         Detailed itinerary has not been added yet.
                     </div>
                     {% endif %}
@@ -175,161 +188,142 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if customization_form %}
+            </form>
+            {% endif %}
         </div>
 
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm sticky-top" style="top: 100px;">
                 <div class="card-body p-4">
-                    <h2 class="h5 mb-3">Plan Your Trip</h2>
+                    <h2 class="h5 mb-3">Booking</h2>
                     {% if is_vendor_owner and customization_form %}
                     <p class="text-muted mb-3">Vendor test mode: preview the customer-facing customization flow here, or open itinerary management to edit days and options.</p>
                     {% elif customization_form %}
-                    <p class="text-muted mb-3">Pick one option for each day, preview the total, then continue to confirmation before payment.</p>
+                    <p class="text-muted mb-3">Choose one option for each required day to preview your custom itinerary total.</p>
                     {% elif is_vendor_owner %}
-                    <p class="text-muted mb-3">This package does not have configurable day options yet. Add itinerary options first.</p>
+                    <p class="text-muted mb-3">This package does not have day-by-day options yet. Add itinerary days and options first, then you can test customization here.</p>
                     {% else %}
-                    <p class="text-muted mb-3">This package currently uses the standard booking flow without day-level customization.</p>
+                    <p class="text-muted mb-3">Current booking flow uses the base package price. Day-by-day customization will be added next.</p>
                     {% endif %}
 
-                    {% if customization_form %}
-                    <form method="post" id="customization-form" action="{% url 'package_detail' package.id %}">
-                        {% csrf_token %}
-                        <div class="d-grid gap-3 mb-4">
-                            {% for item in itinerary_items %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Base Price</span>
+                        <strong>Rs. {{ package.price }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span>Customization</span>
+                        <span class="{% if customization_form %}fw-semibold{% else %}text-muted{% endif %}">
+                            {% if customization_form %}Rs. {{ customization_extra_cost }}{% else %}Coming soon{% endif %}
+                        </span>
+                    </div>
+
+                    {% if selected_options_summary %}
+                    <div class="border rounded p-3 mb-4">
+                        <div class="small text-muted mb-2">Selected options</div>
+                        <div class="d-grid gap-2">
+                            {% for selection in selected_options_summary %}
                             <div>
-                                <label for="{{ item.selection_field.id_for_label }}" class="form-label fw-semibold small">
-                                    Day {{ item.day }}: {{ item.title }}
-                                </label>
-                                <select
-                                    id="{{ item.selection_field.id_for_label }}"
-                                    name="{{ item.selection_field.name }}"
-                                    class="form-select customizer-select js-day-option-select"
-                                    data-day-label="Day {{ item.day }}: {{ item.title }}"
-                                    {% if item.required %}required{% endif %}
-                                >
-                                    <option value="">Select an option</option>
-                                    {% for group in item.option_groups %}
-                                    <optgroup label="{{ group.label }}">
-                                        {% for option in group.options %}
-                                        <option
-                                            value="{{ option.id }}"
-                                            data-price="{{ option.additional_cost }}"
-                                            data-type="{{ option.get_option_type_display }}"
-                                            data-description="{{ option.description|default:'' }}"
-                                            {% if item.selected_option_id == option.id|stringformat:"s" %}selected{% endif %}
-                                        >
-                                            {{ option.title }} (+Rs. {{ option.additional_cost }})
-                                        </option>
-                                        {% endfor %}
-                                    </optgroup>
-                                    {% endfor %}
-                                </select>
-                                {% if item.selection_field and item.selection_field.errors %}
-                                {% for error in item.selection_field.errors %}
-                                <div class="text-danger small mt-1">{{ error }}</div>
-                                {% endfor %}
-                                {% endif %}
+                                <div class="small fw-semibold">Day {{ selection.day_number }}: {{ selection.day_title }}</div>
+                                <div class="small text-muted">{{ selection.option_title }} · {{ selection.option_type }} · +Rs. {{ selection.additional_cost }}</div>
                             </div>
                             {% endfor %}
                         </div>
+                    </div>
+                    {% endif %}
 
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Base Price</span>
-                            <strong>Rs. {{ package.price|floatformat:2 }}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Customization</span>
-                            <strong id="customization-extra-display">Rs. {{ customization_extra_cost|floatformat:2 }}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between border-top pt-3 mb-3">
-                            <span>Total</span>
-                            <strong id="customization-total-display">Rs. {{ customization_total|floatformat:2 }}</strong>
-                        </div>
+                    <div class="d-flex justify-content-between mb-4">
+                        <span>Total</span>
+                        <strong>Rs. {{ customization_total }}</strong>
+                    </div>
 
-                        <div class="border rounded p-3 mb-4">
-                            <div class="small text-muted mb-2">Live Selection Summary</div>
-                            <div id="customization-live-summary" class="customizer-summary-list small text-muted">
-                                {% if selected_options_summary %}
-                                {% for selection in selected_options_summary %}
-                                <div>
-                                    <div class="fw-semibold text-dark">Day {{ selection.day_number }}: {{ selection.day_title }}</div>
-                                    <div>{{ selection.option_title }} · {{ selection.option_type }} · +Rs. {{ selection.additional_cost }}</div>
-                                </div>
-                                {% endfor %}
-                                {% else %}
-                                <div>No day options selected yet.</div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <button type="submit" name="preview_customization" value="1" class="btn btn-primary">Preview Custom Total</button>
-                            {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
-                            <button
-                                type="submit"
-                                formaction="{% url 'custom_booking_confirmation' package.id %}"
-                                class="btn btn-outline-primary"
-                            >
-                                Continue to Confirmation
-                            </button>
-                            {% elif not user.is_authenticated %}
-                            <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-outline-primary">Log In to Continue</a>
-                            {% endif %}
-                        </div>
-                    </form>
-                    {% elif is_vendor_owner %}
-                    <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-primary w-100">Add Itinerary Options</a>
-                    {% elif user.is_authenticated %}
-                    {% if user.userprofile.role == 'traveler' %}
-                    <form action="{% url 'start_package_booking' package.id %}" method="get" id="package-traveler-form" class="border rounded p-3 mb-3">
+                    {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
+                    <div class="border rounded p-3 mb-4">
                         <div class="fw-semibold mb-1">Travelers</div>
                         <div class="small text-muted mb-3">Choose your group size before payment.</div>
                         <div class="d-flex justify-content-between small mb-3">
                             <span class="text-muted">Capacity</span>
                             <strong>{{ capacity_summary.booked_travelers }}/{{ capacity_summary.max_travelers }} booked · {{ capacity_summary.remaining_capacity }} left</strong>
                         </div>
-                        <div class="mb-3">
-                            <label for="package-adult-count" class="form-label small text-muted">Adults</label>
-                            <div class="traveler-mini-stepper">
-                                <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-adult-count" data-change="-1">-</button>
-                                <input type="number" id="package-adult-count" name="adult_count" class="form-control" min="1" value="1">
-                                <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-adult-count" data-change="1">+</button>
+                        <form action="{% url 'start_package_booking' package.id %}" method="get" id="package-traveler-form">
+                            <div class="mb-3">
+                                <label for="package-adult-count" class="form-label small text-muted">Adults</label>
+                                <div class="traveler-mini-stepper">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-adult-count" data-change="-1">-</button>
+                                    <input type="number" id="package-adult-count" name="adult_count" class="form-control" min="1" value="1">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-adult-count" data-change="1">+</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="package-child-count" class="form-label small text-muted">Children Age 7+</label>
-                            <div class="traveler-mini-stepper">
-                                <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="-1">-</button>
-                                <input type="number" id="package-child-count" name="child_count" class="form-control" min="0" value="0">
-                                <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="1">+</button>
+                            <div class="mb-3">
+                                <label for="package-child-count" class="form-label small text-muted">Children Age 7+</label>
+                                <div class="traveler-mini-stepper">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="-1">-</button>
+                                    <input type="number" id="package-child-count" name="child_count" class="form-control" min="0" value="0">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-count" data-change="1">+</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="package-child-under-seven-count" class="form-label small text-muted">Children Under 7</label>
-                            <div class="traveler-mini-stepper">
-                                <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-under-seven-count" data-change="-1">-</button>
-                                <input type="number" id="package-child-under-seven-count" name="child_under_seven_count" class="form-control" min="0" value="0">
-                                <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-under-seven-count" data-change="1">+</button>
+                            <div class="mb-3">
+                                <label for="package-child-under-seven-count" class="form-label small text-muted">Children Under 7</label>
+                                <div class="traveler-mini-stepper">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-under-seven-count" data-change="-1">-</button>
+                                    <input type="number" id="package-child-under-seven-count" name="child_under_seven_count" class="form-control" min="0" value="0">
+                                    <button type="button" class="btn btn-outline-secondary traveler-adjust" data-target="package-child-under-seven-count" data-change="1">+</button>
+                                </div>
+                                <div class="small text-muted mt-1">Children under 7 travel free but still count toward capacity.</div>
                             </div>
-                            <div class="small text-muted mt-1">Children under 7 travel free but still count toward capacity.</div>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Proceed to Payment</button>
-                    </form>
-                    {% endif %}
-                    {% else %}
-                    <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-primary w-100">Log In to Book</a>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Current price per paying traveler</span>
+                                <strong>Rs. <span id="packagePerTravelerPrice">{{ customization_total|floatformat:2 }}</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Estimated package total</span>
+                                <strong id="packageTravelerEstimate">Rs. {{ customization_total|floatformat:2 }}</strong>
+                            </div>
+                            <div class="small text-muted mt-3">If your selected group exceeds the remaining capacity, your request will be sent to the vendor first.</div>
+                            <button type="submit" class="btn btn-primary w-100 mt-3">Proceed to Payment</button>
+                        </form>
+                    </div>
                     {% endif %}
 
                     {% if user.is_authenticated and user.userprofile.role == 'traveler' %}
-                    <div class="mt-3">
+                    <div class="mb-3">
                         <a href="{% url 'chat_thread_open' package.id %}" class="btn btn-outline-secondary w-100">Chat with Vendor</a>
                     </div>
                     {% endif %}
 
                     {% if is_vendor_owner %}
-                    <div class="mt-3">
+                    <div class="mb-3">
                         <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-outline-secondary w-100">Manage Itinerary</a>
                     </div>
+                    {% endif %}
+
+                    {% if customization_form %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" form="customization-form" formmethod="post" name="preview_customization" value="1" class="btn btn-primary">Preview Custom Total</button>
+                        {% if user.is_authenticated %}
+                        <button type="submit" form="customization-form" formmethod="post" name="save_customization" value="1" class="btn btn-outline-primary">
+                            {% if is_vendor_owner %}Save Test Custom Itinerary{% else %}Save Custom Itinerary{% endif %}
+                        </button>
+                        {% else %}
+                        <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-outline-primary">Log In to Save</a>
+                        {% endif %}
+                    </div>
+                    <div class="small text-muted mt-2">
+                        {% if is_vendor_owner %}
+                        This lets you test the customization flow on your own package from the public package page.
+                        {% else %}
+                        Payment still uses the base package flow. Checkout integration for saved custom itineraries is the next step.
+                        {% endif %}
+                    </div>
+                    {% elif is_vendor_owner %}
+                    <a href="{% url 'manage_itinerary' package.id %}" class="btn btn-primary w-100">Add Itinerary Options</a>
+                    {% elif user.is_authenticated %}
+                    {% if user.userprofile.role != 'traveler' %}
+                    <a href="{% url 'choose_payment' package.id %}" class="btn btn-primary w-100">Book Now</a>
+                    {% endif %}
+                    {% else %}
+                    <a href="{% url 'login' %}?next={% url 'package_detail' package.id %}" class="btn btn-primary w-100">Log In to Book</a>
                     {% endif %}
                 </div>
             </div>
@@ -341,59 +335,27 @@
 {% block scripts %}
 <script>
     (function () {
-        const basePrice = Number('{{ package.price }}');
-        const customSelects = Array.from(document.querySelectorAll('.js-day-option-select'));
-        const summaryContainer = document.getElementById('customization-live-summary');
-        const extraDisplay = document.getElementById('customization-extra-display');
-        const totalDisplay = document.getElementById('customization-total-display');
-
-        function formatCurrency(value) {
-            return `Rs. ${Number(value).toFixed(2)}`;
-        }
-
-        function updateCustomizationSummary() {
-            if (!customSelects.length || !summaryContainer || !extraDisplay || !totalDisplay) {
-                return;
-            }
-
-            let extraTotal = 0;
-            const rows = [];
-
-            customSelects.forEach((select) => {
-                const selectedOption = select.options[select.selectedIndex];
-                const value = selectedOption ? selectedOption.value : '';
-                if (!value) {
-                    return;
-                }
-
-                const optionPrice = Number(selectedOption.dataset.price || 0);
-                const optionType = selectedOption.dataset.type || '';
-                extraTotal += optionPrice;
-                rows.push(
-                    `<div><div class="fw-semibold text-dark">${select.dataset.dayLabel}</div><div>${selectedOption.text} · ${optionType}</div></div>`
-                );
-            });
-
-            extraDisplay.textContent = formatCurrency(extraTotal);
-            totalDisplay.textContent = formatCurrency(basePrice + extraTotal);
-            summaryContainer.innerHTML = rows.length ? rows.join('') : '<div>No day options selected yet.</div>';
-        }
-
-        customSelects.forEach((select) => {
-            select.addEventListener('change', updateCustomizationSummary);
-        });
-        updateCustomizationSummary();
-
         const adultInput = document.getElementById('package-adult-count');
         const childInput = document.getElementById('package-child-count');
         const childUnderSevenInput = document.getElementById('package-child-under-seven-count');
+        const estimateEl = document.getElementById('packageTravelerEstimate');
+        const unitPrice = Number('{{ customization_total }}');
+
+        if (!adultInput || !childInput || !childUnderSevenInput || !estimateEl) {
+            return;
+        }
 
         function clampValue(input, minValue) {
-            if (!input) {
-                return;
-            }
             const parsed = Number(input.value || minValue);
             input.value = Number.isNaN(parsed) ? minValue : Math.max(parsed, minValue);
+        }
+
+        function updateEstimate() {
+            clampValue(adultInput, 1);
+            clampValue(childInput, 0);
+            clampValue(childUnderSevenInput, 0);
+            const payableTravelers = Number(adultInput.value) + Number(childInput.value);
+            estimateEl.textContent = `Rs. ${(payableTravelers * unitPrice).toFixed(2)}`;
         }
 
         document.querySelectorAll('.traveler-adjust').forEach((button) => {
@@ -403,17 +365,14 @@
                 const minValue = Number(input.getAttribute('min') || 0);
                 const nextValue = Math.max(minValue, Number(input.value || minValue) + change);
                 input.value = nextValue;
+                updateEstimate();
             });
         });
 
-        [adultInput, childInput, childUnderSevenInput].forEach((input, index) => {
-            if (!input) {
-                return;
-            }
-            input.addEventListener('input', function () {
-                clampValue(input, index === 0 ? 1 : 0);
-            });
-        });
+        adultInput.addEventListener('input', updateEstimate);
+        childInput.addEventListener('input', updateEstimate);
+        childUnderSevenInput.addEventListener('input', updateEstimate);
+        updateEstimate();
     }());
 </script>
 {% endblock %}

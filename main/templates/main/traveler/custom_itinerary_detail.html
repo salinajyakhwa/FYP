@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Customization Confirmation{% endblock %}
+{% block title %}Custom Itinerary{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -8,7 +8,7 @@
         <div class="col-lg-9">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h1 class="h4 mb-0">Customization Confirmation</h1>
+                    <h1 class="h4 mb-0">Custom Itinerary</h1>
                 </div>
                 <div class="card-body p-4">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
@@ -42,12 +42,6 @@
                             </div>
                         </div>
                     </div>
-
-                    {% if not custom_itinerary.booking %}
-                    <div class="alert alert-info mb-4">
-                        Review your selected day-by-day options below, then continue to payment to finalize the booking.
-                    </div>
-                    {% endif %}
 
                     <h3 class="h6 mb-3">Selections</h3>
                     <div class="d-grid gap-3 mb-4">

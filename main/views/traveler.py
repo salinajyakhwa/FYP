@@ -53,14 +53,6 @@ from ..services.trips import (
 )
 
 
-OPTION_GROUP_LABELS = {
-    'transport': 'Transportation',
-    'stay': 'Stay',
-    'activity': 'Activity',
-    'other': 'Other',
-}
-
-
 def _user_can_review_package(user, package):
     return Booking.objects.filter(
         user=user,
@@ -68,81 +60,6 @@ def _user_can_review_package(user, package):
         status__in=['confirmed', 'trip_completed'],
         package__end_date__lt=timezone.now().date(),
     ).exists()
-
-
-def _get_option_group_key(option):
-    if option.option_type in {'flight', 'road', 'rail', 'water'}:
-        return 'transport'
-    if option.option_type == 'stay':
-        return 'stay'
-    if option.option_type == 'activity':
-        return 'activity'
-    return 'other'
-
-
-def _build_package_customization_items(package, customization_form):
-    items = []
-
-    for package_day in package.package_days.prefetch_related('options').all():
-        field_name = f'day_{package_day.id}'
-        selection_field = customization_form[field_name] if field_name in customization_form.fields else None
-        options = list(package_day.options.all())
-        if not options:
-            continue
-
-        selected_option_id = None
-        if selection_field is not None:
-            selected_option_id = selection_field.value()
-
-        option_groups = []
-        grouped_options = {}
-        for option in options:
-            group_key = _get_option_group_key(option)
-            grouped_options.setdefault(group_key, []).append(option)
-
-        for group_key, group_options in grouped_options.items():
-            option_groups.append({
-                'key': group_key,
-                'label': OPTION_GROUP_LABELS[group_key],
-                'options': group_options,
-            })
-
-        items.append({
-            'id': package_day.id,
-            'day': package_day.day_number,
-            'title': package_day.title,
-            'description': package_day.description,
-            'selection_field': selection_field,
-            'selected_option_id': str(selected_option_id) if selected_option_id is not None else '',
-            'option_groups': option_groups,
-            'required': selection_field.field.required if selection_field is not None else False,
-        })
-
-    return items
-
-
-def _create_custom_itinerary_from_form(*, user, package, customization_form, final_price):
-    selected_options = customization_form.get_selected_options()
-
-    with transaction.atomic():
-        custom_itinerary = CustomItinerary.objects.create(
-            user=user,
-            package=package,
-            base_price=package.price,
-            final_price=final_price,
-            status='submitted',
-        )
-        CustomItinerarySelection.objects.bulk_create([
-            CustomItinerarySelection(
-                custom_itinerary=custom_itinerary,
-                package_day=package_day,
-                selected_option=selected_option,
-                selected_price=selected_option.additional_cost,
-            )
-            for package_day, selected_option in selected_options
-        ])
-
-    return custom_itinerary, selected_options
 
 
 @login_required
@@ -249,28 +166,66 @@ def package_detail(request, package_id):
     )
     package_days = package.package_days.prefetch_related('options').all()
     capacity_summary = get_package_capacity_summary(package)
-    customization_form = None
+    customization_form = CustomItinerarySelectionForm(package=package) if package_days.exists() else None
     selected_options_summary = []
     customization_extra_cost = Decimal('0.00')
     customization_total = Decimal(package.price)
 
     if package_days.exists():
-        customization_form = (
-            CustomItinerarySelectionForm(request.POST, package=package)
-            if request.method == 'POST' and 'preview_customization' in request.POST
-            else CustomItinerarySelectionForm(package=package)
-        )
-
-        if request.method == 'POST' and 'preview_customization' in request.POST:
+        if request.method == 'POST' and (
+            'preview_customization' in request.POST or 'save_customization' in request.POST
+        ):
+            customization_form = CustomItinerarySelectionForm(request.POST, package=package)
             if customization_form.is_valid():
                 selected_options = customization_form.get_selected_options()
                 customization_total = customization_form.calculate_total(package.price)
                 customization_extra_cost = customization_total - Decimal(package.price)
                 selected_options_summary = _build_selected_options_summary(selected_options)
-            else:
-                messages.error(request, 'Please complete the required customization selections.')
 
-        itinerary_items = _build_package_customization_items(package, customization_form)
+                if 'save_customization' in request.POST:
+                    if not request.user.is_authenticated:
+                        messages.info(request, 'Log in to save a custom itinerary.')
+                        return redirect(f"{reverse('login')}?next={request.path}")
+
+                    with transaction.atomic():
+                        custom_itinerary = CustomItinerary.objects.create(
+                            user=request.user,
+                            package=package,
+                            base_price=package.price,
+                            final_price=customization_total,
+                            status='submitted',
+                        )
+                        CustomItinerarySelection.objects.bulk_create([
+                            CustomItinerarySelection(
+                                custom_itinerary=custom_itinerary,
+                                package_day=package_day,
+                                selected_option=selected_option,
+                                selected_price=selected_option.additional_cost,
+                            )
+                            for package_day, selected_option in selected_options
+                        ])
+
+                    _notify_custom_itinerary_saved(custom_itinerary)
+                    messages.success(request, 'Custom itinerary saved successfully.')
+                    return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
+
+        for package_day in package_days:
+            selection_field = None
+            if customization_form is not None:
+                field_name = f'day_{package_day.id}'
+                if field_name in customization_form.fields:
+                    selection_field = customization_form[field_name]
+
+            itinerary_items.append({
+                'id': package_day.id,
+                'day': package_day.day_number,
+                'title': package_day.title,
+                'description': package_day.description,
+                'activity_label': 'Day Plan',
+                'inclusions': [],
+                'options': list(package_day.options.all()),
+                'selection_field': selection_field,
+            })
     else:
         activity_labels = dict(ItineraryDayForm.ACTIVITY_CHOICES)
         raw_itinerary_items = package.itinerary if isinstance(package.itinerary, list) else []
@@ -547,45 +502,6 @@ def booking_confirmation(request, booking_id):
         'selection_groups': _group_booking_selection_items(selection_items),
         'operation_record': getattr(booking, 'operations', None),
     })
-
-
-@login_required
-def custom_booking_confirmation(request, package_id):
-    if request.method != 'POST':
-        return HttpResponseBadRequest('POST request required.')
-
-    package = get_object_or_404(TravelPackage, pk=package_id, moderation_status='approved')
-    profile = getattr(request.user, 'userprofile', None)
-    if not profile or profile.role != 'traveler':
-        raise PermissionDenied
-
-    customization_form = CustomItinerarySelectionForm(request.POST, package=package)
-    if not customization_form.is_valid():
-        messages.error(request, 'Please complete the required customization selections.')
-        return render(request, 'main/traveler/package_detail.html', {
-            'package': package,
-            'reviews': Review.objects.filter(package=package).order_by('-created_at'),
-            'user_can_review': _user_can_review_package(request.user, package) and not Review.objects.filter(user=request.user, package=package).exists(),
-            'review_form': ReviewForm(),
-            'itinerary_items': _build_package_customization_items(package, customization_form),
-            'customization_form': customization_form,
-            'selected_options_summary': [],
-            'customization_extra_cost': Decimal('0.00'),
-            'customization_total': Decimal(package.price),
-            'is_vendor_owner': False,
-            'capacity_summary': get_package_capacity_summary(package),
-        })
-
-    customization_total = customization_form.calculate_total(package.price)
-    custom_itinerary, selected_options = _create_custom_itinerary_from_form(
-        user=request.user,
-        package=package,
-        customization_form=customization_form,
-        final_price=customization_total,
-    )
-    _notify_custom_itinerary_saved(custom_itinerary)
-    messages.success(request, 'Your customized itinerary is ready for confirmation.')
-    return redirect('custom_itinerary_detail', custom_itinerary_id=custom_itinerary.id)
 
 
 @login_required
